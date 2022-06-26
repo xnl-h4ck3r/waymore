@@ -1,11 +1,12 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About - v0.2
+## About - v0.3
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
 Anyone who does bug bounty will have likely used the amazing [waybackurls](https://github.com/tomnomnom/waybackurls) by @TomNomNoms. This tool gets URLs from [web.archive.org](https://web.archive.org) and additional links (if any) from one of the index collections on [index.commoncrawl.org](http://index.commoncrawl.org/).
 **Waymore** will get wayback machine links from the Wayback Machine (with filters and options to get what you need) in addition to checking **ALL** Common Crawl index collections if required.
+Also, **waymore** can get further additional links from Alien Vault OTX if required.
 
 👉 The biggest difference between **waymore** and other tools is that it can also **download the archived responses** for those URLs so that you can then search these for even more links, developer comments, extra parameters, etc. etc.
 
@@ -48,9 +49,9 @@ The input `-i` can either be a domain only, e.g. `redbull.com` or a specific dom
 
 There are different modes that can be run for waymore. The `-mode` argument can be 3 different value:
 
-- `U` - URLs will be retrieved from archive.org (and commoncrawl.org if `-xcc` is not passed)
+- `U` - URLs will be retrieved from archive.org, commoncrawl.org (if `-xcc` is not passed) and otx.alienvault.com (if `-xvv` is not passed)
 - `R` - Responses will be downloaded from archive.org
-- `B` - Both URLs and Responses will vbe retrieved
+- `B` - Both URLs and Responses will be retrieved
 
 If the input was a specific URL, e.g. `redbull.com/robots.txt` then the `-mode` defaults to `R`. Only responses will be downloaded. You cannot change the mode to `U` or `B` for a domain with path because it isn't necessary to retrieve URLs for a specific URL.
 
@@ -64,12 +65,14 @@ The `config.yml` file have filter values that can be updated to suit your needs.
 - `FILTER_MIME` - MIME Content-Type exclusions used to filter links and responses from web.archive.org through their API, e.g. `'text/css,image/jpeg`
 - `FILTER_URL` - Response code exclusions we will use to filter links and responses from web.archive.org through their API, e.g. `.css,.jpg`
 
+**NOTE: The MIME types cannot be filtered for Alien Vault results because they do not return that in the API response.**
+
 ## Output
 
 In the path of the `waymore.py` file, a `results` directory will be created. Within that, a directory will be created with target domain (or domain with path) passed with `-i`.
 When run, the following files are created in the target directory:
 
-- `waymore.txt` - If `-mode` is `U` or `B`, this file will contain links from archive.org. Also any additional links from commoncrawl.org if `-xcc` wasn't passed.
+- `waymore.txt` - If `-mode` is `U` or `B`, this file will contain links from archive.org. Also any additional links from commoncrawl.org (if `-xcc` wasn't passed) and otx.alienvault.com (if `-xav` wasn't passed).
 - `index.txt` - If `-mode` is `R` or `B`, and `-url-filname` was not passed then archived responses will be downloaded and hash values will be used for the saved file names. This file contains a comma separated list of `<hash>,<archive URL>,<timestamp>` in case you need to know which URLs produced which response.
 - `*.xnl` - These archived response files will be created if `-mode` was `R` or `B`. If `-url-filename` was passed the the file names will be the archive URL that generated the response, e.g. `https--example.com-robots.txt.xnl`, otherwise the file name will be a hash value, e.g. `7960113391501.xnl`. Using hash values mean that less files will be written as there will only be one file per unique response. These archived responses are edited, before being saved, to remove any reference to `web.archive.org`.
 
@@ -77,25 +80,25 @@ When run, the following files are created in the target directory:
 
 The number of links found, and then potentially the number of files archived responses you will download could potentially be **HUGE** for many domains. This tool isn't about speed, it's about finding more, so be patient.
 
-There is a `-p` option to increase the number of processes (used when getting from Common Crawl index collections, and downloading archived responses from archive.org). However, although it may not be as fast as you'd like, I would suggest leaving `-p` at the default of 3 because I personally found issues with getting responses with higher values. We don't want to cause these services any problems, so be sensible!
+There is a `-p` option to increase the number of processes (used when retrieving links from all sources, and downloading archived responses from archive.org). However, although it may not be as fast as you'd like, I would suggest leaving `-p` at the default of 3 because I personally found issues with getting responses with higher values. We don't want to cause these services any problems, so be sensible!
 
 I often use the `-f` option because I want `waymore.txt` to contain ALL possible links. Even though I don't care about images, fonts, etc. it could still be useful to see all possible paths and maybe parameters. Any filters will always be applied to downloading archived responses though. You don't want to waste time downloading thousands of images!
 
 Using the `-v` option can help see what is happening behind the scenes and could help you if you aren't getting the output you are expecting.
 
-All the MIME Content Types of URL's found (as returned by archive.org) will be displayed when `-v` is used. This may help to add further exclusions if you find you still get back things you don't want to see. It should be noted that sometimes the MIME type on archive.org is stored as `unk` and `unknown` instead of the real MIME so the filter won't necessarily remove it from their results. The `FILTER_URL` config settings can be used to remove these afterwards. For example, if a GIF has MIME type `unk` instead of `image/gif` (and that's in `FILTER_MIME`) then it won't get filtered, but if the url is `https://target.com/assets/logo.gif` and `.gif` is in `FILTER_URL` it won't get requested.
+All the MIME Content Types of URL's found (as returned by archive.org and commoncrawl.org) will be displayed when `-v` is used. This may help to add further exclusions if you find you still get back things you don't want to see. It should be noted that sometimes the MIME type on archive.org is stored as `unk` and `unknown` instead of the real MIME so the filter won't necessarily remove it from their results. The `FILTER_URL` config settings can be used to remove these afterwards. For example, if a GIF has MIME type `unk` instead of `image/gif` (and that's in `FILTER_MIME`) then it won't get filtered, but if the url is `https://target.com/assets/logo.gif` and `.gif` is in `FILTER_URL` it won't get requested.
 
 If `config.yml` doesn't exist, or the entries for filters, aren't in the file, then default filters are used. It's better to have the file and review these to ensure you are getting what you need.
 
 There can potentially be millions of responses so make sure you set filters, but also the Limit (`-l`), From Date (`-from`), To Date (`-to`) and/or Capture Interval (`-ci`) if you need to. The limit defaults to 5000, but say you wanted to get the latest 20,000 responses from 2015 up until January 2018... you would pass `-l -20000 -from 2015 -to 201801`. The Capture Interval determines how many responses will get downloaded for a particular URL within a specified period, e.g. if you set to `m` you will only get one response per month for a URL. The default `d` will likely greatly reduce the number of responses and unlikely to miss many unique responses unless a target changed something more than once in a given day.
 
-**The archive.org and commoncrawl.org servers aren't designed to cope with huge volumes, so be sensible and considerate about what you hit them with!**
+**The provider API servers aren't designed to cope with huge volumes, so be sensible and considerate about what you hit them with!**
 
 ## Some Basic Examples
 
 ### Example 1
 
-Just get the URLs from Wayback and Common Crawl for `redbull.com` (`-mode U` is just for URLs, so no responses are downloaded):
+Just get the URLs from all sources for `redbull.com` (`-mode U` is just for URLs, so no responses are downloaded):
 
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/example1.png"></center>
 
@@ -103,7 +106,7 @@ The URLs are saved in the same path as `waymore.py` under `results/redbull.com/w
 
 ### Example 2
 
-Get ALL the URLs from Wayback for `redbull.com` (no filters are applied with `-f`, and no URLs are retrieved from Commone Crawl because `-xcc` is passed).
+Get ALL the URLs from Wayback for `redbull.com` (no filters are applied with `-f`, and no URLs are retrieved from Commone Crawl because `-xcc` is passed, or from Alien Vault because `-xav` is passed).
 Save the FIRST 1000 responses that are found starting from 2015 (`-l 1000 -from 2015`):
 
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/example2.png"></center>
@@ -140,12 +143,13 @@ If you come across any problems at all, or have ideas for improvements, please f
 
 - Allow a file of domains (or domains with paths) to be passed with `-i` argument
 - Add an `-oss` argument that accepts a file of Out Of Scope subdomains/URLs that will not be returned in the output, or have any responses downloaded
-- Add otx.alientvault.com urlscan.io as sources for links (the same as gau). However, these can only be used if the `-f` option was selected because there is no way of filtering on those API's.
+- Add urlscan.io as source for links (the same as gau)
 
 ## References
 
 - [Wayback CDX Server API - BETA](https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server)
 - [Common Crawl Index Server](https://index.commoncrawl.org/)
+- [Alien Vault OTX API](https://otx.alienvault.com/assets/static/external_api.html)
 
 Good luck and good hunting!
 If you really love the tool (or any others), or they helped you find an awesome bounty, consider [BUYING ME A COFFEE!](https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
