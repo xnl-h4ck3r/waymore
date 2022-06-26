@@ -1,13 +1,13 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About
+## About - v0.2
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
 Anyone who does bug bounty will have likely used the amazing [waybackurls](https://github.com/tomnomnom/waybackurls) by @TomNomNoms. This tool gets URLs from [web.archive.org](https://web.archive.org) and additional links (if any) from one of the index collections on [index.commoncrawl.org](http://index.commoncrawl.org/).
 **Waymore** will get wayback machine links from the Wayback Machine (with filters and options to get what you need) in addition to checking **ALL** Common Crawl index collections if required.
 
-The biggest difference between **waymore** and other tools is that it can also **download the archived responses** for those URLs so that you can then search these for even more links, developer comments, extra parameters, etc. etc.
+👉 The biggest difference between **waymore** and other tools is that it can also **download the archived responses** for those URLs so that you can then search these for even more links, developer comments, extra parameters, etc. etc.
 
 👉 **PLEASE READ ALL OF THE INFORMATION ON THIS PAGE TO MAKE THE MOST OF THIS TOOL, AND ESPECIALLY BEFORE RAISING ANY ISSUES** 🤘
 
@@ -140,6 +140,7 @@ If you come across any problems at all, or have ideas for improvements, please f
 
 - Allow a file of domains (or domains with paths) to be passed with `-i` argument
 - Add an `-oss` argument that accepts a file of Out Of Scope subdomains/URLs that will not be returned in the output, or have any responses downloaded
+- Add otx.alientvault.com urlscan.io as sources for links (the same as gau). However, these can only be used if the `-f` option was selected because there is no way of filtering on those API's.
 
 ## References
 

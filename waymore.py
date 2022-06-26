@@ -4,8 +4,10 @@
 # Full help here: https://github.com/xnl-h4ck3r/waymore/blob/main/README.md
 # Good luck and good hunting! If you really love the tool (or any others), or they helped you find an awesome bounty, consider BUYING ME A COFFEE! (https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
 
+from ast import Pass
 import requests
-from requests.exceptions import ConnectionError, SSLError
+from requests.exceptions import ConnectionError
+from requests.utils import quote
 import argparse
 from signal import SIGINT, signal
 import multiprocessing.dummy as mp
@@ -26,6 +28,7 @@ successCount = 0
 failureCount = 0
 fileCount = 0
 totalResponses = 0
+totalPages = 0
 indexFile = None
 inputIsDomainANDPath = False
 subs = '*.'
@@ -33,8 +36,8 @@ path = ''
 waymorePath = ''
 SPACER = ' ' * 70
 
-WAYBACK_URL = 'http://web.archive.org/cdx/search/cdx?url={DOMAIN}&collapse={COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest'
-CCRAWL_INDEX_URL = 'http://index.commoncrawl.org/collinfo.json'
+WAYBACK_URL = 'https://web.archive.org/cdx/search/cdx?url={DOMAIN}&collapse={COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest'
+CCRAWL_INDEX_URL = 'https://index.commoncrawl.org/collinfo.json'
 
 USER_AGENT  = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246",
@@ -131,7 +134,7 @@ def showOptions():
             else:
                 print(colored('-n: ' +str(args.no_subs), 'magenta'), 'Sub domains are included in the search.')
                 
-            print(colored('-xcc: ' +str(args.xcc), 'magenta'), 'Whether to exclude checks to commoncrawl.org. Searching all their index collections can take a while, and often it may not return any extra URLs that weren\'t already found on archive.org')
+            print(colored('-xcc: ' +str(args.xcc), 'magenta'), 'Whether to exclude checks to commoncrawl.org. Searching all their index collections can take a while, and it may not return any extra URLs that weren\'t already found on archive.org')
             if not args.xcc:
                 if args.lcc == 0:
                     print(colored('-lcc: ' +str(args.lcc), 'magenta'), 'Search ALL Common Crawl index collections.')
@@ -523,12 +526,57 @@ def validateArgInput(x):
     if not match:
         raise argparse.ArgumentTypeError('Pass a domain only (with no schema) to search for all links, or pass a doamin and path (with no schema) to just get archived responses for that URL.')
     return x
+
+def processWayBackPage(url):
+    """
+    Get URLs from a specific page of archive.org CDX API for the input domain
+    """
+    global totalPages, linkMimes, linksFound
+    try:
+        try:             
+            # Choose a random user agent string to use for any requests
+            userAgent = random.choice(USER_AGENT)
+            page = url.split('page=')[1]
+            resp = requests.get(url, headers={"User-Agent":userAgent})  
+        except ConnectionError as ce:
+            print(colored('[ ERR ] archive.org connection error for page ' + page, 'red'),SPACER)
+            resp = None
+            return
+        except Exception as e:
+            print(colored('[ ERR ] Error getting response for page' + page + ' - ' + str(e),'red'),SPACER)
+            resp = None
+            return
+        finally:
+            try:
+                if resp is not None:
+                    # If the response from archive.org is empty then skip
+                    if resp.text == '' and totalPages == 0:
+                        if verbose():
+                            print(colored('[ ERR ] '+url+' gave an empty response.','red'))
+                        return
+                    # If a status other than 200, then stop
+                    if resp.status_code != 200:
+                        if verbose():
+                            print(colored('[ '+str(resp.status_code)+' ] Error for '+url,'red'))
+                        return
+            except:
+                pass
+        
+        # Get the URLs and MIME types
+        for line in resp.iter_lines():
+            linkMimes.add(str(line).split(' ')[2])
+            foundUrl = fixArchiveOrgUrl(str(line).split(' ')[1])
+            linksFound.add(foundUrl)
+  
+    except Exception as e:
+        if verbose():
+            print(colored("ERROR processWayBackPage 1: " + str(e), "red"))
     
 def getWaybackUrls():
     """
     Get URLs from the Wayback Machine, archive.org
     """
-    global linksFound, waymorePath, subs, path, stopProgram
+    global linksFound, linkMimes, waymorePath, subs, path, stopProgram, totalPages
     
     # Write the file of URL's for the passed domain/URL
     try:
@@ -536,57 +584,40 @@ def getWaybackUrls():
         filterCode = '&filter=!statuscode:' + FILTER_CODE
         
         if args.filter_responses_only:
-            url = WAYBACK_URL.replace('{DOMAIN}',subs + args.input + path).replace('{COLLAPSE}','')
+            url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(args.input) + path).replace('{COLLAPSE}','')+'&page='
         else:
-            url = WAYBACK_URL.replace('{DOMAIN}',subs + args.input + path).replace('{COLLAPSE}','') + filterMIME + filterCode
+            url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(args.input) + path).replace('{COLLAPSE}','') + filterMIME + filterCode + '&page='
+        
+        # Get the number of pages (i.e. separate requests) that are going to be made to archive.org
+        totalPages = 0
+        try:
+            print(colored('\rGetting the number of archive.org pages to search...','cyan'), end='\r')
+            # Choose a random user agent string to use for any requests
+            userAgent = random.choice(USER_AGENT)
+            resp = requests.get(url+'&showNumPages=True', headers={"User-Agent":userAgent}) 
+            totalPages = int(resp.text.strip())
+        except Exception as e:
+            print(colored('[ ERR ] unable to get links from archive.org: ' + str(e), 'red'),SPACER)
+            return
         
         if verbose():
             print(colored('The archive URL requested to get links:','magenta'), url+'\n')
-        
-        print(colored('\rGetting links from archive.org (this can take a while for some domains)...','cyan'), end='\r')
-                
-        try:
-            # Choose a random user agent string to use for any requests
-            success = True
-            userAgent = random.choice(USER_AGENT)
-            resp = requests.get(url, stream=True, headers={"User-Agent":userAgent})  
-        except ConnectionError as ce:
-            print(colored('[ ERR ] archive.org connection error', 'red'),SPACER)
-            resp = None
-            success = False
-            return
-        except Exception as e:
-            print(colored('[ ERR ] Error getting response - ' + str(e),'red'),SPACER)
-            resp = None
-            success = False
-            return
-        finally:
-            try:
-                if resp is not None:
-                    # If the response from archive.org is empty then stop
-                    if resp.text == '':
-                        if verbose():
-                            print(colored('[ ERR ] '+url+' gave an empty response.','red'))
-                        success = False
-                    # If a status other than 200, then stop
-                    if resp.status_code != 200:
-                        if verbose():
-                            print(colored('[ '+str(resp.status_code)+' ] Error for '+url,'red'))
-                        success = False
-                if not success:
-                    print(colored('Failed to get links from archive.org - check input domain and try again.', 'red'),SPACER+'\n')
-                    stopProgram = True
-                    return
-            except:
-                pass
-            
-        # Get the URLs and MIME types
-        linkMimes = set()
-        for line in resp.iter_lines():
-            linkMimes.add(str(line).split(' ')[2])
-            url = fixArchiveOrgUrl(str(line).split(' ')[1])
-            linksFound.add(url)
-            
+         
+        # if the page number was found then display it, but otherwise we will just try to increment until we have everything       
+        print(colored('\rGetting links from ' + str(totalPages) + ' archive.org API requests (this can take a while for some domains)...','cyan'), end='\r')
+
+        # Get a list of all the page URLs we need to visit
+        pages = set()
+        for page in range(0, totalPages):
+            pages.add(url+str(page))
+
+        # Process the URLs from web archive        
+        if not stopProgram:
+            p = mp.Pool(args.processes)
+            p.map(processWayBackPage, pages)
+            p.close()
+            p.join()
+               
         # Show the MIME types found (in case user wants to exclude more)
         if verbose() and len(linkMimes) > 0 :
             linkMimes.discard('warc/revisit')
@@ -618,12 +649,11 @@ def processCommonCrawlCollection(cdxApiUrl):
             filterCode = '&filter=!status:' + FILTER_CODE
             
         commonCrawlUrl = cdxApiUrl + '?output=json&fl=timestamp,url,mime,status,digest&url=' 
-        
-        failed = False              
+                    
         if args.filter_responses_only:
-            url = commonCrawlUrl + subs + args.input + path
+            url = commonCrawlUrl + subs + quote(args.input) + path
         else:
-            url = commonCrawlUrl + subs + args.input + path + filterMIME + filterCode
+            url = commonCrawlUrl + subs + quote(args.input) + path + filterMIME + filterCode
         
         try:
             # Choose a random user agent string to use for any requests
@@ -692,9 +722,9 @@ def getCommonCrawlUrls():
     
         if verbose():
             if args.filter_responses_only:
-                url = '{CDX-API-URL}?output=json&fl=timestamp,url,mime,status,digest&url=' + subs + args.input + path
+                url = '{CDX-API-URL}?output=json&fl=timestamp,url,mime,status,digest&url=' + subs + quote(args.input) + path
             else:
-                url = '{CDX-API-URL}?output=json&fl=timestamp,url,mime,status,digest&url=' + subs + args.input + path + filterMIME + filterCode  
+                url = '{CDX-API-URL}?output=json&fl=timestamp,url,mime,status,digest&url=' + subs + quote(args.input) + path + filterMIME + filterCode  
             print(colored('The commomcrawl index URL requested to get links (where {CDX-API-URL} is from ' + CCRAWL_INDEX_URL + '):','magenta'), url+'\n')
         
         print(colored('\rGetting commoncrawl.org index collections list...','cyan'), end='\r')
@@ -786,7 +816,7 @@ def processResponses():
         elif args.capture_interval == 'm': # get at most 1 capture per month
             collapse = 'timestamp:6'
 
-        url = WAYBACK_URL.replace('{DOMAIN}',subs + args.input + path).replace('{COLLAPSE}',collapse) + filterMIME + filterCode + filterLimit + filterFrom + filterTo
+        url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(args.input) + path).replace('{COLLAPSE}',collapse) + filterMIME + filterCode + filterLimit + filterFrom + filterTo
             
         if verbose():
             print(colored('The archive URL requested to get responses:','magenta'), url+'\n')
@@ -976,7 +1006,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '-xcc',
         action='store_true',
-        help='Exclude checks to commoncrawl.org. Searching all their index collections can take a while, and often it may not return any extra URLs that weren\'t already found on archive.org',
+        help='Exclude checks to commoncrawl.org. Searching all their index collections can take a while, and it may not return any extra URLs that weren\'t already found on archive.org',
         default=False
     )
     parser.add_argument(
