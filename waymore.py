@@ -144,7 +144,7 @@ def showOptions():
                     print(colored('-lcc: ' +str(args.lcc), 'magenta'), 'Search ALL Common Crawl index collections.')
                 else:
                     print(colored('-lcc: ' +str(args.lcc), 'magenta'), 'The number of latest Common Crawl index collections to be searched.')
-            print(colored('-xav: ' +str(args.xav), 'magenta'), 'Whether to exclude checks to alienvault.com. Searching all their index pages can take a while, and it may not return any extra URLs that weren\'t already found on archive.org')
+            print(colored('-xav: ' +str(args.xav), 'magenta'), 'Whether to exclude checks to alienvault.com. Searching all their pages can take a while, and it may not return any extra URLs that weren\'t already found on archive.org')
             
         if args.mode in ['R','B']:
             if args.limit == 0:
