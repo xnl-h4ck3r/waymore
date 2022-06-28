@@ -1,14 +1,21 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About - v0.3
+## About - v1.0
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
-Anyone who does bug bounty will have likely used the amazing [waybackurls](https://github.com/tomnomnom/waybackurls) by @TomNomNoms. This tool gets URLs from [web.archive.org](https://web.archive.org) and additional links (if any) from one of the index collections on [index.commoncrawl.org](http://index.commoncrawl.org/).
-**Waymore** will get wayback machine links from the Wayback Machine (with filters and options to get what you need) in addition to checking **ALL** Common Crawl index collections if required.
-Also, **waymore** can get further additional links from Alien Vault OTX if required.
+👉 The biggest difference between **waymore** and other tools is that it can also **download the archived responses** for URLs on wayback machine so that you can then search these for even more links, developer comments, extra parameters, etc. etc.
 
-👉 The biggest difference between **waymore** and other tools is that it can also **download the archived responses** for those URLs so that you can then search these for even more links, developer comments, extra parameters, etc. etc.
+Anyone who does bug bounty will have likely used the amazing [waybackurls](https://github.com/tomnomnom/waybackurls) by @TomNomNoms. This tool gets URLs from [web.archive.org](https://web.archive.org) and additional links (if any) from one of the index collections on [index.commoncrawl.org](http://index.commoncrawl.org/).
+You would have also likely used the amazing [gau](https://github.com/lc/gau) by @hacker\_ which also finds URL's from wayback archive, Common Crawl, but also from Alien Vault and URLScan.
+Now **waymore** gets URL's from ALL of those sources too (with ability to filter more to get what you want):
+
+- Wayback Machine (web.archive.org)
+- Common Crawl (index.commoncrawl.org)
+- Alien Vault OTX (otx.alienvault.com)
+- URLScan (urlscan.io)
+
+👉 It's a point that many seem to miss, so I'll just add it again :) ... The biggest difference between **waymore** and other tools is that it can also **download the archived responses** for URLs on wayback machine so that you can then search these for even more links, developer comments, extra parameters, etc. etc.
 
 👉 **PLEASE READ ALL OF THE INFORMATION ON THIS PAGE TO MAKE THE MOST OF THIS TOOL, AND ESPECIALLY BEFORE RAISING ANY ISSUES** 🤘
 
@@ -26,7 +33,7 @@ $ sudo python setup.py install
 
 | Arg           | Long Arg                | Description                                                                                                                                                                                                                                                                                                      |
 | ------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| -i            | --input                 | The target domain to find links for. This can be a domain only, or a domain with a specific path.                                                                                                                                                                                                                |
+| -i            | --input                 | The target domain to find links for. This can be a domain only, or a domain with a specific path. If it is a domain only to get everything for that domain, don;t prefix with `www.`                                                                                                                             |
 | -mode         |                         | The mode to run: `U` (retrieve URLs only), `R` (download Responses only) or `B` (Both). If `-i` is a domain only, then `-mode` will default to `B`. If `-i` is a domain with path then `-mode` will default to `R`.                                                                                              |
 | -n            | --no-subs               | Don't include subdomains of the target domain (only used if input is not a domain with a specific path).                                                                                                                                                                                                         |
 | -f            | --filter-responses-only | The initial links from Wayback Machine will not be filtered, only the responses that are downloaded, , e.g. it maybe useful to still see all available paths from the links even if you don't want to check the content.                                                                                         |
@@ -41,6 +48,7 @@ $ sudo python setup.py install
 | -lcc          |                         | Limit the number of Common Crawl index collections searched, e.g. `-lcc 10` will just search the latest `10` collections.. As of June 2022 there are currently 88 collections. Setting to `0` (default) will search **ALL** collections. If you don't want to search Common Crawl at all, use the `-xcc` option. |
 | -t            | --timeout               | This is for archived responses only! How many seconds to wait for the server to send data before giving up (default: 30)                                                                                                                                                                                         |
 | -p            | --processes             | Basic multithreading is done when getting requests for a file of URLs. This argument determines the number of processes (threads) used (default: 3)                                                                                                                                                              |
+| -r            | --retries               | The number of retries for requests that get connection error or rate limited (default: 1).                                                                                                                                                                                                                       |
 | -v            | --verbose               | Verbose output                                                                                                                                                                                                                                                                                                   |
 | -h            | --help                  | show the help message and exit                                                                                                                                                                                                                                                                                   |
 
@@ -87,7 +95,8 @@ I often use the `-f` option because I want `waymore.txt` to contain ALL possible
 
 Using the `-v` option can help see what is happening behind the scenes and could help you if you aren't getting the output you are expecting.
 
-All the MIME Content Types of URL's found (as returned by archive.org and commoncrawl.org) will be displayed when `-v` is used. This may help to add further exclusions if you find you still get back things you don't want to see. It should be noted that sometimes the MIME type on archive.org is stored as `unk` and `unknown` instead of the real MIME so the filter won't necessarily remove it from their results. The `FILTER_URL` config settings can be used to remove these afterwards. For example, if a GIF has MIME type `unk` instead of `image/gif` (and that's in `FILTER_MIME`) then it won't get filtered, but if the url is `https://target.com/assets/logo.gif` and `.gif` is in `FILTER_URL` it won't get requested.
+All the MIME Content Types of URL's found (by all sources except Alien Vault) will be displayed when `-v` is used. This may help to add further exclusions if you find you still get back things you don't want to see. If you spot a MIME type that is being included but you don't want that going forward, add it to the FILTER_MIME in `config.yml`.
+It should be noted that sometimes the MIME type on archive.org is stored as `unk` and `unknown` instead of the real MIME so the filter won't necessarily remove it from their results. The `FILTER_URL` config settings can be used to remove these afterwards. For example, if a GIF has MIME type `unk` instead of `image/gif` (and that's in `FILTER_MIME`) then it won't get filtered, but if the url is `https://target.com/assets/logo.gif` and `.gif` is in `FILTER_URL` it won't get requested.
 
 If `config.yml` doesn't exist, or the entries for filters, aren't in the file, then default filters are used. It's better to have the file and review these to ensure you are getting what you need.
 
@@ -144,13 +153,14 @@ If you come across any problems at all, or have ideas for improvements, please f
 
 - Allow a file of domains (or domains with paths) to be passed with `-i` argument
 - Add an `-oss` argument that accepts a file of Out Of Scope subdomains/URLs that will not be returned in the output, or have any responses downloaded
-- Add urlscan.io as source for links (the same as gau)
+- Add an `-o` output option to specify a directory in which you want the search domain's directory created (to store responses), or just for a specific file if set `-mode U` to get just a file of URL's
 
 ## References
 
 - [Wayback CDX Server API - BETA](https://github.com/internetarchive/wayback/tree/master/wayback-cdx-server)
 - [Common Crawl Index Server](https://index.commoncrawl.org/)
 - [Alien Vault OTX API](https://otx.alienvault.com/assets/static/external_api.html)
+- [URLScan API](https://urlscan.io/docs/api/)
 
 Good luck and good hunting!
 If you really love the tool (or any others), or they helped you find an awesome bounty, consider [BUYING ME A COFFEE!](https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
