@@ -731,7 +731,7 @@ def getAlienVaultUrls():
 
                 # Get a list of all the page URLs we need to visit
                 pages = set()
-                for page in range(1, totalPages):
+                for page in range(1, totalPages + 1):
                     pages.add(url+str(page))
 
                 # Process the URLs from alien vault 
@@ -1076,7 +1076,7 @@ def getWaybackUrls():
 
         # Get a list of all the page URLs we need to visit
         pages = set()
-        for page in range(0, totalPages):
+        for page in range(0, totalPages + 1):
             pages.add(url+str(page))
 
         # Process the URLs from web archive        
@@ -1598,5 +1598,5 @@ if __name__ == '__main__':
 
     finally:
         # Clean up
-        linksFound = None  
+        linksFound = None
         linkMimes = None
