@@ -29,6 +29,13 @@ $ cd waymore
 $ sudo python setup.py install
 ```
 
+if you're having a problem running the **`setup.py`** for whatever reason
+you can run the following to install the dependencies:
+
+```
+$ sudo pip3 install -r requirements.txt
+```
+
 ## Usage
 
 | Arg           | Long Arg                | Description                                                                                                                                                                                                                                                                                                      |
