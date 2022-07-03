@@ -37,7 +37,7 @@ indexFile = None
 inputIsDomainANDPath = False
 subs = '*.'
 path = ''
-waymorePath = Path()
+waymorePath = ''
 HTTP_ADAPTER = None
 SPACER = ' ' * 70
 
@@ -248,16 +248,17 @@ def getConfig():
             HTTP_ADAPTER = HTTPAdapter(max_retries=retry)
         except Exception as e:
             print(colored('ERROR getConfig 2: ' + str(e), 'red'))
-            
         # Try to get the config file values
         try:        
-            waymorePath.resolve()
+            waymorePath = Path(
+                os.path.dirname(os.path.realpath(__file__))
+            )
+            waymorePath.absolute
             if waymorePath == '':
                 configPath = 'config.yml'
             else:
-                configPath = waymorePath / 'config.yml'
+                configPath = Path(waymorePath / 'config.yml')
             config = yaml.safe_load(open(configPath))
-        
             try:
                 FILTER_URL = config.get('FILTER_URL')
                 if str(FILTER_URL) == 'None':
