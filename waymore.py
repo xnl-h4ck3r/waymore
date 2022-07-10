@@ -13,6 +13,7 @@ from signal import SIGINT, signal
 import multiprocessing.dummy as mp
 from termcolor import colored
 from datetime import datetime
+from pathlib import Path
 import yaml
 import os
 import json
@@ -247,16 +248,17 @@ def getConfig():
             HTTP_ADAPTER = HTTPAdapter(max_retries=retry)
         except Exception as e:
             print(colored('ERROR getConfig 2: ' + str(e), 'red'))
-            
         # Try to get the config file values
         try:        
-            waymorePath = os.path.dirname(os.path.realpath(__file__))
+            waymorePath = Path(
+                os.path.dirname(os.path.realpath(__file__))
+            )
+            waymorePath.absolute
             if waymorePath == '':
                 configPath = 'config.yml'
             else:
-                configPath = waymorePath + '/config.yml' 
+                configPath = Path(waymorePath / 'config.yml')
             config = yaml.safe_load(open(configPath))
-        
             try:
                 FILTER_URL = config.get('FILTER_URL')
                 if str(FILTER_URL) == 'None':
@@ -417,7 +419,12 @@ def processArchiveUrl(url):
                         else:
                             hashValue = filehash(archiveHtml)
                             fileName = hashValue
-                        filePath = waymorePath+'/results/'+str(args.input).replace('/','-')+'/'+fileName[0:250]+'.xnl'
+                        filePath = (
+                                waymorePath
+                                / 'results'
+                                / str(args.input).replace('/','-')
+                                / f'{fileName[0:250]}.xnl'
+                        )
 
                         # Write the file
                         try:
@@ -501,7 +508,13 @@ def processURLOutput():
         
         try:
             # Open the output file
-            outFile = open(waymorePath+'/results/'+str(args.input).replace('/','-')+'/waymore.txt', "w")
+            outFile = open(
+                waymorePath
+                / 'results'
+                / str(args.input).replace('/','-')
+                / 'waymore.txt',
+                'w',
+            )
         except Exception as e:
             if verbose():
                 print(colored("ERROR processURLOutput 2: " + str(e), "red"))
@@ -536,7 +549,13 @@ def processURLOutput():
             if outputCount == 0:
                 print(colored('No links were found so nothing written to file.\n', 'cyan'))
             else:   
-                print(colored('Links successfully written to file', 'cyan'), waymorePath+'/results/'+str(args.input).replace('/','-')+'/waymore.txt' + '\n')
+                print(
+                    colored('Links successfully written to file', 'cyan'), 
+                    waymorePath
+                    / 'results'
+                    / str(args.input).replace('/','-')
+                    / 'waymore.txt'
+                )
 
     except Exception as e:
         if verbose():
@@ -1385,7 +1404,13 @@ def processResponses():
         
         # Open the index file if hash value is going to be used (not URL)
         if not args.url_filename:
-            indexFile = open(waymorePath+'/results/'+str(args.input).replace('/','-')+'/index.txt', 'a')
+            indexFile = open(
+                waymorePath
+                / 'results'
+                / str(args.input).replace('/','-')
+                / 'index.txt',
+                'a',
+            )
         
         # Process the URLs from web archive        
         if not stopProgram:
@@ -1410,12 +1435,16 @@ def createDirs():
     global waymorePath
     # Create a directory for "results" if it doesn't already exist
     try:
-        os.mkdir(waymorePath+'/results')
+        results_dir = Path(waymorePath / 'results')
+        results_dir.mkdir(exist_ok=True)
     except:
         pass
     # Create a directory for the target domain
     try:
-        os.mkdir(waymorePath+'/results/'+str(args.input).replace('/','-'))
+        domain_dir = Path(
+            waymorePath / 'results' / str(args.input).replace('/','-')
+        )
+        domain_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
         pass     
     
