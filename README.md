@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About - v1.0
+## About - v1.1
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -40,7 +40,7 @@ $ sudo pip3 install -r requirements.txt
 
 | Arg           | Long Arg                | Description                                                                                                                                                                                                                                                                                                      |
 | ------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| -i            | --input                 | The target domain to find links for. This can be a domain only, or a domain with a specific path. If it is a domain only to get everything for that domain, don;t prefix with `www.`                                                                                                                             |
+| -i            | --input                 | The target domain (or file of domains) to find links for. This can be a domain only, or a domain with a specific path. If it is a domain only to get everything for that domain, don't prefix with `www.`                                                                                                        |
 | -mode         |                         | The mode to run: `U` (retrieve URLs only), `R` (download Responses only) or `B` (Both). If `-i` is a domain only, then `-mode` will default to `B`. If `-i` is a domain with path then `-mode` will default to `R`.                                                                                              |
 | -n            | --no-subs               | Don't include subdomains of the target domain (only used if input is not a domain with a specific path).                                                                                                                                                                                                         |
 | -f            | --filter-responses-only | The initial links from Wayback Machine will not be filtered, only the responses that are downloaded, , e.g. it maybe useful to still see all available paths from the links even if you don't want to check the content.                                                                                         |
@@ -61,7 +61,7 @@ $ sudo pip3 install -r requirements.txt
 
 ## Input and Mode
 
-The input `-i` can either be a domain only, e.g. `redbull.com` or a specific domain and path, e.g. `redbull.com/robots.txt`.
+The input `-i` can either be a domain only, e.g. `redbull.com` or a specific domain and path, e.g. `redbull.com/robots.txt`. You can also pass a file of domains/URLs to process.
 
 There are different modes that can be run for waymore. The `-mode` argument can be 3 different value:
 
@@ -85,7 +85,7 @@ The `config.yml` file have filter values that can be updated to suit your needs.
 
 ## Output
 
-In the path of the `waymore.py` file, a `results` directory will be created. Within that, a directory will be created with target domain (or domain with path) passed with `-i`.
+In the path of the `waymore.py` file, a `results` directory will be created. Within that, a directory will be created with target domain (or domain with path) passed with `-i` (or for each line of a file passed with `-i`).
 When run, the following files are created in the target directory:
 
 - `waymore.txt` - If `-mode` is `U` or `B`, this file will contain links from archive.org. Also any additional links from commoncrawl.org (if `-xcc` wasn't passed) and otx.alienvault.com (if `-xav` wasn't passed).
@@ -158,7 +158,6 @@ If you come across any problems at all, or have ideas for improvements, please f
 
 ## TODO
 
-- Allow a file of domains (or domains with paths) to be passed with `-i` argument
 - Add an `-oss` argument that accepts a file of Out Of Scope subdomains/URLs that will not be returned in the output, or have any responses downloaded
 - Add an `-o` output option to specify a directory in which you want the search domain's directory created (to store responses), or just for a specific file if set `-mode U` to get just a file of URL's
 
