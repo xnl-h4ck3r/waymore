@@ -1,5 +1,12 @@
 ## Changelog
 
+- v1.1
+
+  - New
+    - Allow a file of domains/URL's to be passed as input with `-i` instead of just one.
+  - Changed
+    - Remove version numbers from `requirements.txt` as these aren't really needed and may cause some issues.
+
 - v1.0
 
   - New

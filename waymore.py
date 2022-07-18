@@ -25,6 +25,9 @@ import math
 # Global variables
 linksFound = set()
 linkMimes = set()
+inputValues = set()
+argsInput = ''
+isInputFile = False
 stopProgram = False
 stopProgramCount = 0
 stopSource = False
@@ -133,15 +136,19 @@ def showOptions():
     """
     Show the chosen options and config settings
     """
-    global inputIsDomainANDPath
+    global inputIsDomainANDPath, argsInput, isInputFile
                 
     try:
         print(colored('Selected config and settings:', 'cyan'))
         
+        if isInputFile:
+            inputArgDesc = '-i <FILE: current line>: '
+        else:
+            inputArgDesc = '-i: '
         if inputIsDomainANDPath:
-            print(colored('-i: ' + args.input, 'magenta'), 'The target URL to download responses for.')
+            print(colored(inputArgDesc + argsInput, 'magenta'), 'The target URL to download responses for.')
         else: # input is a domain
-            print(colored('-i: ' + args.input, 'magenta'), 'The target domain to find links for.')
+            print(colored(inputArgDesc + argsInput, 'magenta'), 'The target domain to find links for.')
         
         if args.mode == 'U':
             print(colored('-mode: ' + args.mode, 'magenta'), 'Only URLs will be retrieved for the input.')
@@ -220,11 +227,11 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, URLSCAN_API_KEY, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, URLSCAN_API_KEY, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, argsInput
     try:
         
         # If the input doesn't have a / then assume it is a domain rather than a domain AND path
-        if str(args.input).find('/') < 0:
+        if str(argsInput).find('/') < 0:
             path = '/*'
             inputIsDomainANDPath = False
         else:
@@ -372,7 +379,7 @@ def processArchiveUrl(url):
     """
     Get the passed web archive response
     """
-    global stopProgram, successCount, failureCount, fileCount, waymorePath, totalResponses, indexFile
+    global stopProgram, successCount, failureCount, fileCount, waymorePath, totalResponses, indexFile, argsInput
     try:
         if not stopProgram:
             
@@ -496,12 +503,12 @@ def processURLOutput():
     """
     Show results of the URL output, i.e. getting URLs from archive.org and commoncrawl.org and write results to file
     """
-    global linksFound, subs, path
+    global linksFound, subs, path, argsInput
 
     try:
             
         linkCount = len(linksFound)
-        print(colored('Links found for ' + subs + args.input + ':', 'cyan'), str(linkCount) + ' 🤘'+SPACER+'\n')
+        print(colored('Links found for ' + subs + argsInput + ':', 'cyan'), str(linkCount) + ' 🤘'+SPACER+'\n')
         
         # Create 'results' and domain directory if needed
         createDirs()
@@ -527,7 +534,7 @@ def processURLOutput():
             try:
                 if args.regex_after is None or re.search(args.regex_after, link, flags=re.IGNORECASE):
                     # Don't write it if the link does not contain the requested domain (this can sometimes happen)
-                    if link.find(args.input) >= 0:
+                    if link.find(argsInput) >= 0:
                         outFile.write(link + "\n")
                         outputCount = outputCount + 1
             except Exception as e:
@@ -565,12 +572,12 @@ def processResponsesOutput():
     """
     Show results of the archive responses saved
     """
-    global successCount, failureCount, subs, fileCount
+    global successCount, failureCount, subs, fileCount, argsInput
     try:
         if failureCount > 0:
-            print(colored('\nResponses saved for ' + subs + args.input + ':', 'cyan'), str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘', colored('(' + str(failureCount) + ' failed)\n','red'))
+            print(colored('\nResponses saved for ' + subs + argsInput + ':', 'cyan'), str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘', colored('(' + str(failureCount) + ' failed)\n','red'))
         else:
-            print(colored('\nResponses saved for ' + subs + args.input + ':', 'cyan'), str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n')
+            print(colored('\nResponses saved for ' + subs + argsInput + ':', 'cyan'), str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n')
     except Exception as e:
         if verbose():
             print(colored("ERROR processResponsesOutput 1: " + str(e), "red"))    
@@ -590,17 +597,36 @@ def validateArgInput(x):
     Validate the -i / --input argument.
     Ensure it is a domain only, or a URL, but with no schema or query parameters or fragment
     """
-    # Check if input seems to be valid domain or URL
-    match = re.search(r"^((?!-))(xn--)?([a-z0-9][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.)+(xn--)?([a-z0-9\-]{1,61}|[a-z0-9\-]{1,30}\.[a-z]{2,})(/[^\n|?#]*)?$", x)
-    if match is None:
-        raise argparse.ArgumentTypeError('Pass a domain only (with no schema) to search for all links, or pass a domain and path (with no schema) to just get archived responses for that URL. Do not pass a query string or fragment.')
+    global inputValues, isInputFile
+    
+    # Determine if a single input was given, or a file
+    if os.path.isfile(x):
+        isInputFile = True
+        # Open file and put all values in input list
+        inputFile = open(x, 'r')
+        inputValues = inputFile.readlines()
+    else:
+        # Just add the input value to the input list
+        inputValues.add(x)
+    
+    for i in inputValues:        
+        if isInputFile:
+            # Check if input seems to be valid domain or URL
+            match = re.search(r"^((?!-))(xn--)?([a-z0-9][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.)+(xn--)?([a-z0-9\-]{1,61}|[a-z0-9\-]{1,30}\.[a-z]{2,})(/[^\n|?#]*)?$", i.rstrip('\n'))
+            if match is None:
+                raise argparse.ArgumentTypeError('Each line of the file must contain a domain only (with no schema) to search for all links, or a domain and path (with no schema) to just get archived response for that URL. Do not pass a query string or fragment in any lines.')
+        else:
+            # Check if input seems to be valid domain or URL
+            match = re.search(r"^((?!-))(xn--)?([a-z0-9][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.)+(xn--)?([a-z0-9\-]{1,61}|[a-z0-9\-]{1,30}\.[a-z]{2,})(/[^\n|?#]*)?$", i.rstrip('\n'))
+            if match is None:
+                raise argparse.ArgumentTypeError('Pass a domain only (with no schema) to search for all links, or pass a domain and path (with no schema) to just get archived responses for that URL. Do not pass a query string or fragment.')
     return x
 
 def processAlienVaultPage(url):
     """
     Get URLs from a specific page of otx.alienvault.org API for the input domain
     """
-    global totalPages, linkMimes, linksFound, stopSource
+    global totalPages, linkMimes, linksFound, stopSource, argsInput
     try:
         if not stopSource:
             try:             
@@ -661,7 +687,7 @@ def processAlienVaultPage(url):
                         
                         # If the user requested -n / --no-subs then we don't want to add it if it has a sub domain (www. will not be classed as a sub domain)
                         if args.no_subs:
-                            match = re.search(r'\:\/\/(www\.)?'+re.escape(args.input), foundUrl, flags=re.IGNORECASE)
+                            match = re.search(r'\:\/\/(www\.)?'+re.escape(argsInput), foundUrl, flags=re.IGNORECASE)
                             if match is None:
                                 addLink = False
                         
@@ -699,14 +725,14 @@ def getAlienVaultUrls():
     """
     Get URLs from the Alien Vault OTX, otx.alienvault.com
     """
-    global linksFound, waymorePath, subs, path, stopProgram, totalPages, stopSource
+    global linksFound, waymorePath, subs, path, stopProgram, totalPages, stopSource, argsInput
     
     # Write the file of URL's for the passed domain/URL
     try:
         stopSource = False
         originalLinkCount = len(linksFound)
         
-        url = ALIENVAULT_URL.replace('{DOMAIN}',quote(args.input))+'&page='
+        url = ALIENVAULT_URL.replace('{DOMAIN}',quote(argsInput))+'&page='
         
         # Get the number of pages (i.e. separate requests) that are going to be made to alienvault.com
         totalPages = 0
@@ -773,6 +799,8 @@ def processURLScanUrl(url, httpCode, mimeType):
     """
     Process a specific URL from urlscan.io to determine whether to save the link
     """
+    global argsInput
+    
     addLink = True
     
     try:      
@@ -781,7 +809,7 @@ def processURLScanUrl(url, httpCode, mimeType):
             
             # If the user requested -n / --no-subs then we don't want to add it if it has a sub domain (www. will not be classed as a sub domain)
             if args.no_subs:
-                match = re.search(r'^[A-za-z]*\:\/\/(www\.)?'+re.escape(args.input), url, flags=re.IGNORECASE)
+                match = re.search(r'^[A-za-z]*\:\/\/(www\.)?'+re.escape(argsInput), url, flags=re.IGNORECASE)
                 if match is None:
                     addLink = False
         
@@ -817,7 +845,7 @@ def processURLScanUrl(url, httpCode, mimeType):
 
             # URLScan can return URLs that aren't for the domain passed so we need to check for those and not process them
             # Check the URL
-            match = re.search(r'^[A-za-z]*\:\/.*(\/|\.)'+re.escape(args.input)+'$', domainOnly, flags=re.IGNORECASE)
+            match = re.search(r'^[A-za-z]*\:\/.*(\/|\.)'+re.escape(argsInput)+'$', domainOnly, flags=re.IGNORECASE)
             if match is not None:
                 linksFound.add(url)  
             
@@ -828,7 +856,7 @@ def getURLScanUrls():
     """
     Get URLs from the URLSCan API, urlscan.io
     """
-    global URLSCAN_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSource
+    global URLSCAN_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSource, argsInput
     
     # Write the file of URL's for the passed domain/URL
     try:
@@ -836,7 +864,7 @@ def getURLScanUrls():
         linkMimes = set()
         originalLinkCount = len(linksFound)
         
-        url = URLSCAN_URL.replace('{DOMAIN}',quote(args.input))
+        url = URLSCAN_URL.replace('{DOMAIN}',quote(argsInput))
         
         if verbose():
             print(colored('The URLScan URL requested to get links:','magenta'), url+'\n')
@@ -1054,7 +1082,7 @@ def getWaybackUrls():
     """
     Get URLs from the Wayback Machine, archive.org
     """
-    global linksFound, linkMimes, waymorePath, subs, path, stopProgram, totalPages, stopSource
+    global linksFound, linkMimes, waymorePath, subs, path, stopProgram, totalPages, stopSource, argsInput
     
     # Write the file of URL's for the passed domain/URL
     try:
@@ -1063,9 +1091,9 @@ def getWaybackUrls():
         filterCode = '&filter=!statuscode:' + FILTER_CODE.replace(',','|')
         
         if args.filter_responses_only:
-            url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(args.input) + path).replace('{COLLAPSE}','')+'&page='
+            url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}','')+'&page='
         else:
-            url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(args.input) + path).replace('{COLLAPSE}','') + filterMIME + filterCode + '&page='
+            url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}','') + filterMIME + filterCode + '&page='
         
         # Get the number of pages (i.e. separate requests) that are going to be made to archive.org
         totalPages = 0
@@ -1122,7 +1150,7 @@ def processCommonCrawlCollection(cdxApiUrl):
     """
     Get URLs from a given Common Crawl index collection
     """
-    global subs, path, linksFound, linkMimes, stopSource
+    global subs, path, linksFound, linkMimes, stopSource, argsInput
     
     try:
         if not stopSource:
@@ -1140,9 +1168,9 @@ def processCommonCrawlCollection(cdxApiUrl):
             commonCrawlUrl = cdxApiUrl + '?output=json&fl=timestamp,url,mime,status,digest&url=' 
                
             if args.filter_responses_only:
-                url = commonCrawlUrl + subs + quote(args.input) + path
+                url = commonCrawlUrl + subs + quote(argsInput) + path
             else:
-                url = commonCrawlUrl + subs + quote(args.input) + path + filterMIME + filterCode
+                url = commonCrawlUrl + subs + quote(argsInput) + path + filterMIME + filterCode
             
             try:
                 # Choose a random user agent string to use for any requests
@@ -1206,7 +1234,7 @@ def getCommonCrawlUrls():
     """
     Get all Common Crawl index collections to get all URLs from each one
     """
-    global linksFound, linkMimes, waymorePath, subs, path, stopSource
+    global linksFound, linkMimes, waymorePath, subs, path, stopSource, argsInput
     
     try:
         stopSource = False
@@ -1226,10 +1254,10 @@ def getCommonCrawlUrls():
     
         if verbose():
             if args.filter_responses_only:
-                url = '{CDX-API-URL}?output=json&fl=timestamp,url,mime,status,digest&url=' + subs + quote(args.input) + path
+                url = '{CDX-API-URL}?output=json&fl=timestamp,url,mime,status,digest&url=' + subs + quote(argsInput) + path
             else:
-                url = '{CDX-API-URL}?output=json&fl=timestamp,url,mime,status,digest&url=' + subs + quote(args.input) + path + filterMIME + filterCode  
-            print(colored('The commomcrawl index URL requested to get links (where {CDX-API-URL} is from ' + CCRAWL_INDEX_URL + '):','magenta'), url+'\n')
+                url = '{CDX-API-URL}?output=json&fl=timestamp,url,mime,status,digest&url=' + subs + quote(argsInput) + path + filterMIME + filterCode  
+            print(colored('The commoncrawl index URL requested to get links (where {CDX-API-URL} is from ' + CCRAWL_INDEX_URL + '):','magenta'), url+'\n')
         
         print(colored('\rGetting commoncrawl.org index collections list...','cyan'), end='\r')
                   
@@ -1245,7 +1273,7 @@ def getCommonCrawlUrls():
             print(colored('[ ERR ] Common Crawl connection error', 'red'),SPACER)
             return
         except Exception as e:
-            print(colored('[ ERR ] Error getting Commom Crawl index collection - ' + str(e),'red'),SPACER)
+            print(colored('[ ERR ] Error getting Common Crawl index collection - ' + str(e),'red'),SPACER)
             return
         
         # If the rate limit was reached end now
@@ -1288,7 +1316,7 @@ def processResponses():
     """
     Get archived responses from archive.org
     """
-    global linksFound, subs, path, indexFile, totalResponses, stopProgram
+    global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput
     try:
         # Set up filters
         filterLimit = '&limit=' + str(args.limit)
@@ -1327,7 +1355,7 @@ def processResponses():
         elif args.capture_interval == 'm': # get at most 1 capture per month
             collapse = 'timestamp:6'
 
-        url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(args.input) + path).replace('{COLLAPSE}',collapse) + filterMIME + filterCode + filterLimit + filterFrom + filterTo
+        url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}',collapse) + filterMIME + filterCode + filterLimit + filterFrom + filterTo
             
         if verbose():
             print(colored('The archive URL requested to get responses:','magenta'), url+'\n')
@@ -1432,7 +1460,7 @@ def createDirs():
     """
     Create a directory for the 'results' and the sub directory for the passed domain/URL
     """
-    global waymorePath
+    global waymorePath, argsInput
     # Create a directory for "results" if it doesn't already exist
     try:
         results_dir = Path(waymorePath / 'results')
@@ -1462,7 +1490,7 @@ if __name__ == '__main__':
         '-i',
         '--input',
         action='store',
-        help='The target domain to find links for. This can be a domain only, or a domain with a specific path. If it is a domain only to get everything for that domain, don;t prefix with "www."',
+        help='The target domain (or file of domains) to find links for. This can be a domain only, or a domain with a specific path. If it is a domain only to get everything for that domain, don\'t prefix with "www."',
         required=True,
         type=validateArgInput
     )
@@ -1587,40 +1615,57 @@ if __name__ == '__main__':
              
     try:     
 
-        # Get the config settings from the config.yml file
-        getConfig()
+        # For each input (maybe multiple if a file was passed)
+        for input in inputValues:
+            
+            argsInput = input.rstrip('\n')
+            
+            # Reset global variables
+            linksFound = set()
+            linkMimes = set()
+            successCount = 0
+            failureCount = 0
+            fileCount = 0
+            totalResponses = 0
+            totalPages = 0
+            indexFile = None
+            path = ''
+            stopSource = False
+            
+            # Get the config settings from the config.yml file
+            getConfig()
 
-        if verbose():
-            showOptions()
-        
-        # If the mode is U (URLs retrieved) or B (URLs retrieved AND Responses downloaded)
-        if args.mode in ['U','B']:
+            if verbose():
+                showOptions()
             
-            # Get URLs from the Wayback Machine (archive.org)
-            if not stopProgram:
-                getWaybackUrls()
-        
-            # If not requested to exclude, get URLs from commoncrawl.org
-            if not args.xcc and not stopProgram:
-                getCommonCrawlUrls()
-    
-            # If not requested to exclude, get URLs from alienvault.com
-            if not args.xav and not stopProgram:
-                getAlienVaultUrls()
-            
-            # If not requested to exclude, get URLs from urlscan.io
-            if not args.xus and not stopProgram:
-                getURLScanUrls()
+            # If the mode is U (URLs retrieved) or B (URLs retrieved AND Responses downloaded)
+            if args.mode in ['U','B']:
                 
-            # Output results of all searches
-            processURLOutput()
-        
-        # If we want to get actual archived responses from archive.org...
-        if (args.mode in ['R','B'] or inputIsDomainANDPath) and not stopProgram:
-            processResponses()
+                # Get URLs from the Wayback Machine (archive.org)
+                if not stopProgram:
+                    getWaybackUrls()
             
-            # Output details of the responses downloaded
-            processResponsesOutput()
+                # If not requested to exclude, get URLs from commoncrawl.org
+                if not args.xcc and not stopProgram:
+                    getCommonCrawlUrls()
+        
+                # If not requested to exclude, get URLs from alienvault.com
+                if not args.xav and not stopProgram:
+                    getAlienVaultUrls()
+                
+                # If not requested to exclude, get URLs from urlscan.io
+                if not args.xus and not stopProgram:
+                    getURLScanUrls()
+                    
+                # Output results of all searches
+                processURLOutput()
+            
+            # If we want to get actual archived responses from archive.org...
+            if (args.mode in ['R','B'] or inputIsDomainANDPath) and not stopProgram:
+                processResponses()
+                
+                # Output details of the responses downloaded
+                processResponsesOutput()
             
     except Exception as e:
         print(colored('ERROR main 1: ' + str(e), 'red'))
@@ -1629,3 +1674,4 @@ if __name__ == '__main__':
         # Clean up
         linksFound = None
         linkMimes = None
+        inputValues = None
