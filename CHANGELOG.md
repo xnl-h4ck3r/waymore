@@ -1,5 +1,12 @@
 ## Changelog
 
+- v1.2
+
+  - Changed
+    - Removed User-Agent `Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1` because it caused problems on some domains in `xnLinkFinder` tool, so removing from here too.
+    - Base the length of the progress bar (show when downloading archived responses) on the width of the terminal so it displays better and you don't get multiple lines on smaller windows.
+    - Amend `.gitignore` to include other unwanted files
+
 - v1.1
 
   - New

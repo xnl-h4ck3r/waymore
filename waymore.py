@@ -56,7 +56,6 @@ USER_AGENT  = [
     "Mozilla/5.0 (X11; CrOS x86_64 8172.45.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.64 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/601.3.9 (KHTML, like Gecko) Version/9.0.2 Safari/601.3.9",
     "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.111 Safari/537.36",
-    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36 Edg/99.0.1150.36",
     "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko",
@@ -486,7 +485,7 @@ def processArchiveUrl(url):
                     totalResponses,
                     prefix="Downloading " + str(totalResponses) + " responses: ",
                     suffix="Complete  ",
-                    length=50,
+                    length=getProgressBarLength(),
                     fill=fillChar
                 )
                     
@@ -1475,7 +1474,20 @@ def createDirs():
         domain_dir.mkdir(parents=True, exist_ok=True)
     except Exception as e:
         pass     
-    
+
+# Get width of the progress bar based on the width of the terminal
+def getProgressBarLength():
+    try:
+        terminalWidth = os.get_terminal_size().columns
+        if verbose():
+            offset = 95
+        else: 
+            offset = 55
+        progressBarLength = terminalWidth - offset
+    except:
+        progressBarLength = 10
+    return progressBarLength
+  
 # Run waymore
 if __name__ == '__main__':
 
