@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About - v1.2
+## About - v1.3
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -18,6 +18,8 @@ Now **waymore** gets URL's from ALL of those sources too (with ability to filter
 👉 It's a point that many seem to miss, so I'll just add it again :) ... The biggest difference between **waymore** and other tools is that it can also **download the archived responses** for URLs on wayback machine so that you can then search these for even more links, developer comments, extra parameters, etc. etc.
 
 👉 **PLEASE READ ALL OF THE INFORMATION ON THIS PAGE TO MAKE THE MOST OF THIS TOOL, AND ESPECIALLY BEFORE RAISING ANY ISSUES** 🤘
+
+👉 **THIS TOOL CAN BE VERY SLOW, BUT IT IS MEANT FOR COVERAGE, NOT SPEED**
 
 ## Installation
 
@@ -52,6 +54,7 @@ $ sudo pip3 install -r requirements.txt
 | -url-filename |                         | Set the file name of downloaded responses to the URL that generated the response, otherwise it will be set to the hash value of the response. Using the hash value means multiple URLs that generated the same response will only result in one file being saved for that response.                              |
 | -xcc          |                         | Exclude checks to commoncrawl.org. Searching all their index collections can take a while, and often it may not return any extra URLs that weren\'t already found on archive.org                                                                                                                                 |
 | -xav          |                         | Exclude checks to alienvault.com. Searching all their pages can take a while, and often it may not return any extra URLs that weren\'t already found on archive.org                                                                                                                                              |
+| -xus          |                         | Exclude checks to urlscan.io. Searching all their pages can take a while, and it may not return any extra URLs that weren\'t already found on archive.org                                                                                                                                                        |
 | -lcc          |                         | Limit the number of Common Crawl index collections searched, e.g. `-lcc 10` will just search the latest `10` collections.. As of June 2022 there are currently 88 collections. Setting to `0` (default) will search **ALL** collections. If you don't want to search Common Crawl at all, use the `-xcc` option. |
 | -t            | --timeout               | This is for archived responses only! How many seconds to wait for the server to send data before giving up (default: 30)                                                                                                                                                                                         |
 | -p            | --processes             | Basic multithreading is done when getting requests for a file of URLs. This argument determines the number of processes (threads) used (default: 3)                                                                                                                                                              |
@@ -61,11 +64,11 @@ $ sudo pip3 install -r requirements.txt
 
 ## Input and Mode
 
-The input `-i` can either be a domain only, e.g. `redbull.com` or a specific domain and path, e.g. `redbull.com/robots.txt`. You can also pass a file of domains/URLs to process.
+The input `-i` can either be a domain only, e.g. `redbull.com` or a specific domain and path, e.g. `redbull.com/robots.txt`. You can also pass a file of domains/URLs to process (or pass values in by piping from another program on the command line).
 
 There are different modes that can be run for waymore. The `-mode` argument can be 3 different value:
 
-- `U` - URLs will be retrieved from archive.org, commoncrawl.org (if `-xcc` is not passed) and otx.alienvault.com (if `-xvv` is not passed)
+- `U` - URLs will be retrieved from archive.org, commoncrawl.org (if `-xcc` is not passed), otx.alienvault.com (if `-xvv` is not passed) and urlscan.io (if `-xus` is not passed)
 - `R` - Responses will be downloaded from archive.org
 - `B` - Both URLs and Responses will be retrieved
 
@@ -80,6 +83,7 @@ The `config.yml` file have filter values that can be updated to suit your needs.
 - `FILTER_CODE` - Exclusions used to exclude responses we will try to get from web.archive.org, and also for file names when `-i` is a directory, e.g. `301,302`
 - `FILTER_MIME` - MIME Content-Type exclusions used to filter links and responses from web.archive.org through their API, e.g. `'text/css,image/jpeg`
 - `FILTER_URL` - Response code exclusions we will use to filter links and responses from web.archive.org through their API, e.g. `.css,.jpg`
+- `URLSCAN_API_KEY` - You can sign up to [urlscan.io](https://urlscan.io/user/signup) to get a **FREE** API key (there are also paid subscriptions available). It is recommended you get a key and put it into the config file so that you can get more back (and quicker) from their API. NOTE: You will get rate limited unless you have a full paid subscription.
 
 **NOTE: The MIME types cannot be filtered for Alien Vault results because they do not return that in the API response.**
 
@@ -102,12 +106,14 @@ I often use the `-f` option because I want `waymore.txt` to contain ALL possible
 
 Using the `-v` option can help see what is happening behind the scenes and could help you if you aren't getting the output you are expecting.
 
-All the MIME Content Types of URL's found (by all sources except Alien Vault) will be displayed when `-v` is used. This may help to add further exclusions if you find you still get back things you don't want to see. If you spot a MIME type that is being included but you don't want that going forward, add it to the FILTER_MIME in `config.yml`.
+All the MIME Content Types of URL's found (by all sources except Alien Vault) will be displayed when `-v` is used. This may help to add further exclusions if you find you still get back things you don't want to see. If you spot a MIME type that is being included but you don't want that going forward, add it to the `FILTER_MIME` in `config.yml`.
 It should be noted that sometimes the MIME type on archive.org is stored as `unk` and `unknown` instead of the real MIME so the filter won't necessarily remove it from their results. The `FILTER_URL` config settings can be used to remove these afterwards. For example, if a GIF has MIME type `unk` instead of `image/gif` (and that's in `FILTER_MIME`) then it won't get filtered, but if the url is `https://target.com/assets/logo.gif` and `.gif` is in `FILTER_URL` it won't get requested.
 
 If `config.yml` doesn't exist, or the entries for filters, aren't in the file, then default filters are used. It's better to have the file and review these to ensure you are getting what you need.
 
 There can potentially be millions of responses so make sure you set filters, but also the Limit (`-l`), From Date (`-from`), To Date (`-to`) and/or Capture Interval (`-ci`) if you need to. The limit defaults to 5000, but say you wanted to get the latest 20,000 responses from 2015 up until January 2018... you would pass `-l -20000 -from 2015 -to 201801`. The Capture Interval determines how many responses will get downloaded for a particular URL within a specified period, e.g. if you set to `m` you will only get one response per month for a URL. The default `d` will likely greatly reduce the number of responses and unlikely to miss many unique responses unless a target changed something more than once in a given day.
+
+As mentioned above, sign up to [urlscan.io](https://urlscan.io/user/signup) to get a **FREE** API key (there are also paid subscriptions available). It is recommended you get a key and put it into the `config.yml` file so that you can get more back (and quicker) from their API. NOTE: You will get rate limited unless you have a full paid subscription.
 
 **The provider API servers aren't designed to cope with huge volumes, so be sensible and considerate about what you hit them with!**
 
@@ -140,6 +146,20 @@ There will also be a file `results/redbull.com/index.txt` that will contain a re
 ```
 
 where `4847147712618` is the hash value of the response in `4847147712618.xnl`, the 2nd value is the Wayback Machine URL where you can view the actual page that was archived, and the 3rd is a time stamp of when the response was downloaded.
+
+## Example 3
+
+You can pipe waymore to other tools. Any errors are sent to `stderr` and any links found are sent to `stdout`. The output file is still created in addition to the links being piped to the next program. However, archived responses are not piped to the next program, but they are still written to files. For example:
+
+```
+python3 waymore.py -i redbull.com -mode U | unfurl keys | sort -u
+```
+
+You can also pass the input through `stdin` instead of `-i`.
+
+```
+cat redbull_subs.txt | python3 waymore.py
+```
 
 ## Finding Way More URLs!
 

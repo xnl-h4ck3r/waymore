@@ -1,5 +1,14 @@
 ## Changelog
 
+- v1.3
+
+  - New
+    - Added functionality to allow output Links output to be piped to another program (the output file will still be written). Errors and progress bar are written to STDERR. No information about archived responses will be piped.
+    - Added functionality to allow input to be piped to waymore. This will be the same as passing to `-i` argument.
+  - Changed
+    - Use a better way to add trailing spaces to strings to cover up other strings (like progress bar), regardless of terminal width.
+    - Change the README to mention `-xus` argument and how to get a URLScan API key to add to the config file.
+
 - v1.2
 
   - Changed
