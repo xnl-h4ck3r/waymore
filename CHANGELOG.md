@@ -1,5 +1,14 @@
 ## Changelog
 
+- v1.4
+
+  - New
+    - Added `-m /--memory-threshold` argument to set memory threshold percentage. If the machines memory goes above the threshold, the program will be stopped and ended gracefully before running out of memory (default: 95)
+    - If `-v` verbose output was used, memory stats will be output at the end, and also shown on teh progress bar downloading responses.
+    - Included `psutil` in `setup.py`
+  - Changed
+    - Fix some display issues not completely done in v1.3, regarding trailing spaces when errors are displayed.
+
 - v1.3
 
   - New

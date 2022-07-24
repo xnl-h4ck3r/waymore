@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About - v1.3
+## About - v1.4
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -59,6 +59,7 @@ $ sudo pip3 install -r requirements.txt
 | -t            | --timeout               | This is for archived responses only! How many seconds to wait for the server to send data before giving up (default: 30)                                                                                                                                                                                         |
 | -p            | --processes             | Basic multithreading is done when getting requests for a file of URLs. This argument determines the number of processes (threads) used (default: 3)                                                                                                                                                              |
 | -r            | --retries               | The number of retries for requests that get connection error or rate limited (default: 1).                                                                                                                                                                                                                       |
+| -m            | --memory-threshold      | The memory threshold percentage. If the machines memory goes above the threshold, the program will be stopped and ended gracefully before running out of memory (default: 95)                                                                                                                                    |
 | -v            | --verbose               | Verbose output                                                                                                                                                                                                                                                                                                   |
 | -h            | --help                  | show the help message and exit                                                                                                                                                                                                                                                                                   |
 

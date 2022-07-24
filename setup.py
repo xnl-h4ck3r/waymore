@@ -10,5 +10,5 @@ setup(
     author="@xnl-h4ck3r",
     url="https://github.com/xnl-h4ck3r/waymore",
     py_modules=["waymore"],
-    install_requires=["argparse","requests","pyyaml","termcolor"],
+    install_requires=["argparse","requests","pyyaml","termcolor","psutil"],
 )

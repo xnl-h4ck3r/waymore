@@ -24,7 +24,23 @@ import re
 import random
 import sys
 import math
-import shutil
+import enum
+
+# Try to import psutil to show memory usage
+try:
+    import psutil
+except:
+    currentMemUsage = -1
+    maxMemoryUsage = -1
+    currentMemPercent = -1
+    maxMemoryPercent = -1
+
+# Creating stopProgram enum
+class StopProgram(enum.Enum):
+    SIGINT = 1
+    WEBARCHIVE_PROBLEM = 2
+    MEMORY_THRESHOLD = 3
+stopProgram = None
 
 # Global variables
 linksFound = set()
@@ -32,7 +48,6 @@ linkMimes = set()
 inputValues = set()
 argsInput = ''
 isInputFile = False
-stopProgram = False
 stopProgramCount = 0
 stopSource = False
 successCount = 0
@@ -46,6 +61,10 @@ subs = '*.'
 path = ''
 waymorePath = ''
 terminalWidth = 120
+maxMemoryUsage = 0
+currentMemUsage = 0
+maxMemoryPercent = 0
+currentMemPercent = 0
 HTTP_ADAPTER = None
 
 # Source Provider URLs
@@ -97,6 +116,46 @@ class tc:
     MAGENTA = '\x1b[35m'
     CYAN = '\x1b[36m'
 
+# Get memory usage for 
+def getMemory():
+
+    global currentMemUsage, currentMemPercent, maxMemoryUsage, maxMemoryPercent, stopProgram
+
+    currentMemUsage = process.memory_info().rss
+    currentMemPercent = math.ceil(psutil.virtual_memory().percent)
+    if currentMemUsage > maxMemoryUsage:
+        maxMemoryUsage = currentMemUsage
+    if currentMemPercent > maxMemoryPercent:
+        maxMemoryPercent = currentMemPercent
+    if currentMemPercent > args.memory_threshold:
+        stopProgram = StopProgram.MEMORY_THRESHOLD
+
+# Convert bytes to human readable form
+def humanReadableSize(size, decimal_places=2):
+    for unit in ["B", "KB", "MB", "GB", "TB", "PB"]:
+        if size < 1024.0 or unit == "PB":
+            break
+        size /= 1024.0
+    return f"{size:.{decimal_places}f} {unit}"
+
+# Display stats if -v argument was chosen
+def processStats():
+    if maxMemoryUsage > 0:
+        write("MAX MEMORY USAGE: " + humanReadableSize(maxMemoryUsage))
+    elif maxMemoryUsage < 0:
+        write('MAX MEMORY USAGE: To show memory usage, run "pip install psutil"')
+    if maxMemoryPercent > 0:
+        write(
+            "MAX TOTAL MEMORY: "
+            + str(maxMemoryPercent)
+            + "% (Threshold "
+            + str(args.memory_threshold)
+            + "%)"
+        )
+    elif maxMemoryUsage < 0:
+        write('MAX TOTAL MEMORY: To show total memory %, run "pip install psutil"')
+    write()
+            
 def write(text='',pipe=False):
     # Only send text to stdout if the tool isn't piped to pass output to something else, 
     # or if the tool has been piped and the pipe parameter is True
@@ -146,7 +205,7 @@ def handler(signal_received, frame):
     """
     global stopSource, stopProgram, stopProgramCount
 
-    if stopProgram:
+    if stopProgram is not None:
         stopProgramCount = stopProgramCount + 1
         if stopProgramCount == 1:
             writerr(colored(getSPACER(">>> Please be patient... Trying to save data and end gracefully!"),'red'))
@@ -156,7 +215,7 @@ def handler(signal_received, frame):
             writerr(colored(getSPACER(">>> Patience isn't your strong suit eh? ¯\_(ツ)_/¯"), 'red'))
             sys.exit()
     else:
-        stopProgram = True
+        stopProgram = StopProgram.SIGINT
         stopSource = True
         writerr(colored(getSPACER('>>> "Oh my God, they killed Kenny... and waymore!" - Kyle'), "red"))
         writerr(colored(getSPACER('>>> Attempting to rescue any data gathered so far...'), "red"))
@@ -421,11 +480,18 @@ def processArchiveUrl(url):
     """
     global stopProgram, successCount, failureCount, fileCount, waymorePath, totalResponses, indexFile, argsInput
     try:
-        if not stopProgram:
+        if stopProgram is None:
             
             archiveUrl = 'https://web.archive.org/web/' + fixArchiveOrgUrl(url)
             hashValue = ''
         
+            # Get memory usage every 100 responses
+            if (successCount + failureCount) % 100 == 0:
+                try:
+                    getMemory()
+                except:
+                    pass
+                
             # Make a request to the web archive
             try:
                 try:
@@ -480,7 +546,7 @@ def processArchiveUrl(url):
                             responseFile.close()
                             fileCount = fileCount + 1
                         except Exception as e:
-                            writerr(colored('[ ERR ] Failed to write file ' + filePath + ': '+ str(e), 'red'))
+                            writerr(colored(getSPACER('[ ERR ] Failed to write file ' + filePath + ': '+ str(e)), 'red'))
                             
                         # Write the hash value and URL to the index file
                         if not args.url_filename:
@@ -489,7 +555,7 @@ def processArchiveUrl(url):
                                 indexFile.write(hashValue+','+archiveUrl+' ,'+timestamp+'\n')
                             
                             except Exception as e:
-                                writerr(colored('[ ERR ] Failed to write to index.txt for "' + archiveUrl + '": '+ str(e), 'red'))
+                                writerr(colored(getSPACER('[ ERR ] Failed to write to index.txt for "' + archiveUrl + '": '+ str(e)), 'red'))
 
                         # FOR DEBUGGING PURPOSES
                         try:
@@ -503,36 +569,52 @@ def processArchiveUrl(url):
                 except WayBackException as wbe:
                     failureCount = failureCount + 1
                     if verbose():
-                        writerr(colored('[ ERR ] archive.org returned a problem for "' + archiveUrl + '"', 'red'))
+                        writerr(colored(getSPACER('[ ERR ] archive.org returned a problem for "' + archiveUrl + '"'), 'red'))
                 except ConnectionError as ce:
                     failureCount = failureCount + 1
                     if verbose():
-                        writerr(colored('[ ERR ] archive.org connection error for "' + archiveUrl + '"', 'red'))
+                        writerr(colored(getSPACER('[ ERR ] archive.org connection error for "' + archiveUrl + '"'), 'red'))
                 except Exception as e:
                     failureCount = failureCount + 1
                     if verbose():
                         try:
-                            writerr(colored('[ ' + str(resp.status_code) +' ] Failed to get response for "' + archiveUrl + '"', 'red'))
+                            writerr(colored(getSPACER('[ ' + str(resp.status_code) +' ] Failed to get response for "' + archiveUrl + '"'), 'red'))
                         except:
-                            writerr(colored('[ ERR ] Failed to get response for "' + archiveUrl + '": '+ str(e), 'red'))
+                            writerr(colored(getSPACER('[ ERR ] Failed to get response for "' + archiveUrl + '": '+ str(e)), 'red'))
                 
                 # Show progress bar
                 fillTest = (successCount + failureCount) % 2
                 fillChar = "o"
                 if fillTest == 0:
                     fillChar = "O"
+                suffix="Complete  "
+                # Show memory usage if -v option chosen, and check memory every 25 responses (or if its the last)
+                if (successCount + failureCount) % 25 == 1 or (successCount + failureCount) == totalResponses:
+                    try:
+                        getMemory()
+                        if verbose():
+                            suffix = (
+                                "Complete (Mem Usage "
+                                + humanReadableSize(currentMemUsage)
+                                + ", Total Mem "
+                                + str(currentMemPercent)
+                                + "%)"
+                            )
+                    except:
+                        if verbose():
+                            suffix = 'Complete (To show mem use, run "pip install psutil")'
                 printProgressBar(
                     successCount + failureCount,
                     totalResponses,
                     prefix="Downloading " + str(totalResponses) + " responses:",
-                    suffix="Complete  ",
+                    suffix=suffix,
                     length=getProgressBarLength(),
                     fill=fillChar
                 )
                     
             except Exception as e:
                 if verbose():
-                    writerr(colored('Error for "'+url+'": ' + str(e), 'red'))
+                    writerr(colored(getSPACER('Error for "'+url+'": ' + str(e)), 'red'))
         else:
             os.kill(os.getpid(),SIGINT)
             
@@ -691,6 +773,9 @@ def processAlienVaultPage(url):
     """
     global totalPages, linkMimes, linksFound, stopSource, argsInput
     try:
+        # Get memory in case it exceeds threshold
+        getMemory()
+        
         if not stopSource:
             try:             
                 # Choose a random user agent string to use for any requests
@@ -843,7 +928,7 @@ def getAlienVaultUrls():
                     pages.add(url+str(page))
 
                 # Process the URLs from alien vault 
-                if not stopProgram:
+                if stopProgram is None:
                     p = mp.Pool(args.processes)
                     p.map(processAlienVaultPage, pages)
                     p.close()
@@ -986,6 +1071,9 @@ def getURLScanUrls():
                 
                 searchAfter = ''
                 
+                # Get memory in case it exceeds threshold
+                getMemory()
+        
                 # Go through each URL in the list
                 for urlSection in jsonResp['results']:
                     
@@ -1043,7 +1131,7 @@ def getURLScanUrls():
                         # Pass the API-Key header too. This can change the max endpoints per page, depending on URLScan subscription
                         resp = session.get(url+searchAfter, headers={'User-Agent':userAgent, 'API-Key':URLSCAN_API_KEY}) 
                     except Exception as e:
-                        writerr(colored('[ ERR ] unable to get links from urlscan.io: ' + str(e) + SPACER, 'red'))
+                        writerr(colored(getSPACER('[ ERR ] unable to get links from urlscan.io: ' + str(e)), 'red'))
                         pass
                     
                     # If the rate limit was reached end now
@@ -1081,6 +1169,9 @@ def processWayBackPage(url):
     """
     global totalPages, linkMimes, linksFound, stopSource
     try:
+        # Get memory in case it exceeds threshold
+        getMemory()
+        
         if not stopSource:
             try:             
                 # Choose a random user agent string to use for any requests
@@ -1188,9 +1279,9 @@ def getWaybackUrls():
         pages = set()
         for page in range(0, totalPages + 1):
             pages.add(url+str(page))
-
+        
         # Process the URLs from web archive        
-        if not stopProgram:
+        if stopProgram is None:
             p = mp.Pool(args.processes)
             p.map(processWayBackPage, pages)
             p.close()
@@ -1216,6 +1307,9 @@ def processCommonCrawlCollection(cdxApiUrl):
     global subs, path, linksFound, linkMimes, stopSource, argsInput
     
     try:
+        # Get memory in case it exceeds threshold
+        getMemory()
+        
         if not stopSource:
             # Set mime content type filter
             filterMIME = '&filter=~mime:^(?!warc/revisit|' 
@@ -1358,7 +1452,7 @@ def getCommonCrawlUrls():
         write(colored('\rGetting links from the latest ' + str(len(cdxApiUrls)) + ' commoncrawl.org index collections (this can take a while for some domains)...\r','cyan'))
              
         # Process the URLs from common crawl        
-        if not stopProgram:
+        if stopProgram is None:
             p = mp.Pool(args.processes)
             p.map(processCommonCrawlCollection, cdxApiUrls)
             p.close()
@@ -1458,7 +1552,7 @@ def processResponses():
                         success = False
                 if not success:
                     writerr(colored(getSPACER('Failed to get links from archive.org - check input domain and try again.')+'\n', 'red'))
-                    stopProgram = True
+                    stopProgram = StopProgram.WEBARCHIVE_PROBLEM
                     return
             except:
                 pass
@@ -1504,7 +1598,7 @@ def processResponses():
             )
         
         # Process the URLs from web archive        
-        if not stopProgram:
+        if stopProgram is None:
             p = mp.Pool(args.processes)
             p.map(processArchiveUrl, linkRequests)
             p.close()
@@ -1543,7 +1637,10 @@ def createDirs():
 def getProgressBarLength():
     global terminalWidth
     try:
-        offset = 55
+        if verbose():
+            offset = 90
+        else:
+            offset = 50
         progressBarLength = terminalWidth - offset
     except:
         progressBarLength = 20
@@ -1555,6 +1652,15 @@ def getSPACER(text):
     lenSpacer = terminalWidth - len(text) -1
     SPACER = ' ' * lenSpacer
     return text + SPACER
+
+# For validating -m / --memory-threshold argument
+def argcheckPercent(value):
+    ivalue = int(value)
+    if ivalue > 99:
+        raise argparse.ArgumentTypeError(
+            "A valid integer percentage less than 100 must be entered."
+        )
+    return ivalue
     
 # Run waymore
 if __name__ == '__main__':
@@ -1687,6 +1793,15 @@ if __name__ == '__main__':
         help='The number of retries for requests that get connection error or rate limited (default: 1).',
         default=1
     )
+    parser.add_argument(
+        "-m",
+        "--memory-threshold",
+        action="store",
+        help="The memory threshold percentage. If the machines memory goes above the threshold, the program will be stopped and ended gracefully before running out of memory (default: 95)",
+        default=95,
+        metavar="<integer>",
+        type=argcheckPercent,
+    )
     parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
     args = parser.parse_args()
 
@@ -1697,6 +1812,12 @@ if __name__ == '__main__':
             sys.exit()
     else:
         validateArgInput('<stdin>')       
+    
+    # Get the current Process ID to use to get memory usage that is displayed with -vv option
+    try:
+        process = psutil.Process(os.getpid())
+    except:
+        pass
         
     showBanner()
              
@@ -1729,31 +1850,61 @@ if __name__ == '__main__':
             if args.mode in ['U','B']:
                 
                 # Get URLs from the Wayback Machine (archive.org)
-                if not stopProgram:
+                if stopProgram is None:
                     getWaybackUrls()
             
                 # If not requested to exclude, get URLs from commoncrawl.org
-                if not args.xcc and not stopProgram:
+                if not args.xcc and stopProgram is None:
                     getCommonCrawlUrls()
-        
+                    
                 # If not requested to exclude, get URLs from alienvault.com
-                if not args.xav and not stopProgram:
+                if not args.xav and stopProgram is None:
                     getAlienVaultUrls()
                 
                 # If not requested to exclude, get URLs from urlscan.io
-                if not args.xus and not stopProgram:
+                if not args.xus and stopProgram is None:
                     getURLScanUrls()
                     
                 # Output results of all searches
                 processURLOutput()
             
             # If we want to get actual archived responses from archive.org...
-            if (args.mode in ['R','B'] or inputIsDomainANDPath) and not stopProgram:
+            if (args.mode in ['R','B'] or inputIsDomainANDPath) and stopProgram is None:
                 processResponses()
                 
                 # Output details of the responses downloaded
                 processResponsesOutput()
             
+            # Output stats if -v option was selected
+            if verbose():
+                processStats()
+            
+            # If the program was stopped then alert the user
+            if stopProgram is not None:
+                if stopProgram == StopProgram.MEMORY_THRESHOLD:
+                    writerr(
+                        colored(
+                            "YOUR MEMORY USAGE REACHED "
+                            + str(maxMemoryPercent)
+                            + "% SO THE PROGRAM WAS STOPPED. DATA IS LIKELY TO BE INCOMPLETE.\n",
+                            "red",
+                        )
+                    )
+                elif stopProgram == StopProgram.WEBARCHIVE_PROBLEM:
+                    writerr(
+                        colored(
+                            "THE PROGRAM WAS STOPPED DUE TO PROBLEM GETTING DATA FROM WEBARCHIVE.ORG\n",
+                            "red",
+                        )
+                    )
+                else:
+                    writerr(
+                        colored(
+                            "THE PROGRAM WAS STOPPED. DATA IS LIKELY TO BE INCOMPLETE.\n",
+                            "red",
+                        )
+                    )
+                
     except Exception as e:
         writerr(colored('ERROR main 1: ' + str(e), 'red'))
 
