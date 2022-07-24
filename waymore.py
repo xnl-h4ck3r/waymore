@@ -615,8 +615,6 @@ def processArchiveUrl(url):
             except Exception as e:
                 if verbose():
                     writerr(colored(getSPACER('Error for "'+url+'": ' + str(e)), 'red'))
-        else:
-            os.kill(os.getpid(),SIGINT)
             
     except Exception as e:
         writerr(colored('ERROR processArchiveUrl 1:  ' + str(e), 'red'))

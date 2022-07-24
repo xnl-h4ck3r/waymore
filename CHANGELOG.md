@@ -8,6 +8,7 @@
     - Included `psutil` in `setup.py`
   - Changed
     - Fix some display issues not completely done in v1.3, regarding trailing spaces when errors are displayed.
+    - Remove line `os.kill(os.getpid(),SIGINT)` from `processArchiveUrl` which isn't needed and just causes more error if a user does press Ctrl-C.
 
 - v1.3
 
