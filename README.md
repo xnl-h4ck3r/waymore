@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About - v1.4
+## About - v1.5
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -60,6 +60,7 @@ $ sudo pip3 install -r requirements.txt
 | -p            | --processes             | Basic multithreading is done when getting requests for a file of URLs. This argument determines the number of processes (threads) used (default: 3)                                                                                                                                                              |
 | -r            | --retries               | The number of retries for requests that get connection error or rate limited (default: 1).                                                                                                                                                                                                                       |
 | -m            | --memory-threshold      | The memory threshold percentage. If the machines memory goes above the threshold, the program will be stopped and ended gracefully before running out of memory (default: 95)                                                                                                                                    |
+| -ko           | --keywords-only         | Only return links and responses that contain keywords that you are interested in. This can reduce the time it takes to get results. Keywords are given in a comma separated list in the `config.yml` file with the `FILTER_KEYWORDS` key                                                                         |
 | -v            | --verbose               | Verbose output                                                                                                                                                                                                                                                                                                   |
 | -h            | --help                  | show the help message and exit                                                                                                                                                                                                                                                                                   |
 
@@ -84,6 +85,7 @@ The `config.yml` file have filter values that can be updated to suit your needs.
 - `FILTER_CODE` - Exclusions used to exclude responses we will try to get from web.archive.org, and also for file names when `-i` is a directory, e.g. `301,302`
 - `FILTER_MIME` - MIME Content-Type exclusions used to filter links and responses from web.archive.org through their API, e.g. `'text/css,image/jpeg`
 - `FILTER_URL` - Response code exclusions we will use to filter links and responses from web.archive.org through their API, e.g. `.css,.jpg`
+- `FILTER_KEYWORDS` - Only links and responses will be returned that contain the specified keywords if the `-ko`/`--keywords-only` argument is passed, e.g. `admin,portal`
 - `URLSCAN_API_KEY` - You can sign up to [urlscan.io](https://urlscan.io/user/signup) to get a **FREE** API key (there are also paid subscriptions available). It is recommended you get a key and put it into the config file so that you can get more back (and quicker) from their API. NOTE: You will get rate limited unless you have a full paid subscription.
 
 **NOTE: The MIME types cannot be filtered for Alien Vault results because they do not return that in the API response.**
@@ -113,6 +115,8 @@ It should be noted that sometimes the MIME type on archive.org is stored as `unk
 If `config.yml` doesn't exist, or the entries for filters, aren't in the file, then default filters are used. It's better to have the file and review these to ensure you are getting what you need.
 
 There can potentially be millions of responses so make sure you set filters, but also the Limit (`-l`), From Date (`-from`), To Date (`-to`) and/or Capture Interval (`-ci`) if you need to. The limit defaults to 5000, but say you wanted to get the latest 20,000 responses from 2015 up until January 2018... you would pass `-l -20000 -from 2015 -to 201801`. The Capture Interval determines how many responses will get downloaded for a particular URL within a specified period, e.g. if you set to `m` you will only get one response per month for a URL. The default `d` will likely greatly reduce the number of responses and unlikely to miss many unique responses unless a target changed something more than once in a given day.
+
+You can also greatly reduce the number (and therefore reduce the execution time) of links and responses by only returning ones that contain keywords you are interested in. You can list these keywords in `config.yml` with the `FILTER_KEYWORDS` key and then pass argument `-ko`/`--keywords-only` to use these.
 
 As mentioned above, sign up to [urlscan.io](https://urlscan.io/user/signup) to get a **FREE** API key (there are also paid subscriptions available). It is recommended you get a key and put it into the `config.yml` file so that you can get more back (and quicker) from their API. NOTE: You will get rate limited unless you have a full paid subscription.
 

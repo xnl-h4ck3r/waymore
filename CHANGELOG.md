@@ -1,5 +1,15 @@
 ## Changelog
 
+- v1.5
+
+  - New
+    - Add argument `-ko`/`--keywords-only` which if passed, will only get Links (unless `-f` is passed) that have a specified keyword in the URL, and will only download responses (regardless of `-f`) where the keyword is in the URL. These multiple keywords can be specified in `config.yml` in a comma separated list.
+    - Add a `FILTER_KEYWORDS` key/pair to `config.yml` (and default value in code) initially set to `admin,login,logon,signin,register,dashboard,portal,ftp,cpanel`
+  - Changed
+    - Only add to the MIME type list if the `-v` option is used because they are not displayed otherwise.
+    - Warn the user if there is a value missing from the config.yml file
+    - Fixed small bug in `getURLScanUrls` that raised an error for `getSPACER`
+
 - v1.4
 
   - New

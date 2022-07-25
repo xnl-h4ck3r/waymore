@@ -25,6 +25,7 @@ import random
 import sys
 import math
 import enum
+import marisa_trie
 
 # Try to import psutil to show memory usage
 try:
@@ -101,10 +102,14 @@ DEFAULT_FILTER_MIME = 'text/css,image/jpeg,image/jpg,image/png,image/svg+xml,ima
 # Response code exclusions we will use to filter links and responses from web.archive.org through their API
 DEFAULT_FILTER_CODE = '404,301,302'
 
+# Keywords 
+DEFAULT_FILTER_KEYWORDS = 'admin,login,logon,signin,register,dashboard,portal,ftp,cpanel'
+
 # Yaml config values
 FILTER_URL = ''
 FILTER_MIME = ''
 FILTER_CODE = ''
+FILTER_KEYWORDS = ''
 URLSCAN_API_KEY = ''
 
 # Define colours
@@ -289,12 +294,18 @@ def showOptions():
                     
             if args.url_filename:
                 write(colored('-url-filename: ' +str(args.url_filename), 'magenta')+colored(' The filenames of downloaded responses wil be set to the URL rather than the hash value of the response.','white'))
-            
+
         write(colored('-f: ' +str(args.filter_responses_only), 'magenta')+colored(' If True, the initial links from wayback machine will not be filtered, only the responses that are downloaded will be filtered. It maybe useful to still see all available paths even if you don\'t want to check the file for content.','white'))
+        write(colored('-ko: ' +str(args.keywords_only), 'magenta')+colored(' If True, we will only get results that contain the given keywords.','white'))
         write(colored('MIME Type exclusions: ', 'magenta')+colored(FILTER_MIME))
         write(colored('Response Code exclusions: ', 'magenta')+colored(FILTER_CODE))      
         write(colored('Response URL exclusions: ', 'magenta')+colored(FILTER_URL))  
-        
+        if args.keywords_only:
+            if FILTER_KEYWORDS == '':
+                write(colored('Keywords only: ', 'magenta')+colored('It looks like no keywords have been set in config.yml file.','red'))
+            else: 
+                write(colored('Keywords only: ', 'magenta')+colored(FILTER_KEYWORDS))
+                
         if args.regex_after is not None:
             write(colored('-ra: ' + args.regex_after, 'magenta')+colored(' RegEx for filtering purposes against found links from archive.org AND responses downloaded. Only positive matches will be output.','white'))
         if args.mode in ['R','B']:
@@ -312,7 +323,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, URLSCAN_API_KEY, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, argsInput, terminalWidth
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, argsInput, terminalWidth
     try:
         
         # Set terminal width
@@ -360,34 +371,47 @@ def getConfig():
             try:
                 FILTER_URL = config.get('FILTER_URL')
                 if str(FILTER_URL) == 'None':
+                    writerr(colored('No value for "FILTER_URL" in config.yml - default set', 'yellow'))
                     FILTER_URL = ''
             except Exception as e:
-                writerr(colored('Unable to read "FILTER_URL" from config.yml; defaults set', 'red'))
+                writerr(colored('Unable to read "FILTER_URL" from config.yml - default set', 'red'))
                 FILTER_URL = DEFAULT_FILTER_URL
 
             try:
                 FILTER_MIME = config.get('FILTER_MIME')
                 if str(FILTER_MIME) == 'None':
+                    writerr(colored('No value for "FILTER_MIME" in config.yml - default set', 'yellow'))
                     FILTER_MIME = ''
             except Exception as e:
-                writerr(colored('Unable to read "FILTER_MIME" from config.yml; defaults set', 'red'))
+                writerr(colored('Unable to read "FILTER_MIME" from config.yml - default set', 'red'))
                 FILTER_MIME = DEFAULT_FILTER_MIME
             
             try:
                 FILTER_CODE = config.get('FILTER_CODE')
                 if str(FILTER_CODE) == 'None':
+                    writerr(colored('No value for "FILTER_CODE" in config.yml - default set', 'yellow'))
                     FILTER_CODE = ''
             except Exception as e:
-                writerr(colored('Unable to read "FILTER_CODE" from config.yml; defaults set', 'red'))
+                writerr(colored('Unable to read "FILTER_CODE" from config.yml - default set', 'red'))
                 FILTER_CODE = DEFAULT_FILTER_CODE
                 
             try:
                 URLSCAN_API_KEY = config.get('URLSCAN_API_KEY')
                 if str(URLSCAN_API_KEY) == 'None':
+                    writerr(colored('No value for "URLSCAN_API_KEY" in config.yml - consider adding (you can get a FREE api key at urlscan.io)', 'yellow'))
                     URLSCAN_API_KEY = ''
             except Exception as e:
-                writerr(colored('Unable to read "URLSCAN_API_KEY" from config.yml; defaults set', 'red'))
+                writerr(colored('Unable to read "URLSCAN_API_KEY" from config.yml - consider adding (you can get a FREE api key at urlscan.io)', 'red'))
                 URLSCAN_API_KEY = ''
+            
+            try:
+                FILTER_KEYWORDS = config.get('FILTER_KEYWORDS')
+                if str(FILTER_KEYWORDS) == 'None':
+                    writerr(colored('No value for "FILTER_KEYWORDS" in config.yml - default set', 'yellow'))
+                    FILTER_KEYWORDS = ''
+            except Exception as e:
+                writerr(colored('Unable to read "FILTER_KEYWORDS" from config.yml - default set', 'red'))
+                FILTER_KEYWORDS = ''
                 
         except:
             writerr(colored('WARNING: Cannot find config.yml, so using default values', 'yellow'))
@@ -395,6 +419,7 @@ def getConfig():
             FILTER_MIME = DEFAULT_FILTER_MIME
             FILTER_CODE = DEFAULT_FILTER_CODE
             URLSCAN_API_KEY = ''
+            FILTER_KEYWORDS = ''
             
     except Exception as e:
         writerr(colored('ERROR getConfig 1: ' + str(e), 'red'))
@@ -857,7 +882,13 @@ def processAlienVaultPage(url):
                                 match = re.search(r'('+re.escape(FILTER_URL).replace(',','|')+')', foundUrl, flags=re.IGNORECASE)
                                 if match is not None:
                                     addLink = False            
-                                    
+                            
+                            # Set keywords filter if -ko argument passed
+                            if addLink and args.keywords_only:
+                                match = re.search(r'('+re.escape(FILTER_KEYWORDS).replace(',','|')+')', foundUrl, flags=re.IGNORECASE)
+                                if match is None:
+                                    addLink = False
+                
                         # Add link if it passed filters        
                         if addLink:
                             linksFound.add(foundUrl)
@@ -975,13 +1006,21 @@ def processURLScanUrl(url, httpCode, mimeType):
                     if match is not None:
                         addLink = False            
                 
+                # Set keywords filter if -ko argument passed
+                if addLink and args.keywords_only:
+                    match = re.search(r'('+re.escape(FILTER_KEYWORDS).replace(',','|')+')', url, flags=re.IGNORECASE)
+                    if match is None:
+                        addLink = False
+                                    
                 # Check the MIME exclusions
                 if mimeType != '':
                     match = re.search(r'('+re.escape(FILTER_MIME).replace(',','|')+')', mimeType, flags=re.IGNORECASE)
                     if match is not None:
                         addLink = False
                     else:
-                        linkMimes.add(mimeType)            
+                        # Add MIME Types if --verbose option was selected
+                        if verbose():
+                            linkMimes.add(mimeType)            
                     
         # Add link if it passed filters        
         if addLink:
@@ -1153,7 +1192,7 @@ def getURLScanUrls():
         # Show the MIME types found (in case user wants to exclude more)
         if verbose() and len(linkMimes) > 0:
             linkMimes.discard('warc/revisit')
-            write(getSPACER(colored('MIME types found: ','magenta')+colored(str(linkMimes)),'white')+'\n')
+            write(getSPACER(colored('MIME types found: ','magenta')+colored(str(linkMimes),'white'))+'\n')
                     
         linkCount = len(linksFound) - originalLinkCount
         write(getSPACER(colored('Extra links found on urlscan.io: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
@@ -1211,12 +1250,14 @@ def processWayBackPage(url):
             # Get the URLs and MIME types. Each line is a separate JSON string
             for line in resp.iter_lines():
                 results = line.decode("utf-8")
-                try:
-                    linkMimes.add(str(results).split(' ')[2])
-                except Exception as e:
-                    if verbose():
-                        writerr(colored(getSPACER('ERROR processWayBackPage 2: Cannot get MIME type from line: ' + str(line)),'red'))
-                        write(resp.text)
+                # Only get MIME Types if --verbose option was selected
+                if verbose():
+                    try:
+                        linkMimes.add(str(results).split(' ')[2])
+                    except Exception as e:
+                        if verbose():
+                            writerr(colored(getSPACER('ERROR processWayBackPage 2: Cannot get MIME type from line: ' + str(line)),'red'))
+                            write(resp.text)
                 try:
                     foundUrl = fixArchiveOrgUrl(str(results).split(' ')[1])
                     linksFound.add(foundUrl)
@@ -1242,10 +1283,15 @@ def getWaybackUrls():
         filterMIME = '&filter=!mimetype:warc/revisit|' + FILTER_MIME.replace(',','|') 
         filterCode = '&filter=!statuscode:' + FILTER_CODE.replace(',','|')
         
+        # Set keywords filter if -ko argument passed
+        filterKeywords = ''
+        if args.keywords_only:
+            filterKeywords = '&filter=original:.*(' + FILTER_KEYWORDS.replace(',','|') + ').*'
+            
         if args.filter_responses_only:
-            url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}','')+'&page='
+            url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}','') + '&page='
         else:
-            url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}','') + filterMIME + filterCode + '&page='
+            url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}','') + filterMIME + filterCode + filterKeywords + '&page='
         
         # Get the number of pages (i.e. separate requests) that are going to be made to archive.org
         totalPages = 0
@@ -1319,13 +1365,18 @@ def processCommonCrawlCollection(cdxApiUrl):
             filterCode = ''
             if FILTER_CODE.strip() != '':
                 filterCode = '&filter=~status:^(?!' + FILTER_CODE.replace(',','|') + ')'
+            
+            # Set keywords filter if -ko argument passed
+            filterKeywords = ''
+            if args.keywords_only:
+                filterKeywords = '&filter=~url:.*(' + FILTER_KEYWORDS.replace(',','|') + ').*'
                 
             commonCrawlUrl = cdxApiUrl + '?output=json&fl=timestamp,url,mime,status,digest&url=' 
                
             if args.filter_responses_only:
                 url = commonCrawlUrl + subs + quote(argsInput) + path
             else:
-                url = commonCrawlUrl + subs + quote(argsInput) + path + filterMIME + filterCode
+                url = commonCrawlUrl + subs + quote(argsInput) + path + filterMIME + filterCode + filterKeywords
             
             try:
                 # Choose a random user agent string to use for any requests
@@ -1372,10 +1423,12 @@ def processCommonCrawlCollection(cdxApiUrl):
                 results = line.decode("utf-8")
                 try:
                     data = json.loads(results)
-                    try:
-                        linkMimes.add(data['mime'])
-                    except:
-                        pass
+                    # Get MIME Types if --verbose option was seletced
+                    if verbose():
+                        try:
+                            linkMimes.add(data['mime'])
+                        except:
+                            pass
                     linksFound.add(data['url'])
                 except Exception as e:
                     if verbose():
@@ -1484,6 +1537,11 @@ def processResponses():
         else:
             filterTo = '&to=' + str(args.to_date)
         
+        # Set keywords filter if -ko argument passed
+        filterKeywords = ''
+        if args.keywords_only:
+            filterKeywords = '&filter=original:.*(' + FILTER_KEYWORDS.replace(',','|') + ').*'
+            
         # Get the list again with filters and include timestamp
         linksFound = set()
         
@@ -1510,7 +1568,7 @@ def processResponses():
         elif args.capture_interval == 'm': # get at most 1 capture per month
             collapse = 'timestamp:6'
 
-        url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}',collapse) + filterMIME + filterCode + filterLimit + filterFrom + filterTo
+        url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}',collapse) + filterMIME + filterCode + filterLimit + filterFrom + filterTo + filterKeywords
             
         if verbose():
             write(colored('The archive URL requested to get responses: ','magenta')+colored(url+'\n','white'))
@@ -1549,8 +1607,10 @@ def processResponses():
                             writerr(colored(getSPACER('[ '+str(resp.status_code)+' ] Error for '+url),'red'))
                         success = False
                 if not success:
-                    writerr(colored(getSPACER('Failed to get links from archive.org - check input domain and try again.')+'\n', 'red'))
-                    stopProgram = StopProgram.WEBARCHIVE_PROBLEM
+                    if args.keywords_only:
+                        writerr(colored(getSPACER('Failed to get links from archive.org - consider removing -ko / --keywords-only argument, or changing FILTER_KEYWORDS in config.yml'), 'red'))
+                    else:    
+                        writerr(colored(getSPACER('Failed to get links from archive.org - check input domain and try again.'), 'red'))
                     return
             except:
                 pass
@@ -1799,6 +1859,13 @@ if __name__ == '__main__':
         default=95,
         metavar="<integer>",
         type=argcheckPercent,
+    )
+    parser.add_argument(
+        '-ko',
+        '--keywords-only',
+        action='store_true',
+        help='Only return links and responses that contain keywords that you are interested in. This can reduce the time it takes to get results. Keywords are given in a comma separated list in the "config.yml" file with the "FILTER_KEYWORDS" key',
+        default=False
     )
     parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
     args = parser.parse_args()
