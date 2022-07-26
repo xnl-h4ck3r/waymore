@@ -4,6 +4,7 @@
 # Full help here: https://github.com/xnl-h4ck3r/waymore/blob/main/README.md
 # Good luck and good hunting! If you really love the tool (or any others), or they helped you find an awesome bounty, consider BUYING ME A COFFEE! (https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
 
+from urllib.parse import urlparse
 import requests
 from requests.exceptions import ConnectionError
 from requests.utils import quote
@@ -99,7 +100,7 @@ DEFAULT_FILTER_MIME = 'text/css,image/jpeg,image/jpg,image/png,image/svg+xml,ima
 DEFAULT_FILTER_CODE = '404,301,302'
 
 # Keywords 
-DEFAULT_FILTER_KEYWORDS = 'admin,login,logon,signin,register,dashboard,portal,ftp,cpanel'
+DEFAULT_FILTER_KEYWORDS = 'admin,login,logon,signin,register,dashboard,portal,ftp,cpanel,panel,.js,api,robots.txt,graph,gql'
 
 # Yaml config values
 FILTER_URL = ''
@@ -494,7 +495,20 @@ def fixArchiveOrgUrl(url):
         if newline > 0:
             url = url[0:newline]
     return url
-                
+
+# Add a link to the linksFound collection
+def linksFoundAdd(link):
+    global linksFound
+    # If the link specifies port 80 or 443, e.g. http://example.com:80, then remove the port 
+    try:
+        parsed = urlparse(link.strip())
+        if parsed.netloc.find(':80') or parsed.netloc.fnd(':443'):
+            newNetloc = parsed.netloc.split(':')[0]
+            parsed = parsed._replace(netloc=newNetloc).geturl()
+        linksFound.add(parsed)
+    except:
+        linksFound.add(link)
+    
 def processArchiveUrl(url):
     """
     Get the passed web archive response
@@ -748,7 +762,8 @@ def validateArgInput(x):
         stdinFile = sys.stdin.readlines()
         count = 1
         for line in stdinFile:
-            inputValues.add(line.rstrip('\n'))
+            # Remove newline characters, and also *. if the domain starts with this
+            inputValues.add(line.rstrip('\n').lstrip('*.'))
             count = count + 1
         if count > 1:
             isInputFile = True
@@ -758,7 +773,10 @@ def validateArgInput(x):
             isInputFile = True
             # Open file and put all values in input list
             inputFile = open(x, 'r')
-            inputValues = inputFile.readlines()
+            lines = inputFile.readlines()          
+            # Check if any lines start with a *. and replace without the *.
+            for line in lines:
+                inputValues.add(line.lstrip('*.'))
         else:
             # Just add the input value to the input list
             inputValues.add(x)
@@ -848,7 +866,7 @@ def processAlienVaultPage(url):
                 if foundUrl != '':    
                     # If filters are not required and subs are wanted then just add the URL to the list
                     if args.filter_responses_only and not args.no_subs:
-                        linksFound.add(foundUrl)
+                        linksFoundAdd(foundUrl)
                     else:
                         addLink = True
                         
@@ -887,7 +905,7 @@ def processAlienVaultPage(url):
                 
                         # Add link if it passed filters        
                         if addLink:
-                            linksFound.add(foundUrl)
+                            linksFoundAdd(foundUrl)
         else:
             pass                    
     except Exception as e:
@@ -1028,7 +1046,7 @@ def processURLScanUrl(url, httpCode, mimeType):
             # Check the URL
             match = re.search(r'^[A-za-z]*\:\/.*(\/|\.)'+re.escape(argsInput)+'$', domainOnly, flags=re.IGNORECASE)
             if match is not None:
-                linksFound.add(url)  
+                linksFoundAdd(url)  
             
     except Exception as e:
         writerr(colored('ERROR processURLScanUrl 1: ' + str(e), 'red'))
@@ -1256,7 +1274,7 @@ def processWayBackPage(url):
                             write(resp.text)
                 try:
                     foundUrl = fixArchiveOrgUrl(str(results).split(' ')[1])
-                    linksFound.add(foundUrl)
+                    linksFoundAdd(foundUrl)
                 except Exception as e:
                     if verbose():
                         writerr(colored(getSPACER('ERROR processWayBackPage 3: Cannot get link from line: ' + str(line)),'red'))         
@@ -1425,7 +1443,7 @@ def processCommonCrawlCollection(cdxApiUrl):
                             linkMimes.add(data['mime'])
                         except:
                             pass
-                    linksFound.add(data['url'])
+                    linksFoundAdd(data['url'])
                 except Exception as e:
                     if verbose():
                         writerr(colored('ERROR processCommonCrawlCollection 2: Cannot get URL and MIME type from line: ' + str(line),'red'))
@@ -1617,7 +1635,7 @@ def processResponses():
                 results = line.decode("utf-8") 
                 timestamp = results.split(' ')[0]
                 originalUrl = results.split(' ')[1]
-                linksFound.add(timestamp+'/'+originalUrl)
+                linksFoundAdd(timestamp+'/'+originalUrl)
             except Exception as e:
                 writerr(colored(getSPACER('ERROR processResponses 2: Cannot to get link from line: '+str(line)), 'red'))
         

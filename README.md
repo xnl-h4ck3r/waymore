@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About - v1.5
+## About - v1.6
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 

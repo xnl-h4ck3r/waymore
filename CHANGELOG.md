@@ -1,5 +1,15 @@
 ## Changelog
 
+- v1.6
+
+  - New
+    - Add a docker option to run `waymore`. Include instructions in `README.md` and a new `DockerFile`
+  - Changed
+    - If multiple domain/URLs are passed by file or STDIN, remove `*.` from the start of any input values.
+    - Change the default `FILTER_KEYWORDS` to include more useful words.
+    - If a link found from an API has port 80 or 443 specified, e.g. `https://exmaple.com:80/example` then remove the `:80`. Many links have this in archive.org so this could reduce the number of similar links reported.
+    - Amend `setup.py` to include `urlparse3` that is now used to get the domain and port of links found
+
 - v1.5
 
   - New
