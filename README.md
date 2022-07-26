@@ -64,6 +64,27 @@ $ sudo pip3 install -r requirements.txt
 | -v            | --verbose               | Verbose output                                                                                                                                                                                                                                                                                                   |
 | -h            | --help                  | show the help message and exit                                                                                                                                                                                                                                                                                   |
 
+## Run with docker
+
+Install [docker](https://docs.docker.com/get-docker/)
+
+```bash
+git clone https://github.com/xnl-h4ck3r/waymore.git
+cd waymore
+```
+
+Build image:
+
+```bash
+docker build -t waymore .
+```
+
+Run waymore with this command:
+
+```bash
+docker run -it --rm -v $PWD/results:/app/results waymore:latest python3 waymore.py -i example.com -mode U
+```
+
 ## Input and Mode
 
 The input `-i` can either be a domain only, e.g. `redbull.com` or a specific domain and path, e.g. `redbull.com/robots.txt`. You can also pass a file of domains/URLs to process (or pass values in by piping from another program on the command line).
