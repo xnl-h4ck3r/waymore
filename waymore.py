@@ -22,7 +22,6 @@ import random
 import sys
 import math
 import enum
-import marisa_trie
 
 # Try to import psutil to show memory usage
 try:
