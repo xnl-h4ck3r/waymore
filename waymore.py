@@ -4,9 +4,6 @@
 # Full help here: https://github.com/xnl-h4ck3r/waymore/blob/main/README.md
 # Good luck and good hunting! If you really love the tool (or any others), or they helped you find an awesome bounty, consider BUYING ME A COFFEE! (https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
 
-from binascii import Error
-from threading import ExceptHookArgs
-from tkinter import EXCEPTION
 import requests
 from requests.exceptions import ConnectionError
 from requests.utils import quote
