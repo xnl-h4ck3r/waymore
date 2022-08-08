@@ -123,14 +123,17 @@ def getMemory():
 
     global currentMemUsage, currentMemPercent, maxMemoryUsage, maxMemoryPercent, stopProgram
 
-    currentMemUsage = process.memory_info().rss
-    currentMemPercent = math.ceil(psutil.virtual_memory().percent)
-    if currentMemUsage > maxMemoryUsage:
-        maxMemoryUsage = currentMemUsage
-    if currentMemPercent > maxMemoryPercent:
-        maxMemoryPercent = currentMemPercent
-    if currentMemPercent > args.memory_threshold:
-        stopProgram = StopProgram.MEMORY_THRESHOLD
+    try:
+        currentMemUsage = process.memory_info().rss
+        currentMemPercent = math.ceil(psutil.virtual_memory().percent)
+        if currentMemUsage > maxMemoryUsage:
+            maxMemoryUsage = currentMemUsage
+        if currentMemPercent > maxMemoryPercent:
+            maxMemoryPercent = currentMemPercent
+        if currentMemPercent > args.memory_threshold:
+            stopProgram = StopProgram.MEMORY_THRESHOLD
+    except:
+        pass
 
 # Convert bytes to human readable form
 def humanReadableSize(size, decimal_places=2):
@@ -252,15 +255,16 @@ def showOptions():
                 write(colored('-n: ' +str(args.no_subs), 'magenta')+colored(' Sub domains are excluded in the search.','white'))
             else:
                 write(colored('-n: ' +str(args.no_subs), 'magenta')+colored(' Sub domains are included in the search.','white'))
-                
-            write(colored('-xcc: ' +str(args.xcc), 'magenta')+colored(' Whether to exclude checks to commoncrawl.org. Searching all their index collections can take a while, and it may not return any extra URLs that weren\'t already found on archive.org','white'))
+            
+            write(colored('-xwm: ' +str(args.xwm), 'magenta')+colored(' Whether to exclude checks for links from Wayback Machine (archive.org)','white'))    
+            write(colored('-xcc: ' +str(args.xcc), 'magenta')+colored(' Whether to exclude checks for links from commoncrawl.org','white'))
             if not args.xcc:
                 if args.lcc == 0:
                     write(colored('-lcc: ' +str(args.lcc), 'magenta')+colored(' Search ALL Common Crawl index collections.','white'))
                 else:
                     write(colored('-lcc: ' +str(args.lcc), 'magenta')+colored(' The number of latest Common Crawl index collections to be searched.','white'))
-            write(colored('-xav: ' +str(args.xav), 'magenta')+colored(' Whether to exclude checks to alienvault.com. Searching all their pages can take a while, and it may not return any extra URLs that weren\'t already found on archive.org','white'))
-            write(colored('-xus: ' +str(args.xus), 'magenta')+colored(' Whether to exclude checks to urlscan.io. Searching all their pages can take a while, and it may not return any extra URLs that weren\'t already found on archive.org','white'))
+            write(colored('-xav: ' +str(args.xav), 'magenta')+colored(' Whether to exclude checks for links from alienvault.com','white'))
+            write(colored('-xus: ' +str(args.xus), 'magenta')+colored(' Whether to exclude checks for links from urlscan.io','white'))
             if URLSCAN_API_KEY == '':
                 write(colored('URLScan API Key:', 'magenta')+colored(' {none} - You can get a FREE or paid API Key at https://urlscan.io/user/signup which will let you get more bac, and quicker.','white'))
             else:
@@ -294,6 +298,7 @@ def showOptions():
 
         write(colored('-f: ' +str(args.filter_responses_only), 'magenta')+colored(' If True, the initial links from wayback machine will not be filtered, only the responses that are downloaded will be filtered. It maybe useful to still see all available paths even if you don\'t want to check the file for content.','white'))
         write(colored('-ko: ' +str(args.keywords_only), 'magenta')+colored(' If True, we will only get results that contain the given keywords.','white'))
+        write(colored('-lr: ' +str(args.limit_requests), 'magenta')+colored(' The limit of requests made per source when getting links. A value of 0 (Zero) means no limit is applied.','white'))
         write(colored('MIME Type exclusions: ', 'magenta')+colored(FILTER_MIME))
         write(colored('Response Code exclusions: ', 'magenta')+colored(FILTER_CODE))      
         write(colored('Response URL exclusions: ', 'magenta')+colored(FILTER_URL))  
@@ -887,7 +892,7 @@ def processAlienVaultPage(url):
                             
                             # If we have a HTTP Code, compare against the Code exclusions
                             if httpCode != '':
-                                match = re.search(r'('+FILTER_CODE.replace(',','|')+')', httpCode, flags=re.IGNORECASE)
+                                match = re.search(r'('+re.escape(FILTER_CODE).replace(',','|')+')', httpCode, flags=re.IGNORECASE)
                                 if match is not None:
                                     addLink = False
                             
@@ -959,8 +964,12 @@ def getAlienVaultUrls():
             # If there are results, carry on
             if  totalUrls > 0:
                 
-                # Get total pages
+                # Get total pages 
                 totalPages = math.ceil(totalUrls / 500)
+                
+                # If the argument to limit the requests was passed and the total pages is larger than that, set to the limit
+                if args.limit_requests != 0 and totalPages > args.limit_requests:
+                    totalPages = args.limit_requests
 
                 # if the page number was found then display it, but otherwise we will just try to increment until we have everything       
                 write(colored('\rGetting links from ' + str(totalPages) + ' alienvault.com API requests (this can take a while for some domains)...\r','cyan'))
@@ -1010,7 +1019,7 @@ def processURLScanUrl(url, httpCode, mimeType):
                 
                 # If we have a HTTP Code, compare against the Code exclusions
                 if httpCode != '':
-                    match = re.search(r'('+FILTER_CODE.replace(',','|')+')', httpCode, flags=re.IGNORECASE)
+                    match = re.search(r'('+re.escape(FILTER_CODE).replace(',','|')+')', httpCode, flags=re.IGNORECASE)
                     if match is not None:
                         addLink = False
                 
@@ -1059,6 +1068,7 @@ def getURLScanUrls():
     
     # Write the file of URL's for the passed domain/URL
     try:
+        requestsMade = 0
         stopSource = False
         linkMimes = set()
         originalLinkCount = len(linksFound)
@@ -1079,6 +1089,7 @@ def getURLScanUrls():
             session.mount('http://', HTTP_ADAPTER)
              # Pass the API-Key header too. This can change the max endpoints per page, depending on URLScan subscription
             resp = session.get(url, headers={'User-Agent':userAgent, 'API-Key':URLSCAN_API_KEY})
+            requestsMade = requestsMade + 1
         except Exception as e:
             write(colored(getSPACER('[ ERR ] unable to get links from urlscan.io: ' + str(e)), 'red'))
             return
@@ -1181,6 +1192,7 @@ def getURLScanUrls():
                         session.mount('http://', HTTP_ADAPTER)
                         # Pass the API-Key header too. This can change the max endpoints per page, depending on URLScan subscription
                         resp = session.get(url+searchAfter, headers={'User-Agent':userAgent, 'API-Key':URLSCAN_API_KEY}) 
+                        requestsMade = requestsMade + 1
                     except Exception as e:
                         writerr(colored(getSPACER('[ ERR ] unable to get links from urlscan.io: ' + str(e)), 'red'))
                         pass
@@ -1199,8 +1211,8 @@ def getURLScanUrls():
                         # Get the JSON response
                         jsonResp = json.loads(resp.text.strip())
                         
-                        # If there are no more results then stop
-                        if len(jsonResp['results']) == 0:
+                        # If there are no more results, or if the requests limit was specified and has been exceeded, then stop
+                        if len(jsonResp['results']) == 0 or (args.limit_requests != 0 and requestsMade > args.limit_requests):
                             stopSource = True
         
         # Show the MIME types found (in case user wants to exclude more)
@@ -1294,13 +1306,13 @@ def getWaybackUrls():
     # Write the file of URL's for the passed domain/URL
     try:
         stopSource = False
-        filterMIME = '&filter=!mimetype:warc/revisit|' + FILTER_MIME.replace(',','|') 
-        filterCode = '&filter=!statuscode:' + FILTER_CODE.replace(',','|')
+        filterMIME = '&filter=!mimetype:warc/revisit|' + re.escape(FILTER_MIME).replace(',','|') 
+        filterCode = '&filter=!statuscode:' + re.escape(FILTER_CODE).replace(',','|')
         
         # Set keywords filter if -ko argument passed
         filterKeywords = ''
         if args.keywords_only:
-            filterKeywords = '&filter=original:.*(' + FILTER_KEYWORDS.replace(',','|') + ').*'
+            filterKeywords = '&filter=original:.*(' + re.escape(FILTER_KEYWORDS).replace(',','|') + ').*'
             
         if args.filter_responses_only:
             url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}','') + '&page='
@@ -1318,6 +1330,10 @@ def getWaybackUrls():
             session.mount('http://', HTTP_ADAPTER)
             resp = session.get(url+'&showNumPages=True', headers={"User-Agent":userAgent}) 
             totalPages = int(resp.text.strip())
+            
+            # If the argument to limit the requests was passed and the total pages is larger than that, set to the limit
+            if args.limit_requests != 0 and totalPages > args.limit_requests:
+                totalPages = args.limit_requests
         except Exception as e:
             writerr(colored(getSPACER('[ ERR ] unable to get links from archive.org: ' + str(e)), 'red'))
             return
@@ -1351,7 +1367,7 @@ def getWaybackUrls():
             write(getSPACER(colored('MIME types found: ','magenta')+colored(str(linkMimes),'white'))+'\n')
             linkMimes = None
         
-        if not args.xcc or not args.xav:
+        if not args.xwm:
             linkCount = len(linksFound)
             write(getSPACER(colored('Links found on archive.org: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
             
@@ -1372,18 +1388,18 @@ def processCommonCrawlCollection(cdxApiUrl):
             # Set mime content type filter
             filterMIME = '&filter=~mime:^(?!warc/revisit|' 
             if FILTER_MIME.strip() != '':
-                filterMIME = filterMIME + FILTER_MIME.replace(',','|')
+                filterMIME = filterMIME + re.escape(FILTER_MIME).replace(',','|')
             filterMIME = filterMIME + ')'
             
             # Set status code filter
             filterCode = ''
             if FILTER_CODE.strip() != '':
-                filterCode = '&filter=~status:^(?!' + FILTER_CODE.replace(',','|') + ')'
+                filterCode = '&filter=~status:^(?!' + re.escape(FILTER_CODE).replace(',','|') + ')'
             
             # Set keywords filter if -ko argument passed
             filterKeywords = ''
             if args.keywords_only:
-                filterKeywords = '&filter=~url:.*(' + FILTER_KEYWORDS.replace(',','|') + ').*'
+                filterKeywords = '&filter=~url:.*(' + re.escape(FILTER_KEYWORDS).replace(',','|') + ').*'
                 
             commonCrawlUrl = cdxApiUrl + '?output=json&fl=timestamp,url,mime,status,digest&url=' 
                
@@ -1466,13 +1482,13 @@ def getCommonCrawlUrls():
         # Set mime content type filter
         filterMIME = '&filter=~mime:^(?!warc/revisit|' 
         if FILTER_MIME.strip() != '':
-            filterMIME = filterMIME + FILTER_MIME.replace(',','|')
+            filterMIME = filterMIME + re.escape(FILTER_MIME).replace(',','|')
         filterMIME = filterMIME + ')'
         
         # Set status code filter
         filterCode = ''
         if FILTER_CODE.strip() != '':
-            filterCode = '&filter=~status:^(?!' + FILTER_CODE.replace(',','|') + ')'
+            filterCode = '&filter=~status:^(?!' + re.escape(FILTER_CODE).replace(',','|') + ')'
     
         if verbose():
             if args.filter_responses_only:
@@ -1554,7 +1570,7 @@ def processResponses():
         # Set keywords filter if -ko argument passed
         filterKeywords = ''
         if args.keywords_only:
-            filterKeywords = '&filter=original:.*(' + FILTER_KEYWORDS.replace(',','|') + ').*'
+            filterKeywords = '&filter=original:.*(' + re.escape(FILTER_KEYWORDS).replace(',','|') + ').*'
             
         # Get the list again with filters and include timestamp
         linksFound = set()
@@ -1562,12 +1578,12 @@ def processResponses():
         # Set mime content type filter
         filterMIME = '&filter=!mimetype:warc/revisit' 
         if FILTER_MIME.strip() != '':
-            filterMIME = filterMIME + '|' + FILTER_MIME.replace(',','|')
+            filterMIME = filterMIME + '|' + re.escape(FILTER_MIME).replace(',','|')
             
         # Set status code filter
         filterCode = ''
         if FILTER_CODE.strip() != '':
-            filterCode = '&filter=!statuscode:' + FILTER_CODE.replace(',','|')
+            filterCode = '&filter=!statuscode:' + re.escape(FILTER_CODE).replace(',','|')
         
         # Set the collapse parameter value in the archive.org URL. From the Wayback API docs:
         # "A new form of filtering is the option to 'collapse' results based on a field, or a substring of a field.
@@ -1816,21 +1832,27 @@ if __name__ == '__main__':
         default=False
     )
     parser.add_argument(
+        '-xwm',
+        action='store_true',
+        help='Exclude checks for links from Wayback Machine (archive.org)',
+        default=False
+    )
+    parser.add_argument(
         '-xcc',
         action='store_true',
-        help='Exclude checks to commoncrawl.org. Searching all their index collections can take a while, and it may not return any extra URLs that weren\'t already found on archive.org',
+        help='Exclude checks for links from commoncrawl.org',
         default=False
     )
     parser.add_argument(
         '-xav',
         action='store_true',
-        help='Exclude checks to alienvault.com. Searching all their pages can take a while, and it may not return any extra URLs that weren\'t already found on archive.org',
+        help='Exclude checks for links from alienvault.com',
         default=False
     )
     parser.add_argument(
         '-xus',
         action='store_true',
-        help='Exclude checks to urlscan.io. Searching all their pages can take a while, and it may not return any extra URLs that weren\'t already found on archive.org',
+        help='Exclude checks for links from urlscan.io',
         default=False
     )
     parser.add_argument(
@@ -1881,6 +1903,13 @@ if __name__ == '__main__':
         help='Only return links and responses that contain keywords that you are interested in. This can reduce the time it takes to get results. Keywords are given in a comma separated list in the "config.yml" file with the "FILTER_KEYWORDS" key',
         default=False
     )
+    parser.add_argument(
+        '-lr',
+        '--limit-requests',
+        type=int,
+        help='Limit the number of requests that will be made when getting links from a source (this doesn\'t apply to Common Crawl). Some targets can return a huge amount of requests needed that are just not feasible to get, so this can be used to manage that situation. This defaults to 0 (Zero) which means there is no limit.',
+        default=0,
+    )
     parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
     args = parser.parse_args()
 
@@ -1928,8 +1957,8 @@ if __name__ == '__main__':
             # If the mode is U (URLs retrieved) or B (URLs retrieved AND Responses downloaded)
             if args.mode in ['U','B']:
                 
-                # Get URLs from the Wayback Machine (archive.org)
-                if stopProgram is None:
+                # If not requested to exclude, get URLs from the Wayback Machine (archive.org)
+                if not args.xwm and stopProgram is None:
                     getWaybackUrls()
             
                 # If not requested to exclude, get URLs from commoncrawl.org
@@ -1947,6 +1976,9 @@ if __name__ == '__main__':
                 # Output results of all searches
                 processURLOutput()
             
+                # Clean up 
+                linkMimes = None
+                
             # If we want to get actual archived responses from archive.org...
             if (args.mode in ['R','B'] or inputIsDomainANDPath) and stopProgram is None:
                 processResponses()

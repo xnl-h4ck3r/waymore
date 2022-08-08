@@ -1,5 +1,14 @@
 ## Changelog
 
+- v1.7
+
+  - New
+    - Added `-xwm` parameter to exclude getting URL's from Wayback Machine (archive.org)
+    - Added `-lr`/`--limit-requests` that can be used to limit the number of requests made per source (excluding Common Crawl) when getting URL's. For example, if you run **waymore** for `-i twitter.com` it says there are 28,903,799 requests to archive.org that need to be made (that could take almost 1000 days for some people!!!). The default value for the argument is 0 (Zero) which will apply no limit as before. There is also an problem with the Wayback Machine CDX API where the number of pages returned is not correct when filters are applied and can cause issues. Setting this parameter to a sensible value can relieve that issue (it may take a while for archive.org to address the problem).
+  - Changed
+    - Make sure that filters in API URL's are escaped correctly
+    - Add error handling to `getMemory()` to avoid any errors if `psutil` is not installed
+
 - v1.6
 
   - New
