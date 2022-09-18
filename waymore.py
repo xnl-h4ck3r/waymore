@@ -569,14 +569,30 @@ def processArchiveUrl(url):
                         # Create file name based on url or hash value of the response, depending on selection. Ensure the file name isn't over 255 characters 
                         if args.url_filename:
                             fileName = url.replace('/','-').replace(':','')
+                            fileName = fileName[0:254]
                         else:
                             hashValue = filehash(archiveHtml)
                             fileName = hashValue
+                            
+                            # Determine extension of file from the file name
+                            extension = ''
+                            try:
+                                path = url[url.rindex(argsInput)+len(argsInput):]
+                                if path.find('?') > 0:
+                                    path = path[:path.index('?')]
+                                extension = path[path.rindex('.')+1:]
+                            except:
+                                pass
+                            # If the extension is blank, numeric, longer than 6 characters or not alphanumeric - then it's not a valid file type so set to default of xnl
+                            if extension == '' or extension.isnumeric() or len(extension) > 6 or not extension.isalnum():
+                                extension = 'xnl'
+                            fileName = fileName + '.' + extension
+                        
                         filePath = (
                                 waymorePath
                                 / 'results'
                                 / str(argsInput).replace('/','-')
-                                / f'{fileName[0:250]}.xnl'
+                                / f'{fileName}'
                         )
 
                         # Write the file

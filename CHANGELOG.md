@@ -1,5 +1,10 @@
 ## Changelog
 
+- v1.8
+
+  - Changed
+    - When archived responses are saved as files, the extension `.xnl` will no longer be used if `-url-filename` is passed. If `-url-filename` is not passed then the filename is represented by a hash value. The extension of these files will be set to `.xnl` only of the original file type cannot be derived from the original URL.
+
 - v1.7
 
   - New

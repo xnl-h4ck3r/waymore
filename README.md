@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About - v1.7
+## About - v1.8
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -120,7 +120,7 @@ When run, the following files are created in the target directory:
 
 - `waymore.txt` - If `-mode` is `U` or `B`, this file will contain links from archive.org. Also any additional links from commoncrawl.org (if `-xcc` wasn't passed) and otx.alienvault.com (if `-xav` wasn't passed).
 - `index.txt` - If `-mode` is `R` or `B`, and `-url-filname` was not passed then archived responses will be downloaded and hash values will be used for the saved file names. This file contains a comma separated list of `<hash>,<archive URL>,<timestamp>` in case you need to know which URLs produced which response.
-- `*.xnl` - These archived response files will be created if `-mode` was `R` or `B`. If `-url-filename` was passed the the file names will be the archive URL that generated the response, e.g. `https--example.com-robots.txt.xnl`, otherwise the file name will be a hash value, e.g. `7960113391501.xnl`. Using hash values mean that less files will be written as there will only be one file per unique response. These archived responses are edited, before being saved, to remove any reference to `web.archive.org`.
+- `ALL OTHER FILES` - These archived response files will be created if `-mode` was `R` or `B`. If `-url-filename` was passed the the file names will be the archive URL that generated the response, e.g. `https--example.com-robots.txt`, otherwise the file name will be a hash value, e.g. `7960113391501.xnl` (the extension of `.xnl` is used if the original file name cannot be derived from the URL). Using hash values mean that less files will be written as there will only be one file per unique response. These archived responses are edited, before being saved, to remove any reference to `web.archive.org`.
 
 ## Info and Suggestions
 
