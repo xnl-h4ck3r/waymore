@@ -452,7 +452,7 @@ def printProgressBar(
     try:
         percent = ("{0:." + str(decimals) + "f}").format(
             100 * (iteration / float(total))
-        )
+        ).rjust(5)
         filledLength = int(length * iteration // total)
         bar = fill * filledLength + "-" * (length - filledLength)
         # If the program is not piped with something else, write to stdout, otherwise write to stderr
@@ -616,7 +616,7 @@ def processArchiveUrl(url):
                         # FOR DEBUGGING PURPOSES
                         try:
                             if archiveHtml.find('archive.org') > 0 and os.environ.get('USER') == 'xnl':
-                                writerr(colored(getSPACER('"' + hashValue + '.xnl" CONTAINS ARCHIVE.ORG - CHECK ITS A VALID REFERENCE'), 'yellow'))
+                                writerr(colored(getSPACER('"' + fileName + '" CONTAINS ARCHIVE.ORG - CHECK ITS A VALID REFERENCE'), 'yellow'))
                         except:
                             pass
                             
@@ -643,7 +643,7 @@ def processArchiveUrl(url):
                 fillChar = "o"
                 if fillTest == 0:
                     fillChar = "O"
-                suffix="Complete  "
+                suffix="Complete "
                 # Show memory usage if -v option chosen, and check memory every 25 responses (or if its the last)
                 if (successCount + failureCount) % 25 == 1 or (successCount + failureCount) == totalResponses:
                     try:
@@ -654,7 +654,7 @@ def processArchiveUrl(url):
                                 + humanReadableSize(currentMemUsage)
                                 + ", Total Mem "
                                 + str(currentMemPercent)
-                                + "%)"
+                                + "%)   "
                             )
                     except:
                         if verbose():
