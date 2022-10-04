@@ -23,6 +23,7 @@ import random
 import sys
 import math
 import enum
+import pickle
 
 # Try to import psutil to show memory usage
 try:
@@ -54,6 +55,7 @@ fileCount = 0
 totalResponses = 0
 totalPages = 0
 indexFile = None
+continueRespFile = None
 inputIsDomainANDPath = False
 subs = '*.'
 path = ''
@@ -108,6 +110,7 @@ FILTER_MIME = ''
 FILTER_CODE = ''
 FILTER_KEYWORDS = ''
 URLSCAN_API_KEY = ''
+CONTINUE_RESPONSES_IF_PIPED = True
 
 # Define colours
 class tc:
@@ -325,7 +328,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, argsInput, terminalWidth
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, argsInput, terminalWidth
     try:
         
         # Set terminal width
@@ -414,6 +417,15 @@ def getConfig():
             except Exception as e:
                 writerr(colored('Unable to read "FILTER_KEYWORDS" from config.yml - default set', 'red'))
                 FILTER_KEYWORDS = ''
+            
+            try:
+                CONTINUE_RESPONSES_IF_PIPED = config.get('CONTINUE_RESPONSES_IF_PIPED')
+                if str(CONTINUE_RESPONSES_IF_PIPED) == 'None':
+                    writerr(colored('No value for "CONTINUE_RESPONSES_IF_PIPED" in config.yml - default set', 'yellow'))
+                    CONTINUE_RESPONSES_IF_PIPED = True
+            except Exception as e:
+                writerr(colored('Unable to read "FILTER_KEYWORDS" from config.yml - default set', 'red'))
+                CONTINUE_RESPONSES_IF_PIPED = True
                 
         except:
             writerr(colored('WARNING: Cannot find config.yml, so using default values', 'yellow'))
@@ -422,6 +434,7 @@ def getConfig():
             FILTER_CODE = DEFAULT_FILTER_CODE
             URLSCAN_API_KEY = ''
             FILTER_KEYWORDS = ''
+            CONTINUE_RESPONSES_IF_PIPED = True
             
     except Exception as e:
         writerr(colored('ERROR getConfig 1: ' + str(e), 'red'))
@@ -518,7 +531,7 @@ def processArchiveUrl(url):
     """
     Get the passed web archive response
     """
-    global stopProgram, successCount, failureCount, fileCount, waymorePath, totalResponses, indexFile, argsInput
+    global stopProgram, successCount, failureCount, fileCount, waymorePath, totalResponses, indexFile, argsInput, continueRespFile
     try:
         if stopProgram is None:
             
@@ -609,7 +622,7 @@ def processArchiveUrl(url):
                             try:
                                 timestamp = str(datetime.now())
                                 indexFile.write(hashValue+','+archiveUrl+' ,'+timestamp+'\n')
-                            
+                                indexFile.flush()
                             except Exception as e:
                                 writerr(colored(getSPACER('[ ERR ] Failed to write to index.txt for "' + archiveUrl + '": '+ str(e)), 'red'))
 
@@ -667,7 +680,15 @@ def processArchiveUrl(url):
                     length=getProgressBarLength(),
                     fill=fillChar
                 )
-                    
+                
+                # Write the total count to the continueResp.tmp file
+                try:
+                    continueRespFile.seek(0)
+                    continueRespFile.write(str(successCount + failureCount)+'\n')
+                except Exception as e:
+                    if verbose():
+                        writerr(colored(getSPACER('ERROR processArchiveUrl 2:  ' + str(e)), 'red'))
+                
             except Exception as e:
                 if verbose():
                     writerr(colored(getSPACER('Error for "'+url+'": ' + str(e)), 'red'))
@@ -1345,7 +1366,7 @@ def getWaybackUrls():
             session.mount('https://', HTTP_ADAPTER)
             session.mount('http://', HTTP_ADAPTER)
             resp = session.get(url+'&showNumPages=True', headers={"User-Agent":userAgent}) 
-            totalPages = int(resp.text.strip())
+            totalPages = int(resp.text.strip())+1
             
             # If the argument to limit the requests was passed and the total pages is larger than that, set to the limit
             if args.limit_requests != 0 and totalPages > args.limit_requests:
@@ -1367,7 +1388,7 @@ def getWaybackUrls():
 
         # Get a list of all the page URLs we need to visit
         pages = set()
-        for page in range(0, totalPages + 1):
+        for page in range(0, totalPages):
             pages.add(url+str(page))
         
         # Process the URLs from web archive        
@@ -1570,126 +1591,192 @@ def processResponses():
     """
     Get archived responses from archive.org
     """
-    global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput
+    global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput, continueRespFile, successCount, fileCount
     try:
-        # Set up filters
-        filterLimit = '&limit=' + str(args.limit)
-        if args.from_date is None:
-            filterFrom = ''
-        else:
-            filterFrom = '&from=' + str(args.from_date)
-        if args.to_date is None:
-            filterTo = ''
-        else:
-            filterTo = '&to=' + str(args.to_date)
-        
-        # Set keywords filter if -ko argument passed
-        filterKeywords = ''
-        if args.keywords_only:
-            filterKeywords = '&filter=original:.*(' + re.escape(FILTER_KEYWORDS).replace(',','|') + ').*'
-            
-        # Get the list again with filters and include timestamp
-        linksFound = set()
-        
-        # Set mime content type filter
-        filterMIME = '&filter=!mimetype:warc/revisit' 
-        if FILTER_MIME.strip() != '':
-            filterMIME = filterMIME + '|' + re.escape(FILTER_MIME).replace(',','|')
-            
-        # Set status code filter
-        filterCode = ''
-        if FILTER_CODE.strip() != '':
-            filterCode = '&filter=!statuscode:' + re.escape(FILTER_CODE).replace(',','|')
-        
-        # Set the collapse parameter value in the archive.org URL. From the Wayback API docs:
-        # "A new form of filtering is the option to 'collapse' results based on a field, or a substring of a field.
-        # Collapsing is done on adjacent cdx lines where all captures after the first one that are duplicate are filtered out.
-        # This is useful for filtering out captures that are 'too dense' or when looking for unique captures."
-        if args.capture_interval == 'none': # get all
-            collapse = ''
-        elif args.capture_interval == 'h': # get at most 1 capture per hour
-            collapse = 'timestamp:10'
-        elif args.capture_interval == 'd': # get at most 1 capture per day
-            collapse = 'timestamp:8'
-        elif args.capture_interval == 'm': # get at most 1 capture per month
-            collapse = 'timestamp:6'
-
-        url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}',collapse) + filterMIME + filterCode + filterLimit + filterFrom + filterTo + filterKeywords
-            
-        if verbose():
-            write(colored('The archive URL requested to get responses: ','magenta')+colored(url+'\n','white'))
-        
-        write(colored('\rGetting list of response links (this can take a while for some domains)...\r','cyan'))
-            
-        # Build the list of links, concatenating timestamp and URL
-        try:
-            # Choose a random user agent string to use for any requests
-            success = True
-            userAgent = random.choice(USER_AGENT)
-            session = requests.Session()
-            session.mount('https://', HTTP_ADAPTER)
-            session.mount('http://', HTTP_ADAPTER)
-            resp = session.get(url, stream=True, headers={"User-Agent":userAgent}, timeout=args.timeout)  
-        except ConnectionError as ce:
-            writerr(colored(getSPACER('[ ERR ] archive.org connection error'), 'red'))
-            resp = None
-            success = False
-            return 
-        except Exception as e:
-            writerr(colored(getSPACER('[ ERR ] Couldn\'t get list of responses: ' + str(e)),'red'))
-            resp = None
-            success = False
-            return
-        finally:
-            try:
-                if resp is not None:
-                    # If the response from archive.org is empty, then no responses were found
-                    if resp.text == '':
-                        writerr(colored(getSPACER('No archived responses were found on archive.org for the given search parameters.'),'red'))
-                        success = False
-                    # If a status other than 200, then stop
-                    if resp.status_code != 200:
-                        if verbose(): 
-                            writerr(colored(getSPACER('[ '+str(resp.status_code)+' ] Error for '+url),'red'))
-                        success = False
-                if not success:
-                    if args.keywords_only:
-                        writerr(colored(getSPACER('Failed to get links from archive.org - consider removing -ko / --keywords-only argument, or changing FILTER_KEYWORDS in config.yml'), 'red'))
-                    else:    
-                        writerr(colored(getSPACER('Failed to get links from archive.org - check input domain and try again.'), 'red'))
-                    return
-            except:
-                pass
-        
-        # Go through the response to save the links found        
-        for line in resp.iter_lines():
-            try:
-                results = line.decode("utf-8") 
-                timestamp = results.split(' ')[0]
-                originalUrl = results.split(' ')[1]
-                linksFoundAdd(timestamp+'/'+originalUrl)
-            except Exception as e:
-                writerr(colored(getSPACER('ERROR processResponses 2: Cannot to get link from line: '+str(line)), 'red'))
-        
-        # Remove any links that have URL exclusions
-        linkRequests = set()
-        exclusionRegex = re.compile(r'('+re.escape(FILTER_URL).replace(',','|')+')',flags=re.IGNORECASE)
-        for link in linksFound:
-            # Only add the link if:
-            # a) if the -ra --regex-after was passed that it matches that
-            # b) it does not match the URL exclusions
-            if (args.regex_after is None or re.search(args.regex_after, link, flags=re.IGNORECASE) is not None) and exclusionRegex.search(link) is None:
-                linkRequests.add(link)
-            
-        # Get the total number of responses we will try to get
-        totalResponses = len(linkRequests)
-        
-        # If the limit has been set over the default, give a warning that this could take a long time!
-        if totalResponses > DEFAULT_LIMIT:
-            writerr(colored(getSPACER('WARNING: Downloading ' + str(totalResponses) + ' responses may take a loooooooong time! Consider using arguments -l, -ci, -from and -to wisely!'),'yellow'))
-
+       
         # Create 'results' and domain directory if needed
         createDirs()
+            
+        # Check if a continueResp.tmp and responses.tmp files exists
+        runPrevious = 'n'
+        if os.path.exists(waymorePath
+                / 'results'
+                / str(argsInput).replace('/','-')
+                / 'continueResp.tmp') and os.path.exists(waymorePath
+                / 'results'
+                / str(argsInput).replace('/','-')
+                / 'responses.tmp'):
+            
+            # Load the links into the set
+            with open(
+                waymorePath
+                / 'results'
+                / str(argsInput).replace('/','-')
+                / 'responses.tmp',
+                'rb',
+            ) as fl:
+                linkRequests = pickle.load(fl)
+            totalPrevResponses = len(linkRequests)        
+               
+            # Get the previous end position to start again at this point
+            try:
+                with open(waymorePath
+                    / 'results'
+                    / str(argsInput).replace('/','-')
+                    / 'continueResp.tmp',
+                    'r') as fc:
+                        successCount = int(fc.readline().strip())
+            except Exception as e:
+                successCount = 0
+                
+            # Ask the user if we should continue with previous run if the current starting position is greater than 0 and less than the total
+            if successCount > 0 and successCount < totalPrevResponses:
+                 # If the program is not piped from or to another process, then ask whether to continue with previous run
+                if sys.stdout.isatty() and sys.stdin.isatty():
+                    write(colored('The previous run to get archived responses for ' + argsInput  + ' was not completed.\nYou can start from response ' + str(successCount) + ' of ' + str(totalPrevResponses) + ' for the previous run, or you can start a new run with your specified arguments.', 'yellow'))
+                    runPrevious = input('Continue with previous run? y/n: ')
+                else:
+                    if CONTINUE_RESPONSES_IF_PIPED:
+                        runPrevious = 'y'
+                        writerr(colored('The previous run to get archived responses for ' + argsInput  + ' was not completed. Starting from response ' + str(successCount) + ' of ' + str(totalPrevResponses) + '... ', 'yellow'))
+                    else:
+                        runPrevious = 'n'
+        
+        # If we are going to run a new run
+        if runPrevious.lower() == 'n':
+            
+            # Set start point
+            successCount = 0
+            
+            # Set up filters
+            filterLimit = '&limit=' + str(args.limit)
+            if args.from_date is None:
+                filterFrom = ''
+            else:
+                filterFrom = '&from=' + str(args.from_date)
+            if args.to_date is None:
+                filterTo = ''
+            else:
+                filterTo = '&to=' + str(args.to_date)
+            
+            # Set keywords filter if -ko argument passed
+            filterKeywords = ''
+            if args.keywords_only:
+                filterKeywords = '&filter=original:.*(' + re.escape(FILTER_KEYWORDS).replace(',','|') + ').*'
+                
+            # Get the list again with filters and include timestamp
+            linksFound = set()
+            
+            # Set mime content type filter
+            filterMIME = '&filter=!mimetype:warc/revisit' 
+            if FILTER_MIME.strip() != '':
+                filterMIME = filterMIME + '|' + re.escape(FILTER_MIME).replace(',','|')
+                
+            # Set status code filter
+            filterCode = ''
+            if FILTER_CODE.strip() != '':
+                filterCode = '&filter=!statuscode:' + re.escape(FILTER_CODE).replace(',','|')
+            
+            # Set the collapse parameter value in the archive.org URL. From the Wayback API docs:
+            # "A new form of filtering is the option to 'collapse' results based on a field, or a substring of a field.
+            # Collapsing is done on adjacent cdx lines where all captures after the first one that are duplicate are filtered out.
+            # This is useful for filtering out captures that are 'too dense' or when looking for unique captures."
+            if args.capture_interval == 'none': # get all
+                collapse = ''
+            elif args.capture_interval == 'h': # get at most 1 capture per hour
+                collapse = 'timestamp:10'
+            elif args.capture_interval == 'd': # get at most 1 capture per day
+                collapse = 'timestamp:8'
+            elif args.capture_interval == 'm': # get at most 1 capture per month
+                collapse = 'timestamp:6'
+
+            url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}',collapse) + filterMIME + filterCode + filterLimit + filterFrom + filterTo + filterKeywords
+                
+            if verbose():
+                write(colored('The archive URL requested to get responses: ','magenta')+colored(url+'\n','white'))
+            
+            write(colored('\rGetting list of response links (this can take a while for some domains)...\r','cyan'))
+                
+            # Build the list of links, concatenating timestamp and URL
+            try:
+                # Choose a random user agent string to use for any requests
+                success = True
+                userAgent = random.choice(USER_AGENT)
+                session = requests.Session()
+                session.mount('https://', HTTP_ADAPTER)
+                session.mount('http://', HTTP_ADAPTER)
+                resp = session.get(url, stream=True, headers={"User-Agent":userAgent}, timeout=args.timeout)  
+            except ConnectionError as ce:
+                writerr(colored(getSPACER('[ ERR ] archive.org connection error'), 'red'))
+                resp = None
+                success = False
+                return 
+            except Exception as e:
+                writerr(colored(getSPACER('[ ERR ] Couldn\'t get list of responses: ' + str(e)),'red'))
+                resp = None
+                success = False
+                return
+            finally:
+                try:
+                    if resp is not None:
+                        # If the response from archive.org is empty, then no responses were found
+                        if resp.text == '':
+                            writerr(colored(getSPACER('No archived responses were found on archive.org for the given search parameters.'),'red'))
+                            success = False
+                        # If a status other than 200, then stop
+                        if resp.status_code != 200:
+                            if verbose(): 
+                                writerr(colored(getSPACER('[ '+str(resp.status_code)+' ] Error for '+url),'red'))
+                            success = False
+                    if not success:
+                        if args.keywords_only:
+                            writerr(colored(getSPACER('Failed to get links from archive.org - consider removing -ko / --keywords-only argument, or changing FILTER_KEYWORDS in config.yml'), 'red'))
+                        else:    
+                            writerr(colored(getSPACER('Failed to get links from archive.org - check input domain and try again.'), 'red'))
+                        return
+                except:
+                    pass
+            
+            # Go through the response to save the links found        
+            for line in resp.iter_lines():
+                try:
+                    results = line.decode("utf-8") 
+                    timestamp = results.split(' ')[0]
+                    originalUrl = results.split(' ')[1]
+                    linksFoundAdd(timestamp+'/'+originalUrl)
+                except Exception as e:
+                    writerr(colored(getSPACER('ERROR processResponses 3: Cannot to get link from line: '+str(line)), 'red'))
+            
+            # Remove any links that have URL exclusions
+            linkRequests = []
+            exclusionRegex = re.compile(r'('+re.escape(FILTER_URL).replace(',','|')+')',flags=re.IGNORECASE)
+            for link in linksFound:
+                # Only add the link if:
+                # a) if the -ra --regex-after was passed that it matches that
+                # b) it does not match the URL exclusions
+                if (args.regex_after is None or re.search(args.regex_after, link, flags=re.IGNORECASE) is not None) and exclusionRegex.search(link) is None:
+                    linkRequests.append(link)
+                    
+            # Write the links to a temp file
+            with open(
+                    waymorePath
+                    / 'results'
+                    / str(argsInput).replace('/','-')
+                    / 'responses.tmp',
+                    'wb',
+                ) as f:
+                pickle.dump(linkRequests, f)
+                
+        # Get the total number of responses we will try to get and set the current file count to the success count
+        totalResponses = len(linkRequests)
+        fileCount = successCount
+        
+        # If the limit has been set over the default, give a warning that this could take a long time!
+        if totalResponses - successCount > DEFAULT_LIMIT:
+            if successCount > 0:
+                writerr(colored(getSPACER('WARNING: Downloading remaining ' + str(totalResponses - successCount) + ' responses may take a loooooooong time! Consider using arguments -l, -ci, -from and -to wisely!'),'yellow'))
+            else:
+                writerr(colored(getSPACER('WARNING: Downloading ' + str(totalResponses) + ' responses may take a loooooooong time! Consider using arguments -l, -ci, -from and -to wisely!'),'yellow'))
         
         # Open the index file if hash value is going to be used (not URL)
         if not args.url_filename:
@@ -1701,16 +1788,42 @@ def processResponses():
                 'a',
             )
         
-        # Process the URLs from web archive        
+        # Open the continue.tmp file to store what record we are upto
+        continueRespFile = open(
+                waymorePath
+                / 'results'
+                / str(argsInput).replace('/','-')
+                / 'continueResp.tmp',
+                'w+',
+            )
+        
+        # Process the URLs from web archive   
         if stopProgram is None:
             p = mp.Pool(args.processes)
-            p.map(processArchiveUrl, linkRequests)
+            p.map(processArchiveUrl, linkRequests[successCount:])
             p.close()
             p.join()
             
+        # Delete the tmp files now it has run successfully
+        if stopProgram is None:
+            try:
+                os.remove(waymorePath
+                    / 'results'
+                    / str(argsInput).replace('/','-')
+                    / 'continueResp.tmp')
+                os.remove(waymorePath
+                    / 'results'
+                    / str(argsInput).replace('/','-')
+                    / 'responses.tmp')
+            except:
+                pass
+        
         # Close the index file if hash value is going to be used (not URL)
         if not args.url_filename:
             indexFile.close()
+            
+        # Close the continueResp.tmp file
+        continueRespFile.close()
         
     except Exception as e:
         writerr(colored(getSPACER('ERROR processResponses 1: ' + str(e)), 'red'))
@@ -1948,9 +2061,9 @@ if __name__ == '__main__':
     try:     
 
         # For each input (maybe multiple if a file was passed)
-        for input in inputValues:
+        for inpt in inputValues:
             
-            argsInput = input.rstrip('\n')
+            argsInput = inpt.rstrip('\n')
             
             # Reset global variables
             linksFound = set()

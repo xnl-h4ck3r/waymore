@@ -1,5 +1,15 @@
 ## Changelog
 
+- v1.9
+
+  - New
+    - Add functionality to continue downloading archived responses if it does not complete for any reason. When downloading archived responses, a file called `responses.tmp` will be created with the links of all responses that will be downloaded. There will also be a `continueresp.tmp` that will store the index of the current response being saved. If these files exist when run again, the user will be prompted whether to continue a previous run (so new filters will be ignored) or start a new one.
+    - Add `CONTINUE_RESPONSES_IF_PIPED` to `config.yml`. If `stdin` or `stdout` is piped from another process, the user is not prompted whether they want a previous run of downloading responses. This value will determine whether to continue a previous run, or start a new one, in that situation.
+  - Changed
+    - Corrected the total pages shown when getting wayback URLs
+    - Included missing packages in the `requirements.txt` document.
+    - Fix Issue #16 (https://github.com/xnl-h4ck3r/waymore/issues/16)
+
 - v1.8
 
   - Changed

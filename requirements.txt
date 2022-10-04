@@ -3,3 +3,5 @@ PyYAML
 requests
 setuptools
 termcolor
+psutil
+urlparse3

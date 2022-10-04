@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About - v1.8
+## About - v1.9
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -103,13 +103,14 @@ If the input is just a domain, e.g. `redbull.com` then the `-mode` defaults to `
 
 ## config.yml
 
-The `config.yml` file have filter values that can be updated to suit your needs. These are all provided as comma separated lists:
+The `config.yml` file have values that can be updated to suit your needs. Filters are all provided as comma separated lists:
 
 - `FILTER_CODE` - Exclusions used to exclude responses we will try to get from web.archive.org, and also for file names when `-i` is a directory, e.g. `301,302`
 - `FILTER_MIME` - MIME Content-Type exclusions used to filter links and responses from web.archive.org through their API, e.g. `'text/css,image/jpeg`
 - `FILTER_URL` - Response code exclusions we will use to filter links and responses from web.archive.org through their API, e.g. `.css,.jpg`
 - `FILTER_KEYWORDS` - Only links and responses will be returned that contain the specified keywords if the `-ko`/`--keywords-only` argument is passed, e.g. `admin,portal`
 - `URLSCAN_API_KEY` - You can sign up to [urlscan.io](https://urlscan.io/user/signup) to get a **FREE** API key (there are also paid subscriptions available). It is recommended you get a key and put it into the config file so that you can get more back (and quicker) from their API. NOTE: You will get rate limited unless you have a full paid subscription.
+- `CONTINUE_RESPONSES_IF_PIPED` - If retrieving archive responses doesn't complete, you will be prompted next time whether you want to continue with the previous run. However, if `stdout` is piped to another process it is assumed you don't want to have an interactive prompt. A value of `True` (default) will determine assure the previous run will be continued. if you want a fresh run every time then set to `False`.
 
 **NOTE: The MIME types cannot be filtered for Alien Vault results because they do not return that in the API response.**
 
@@ -148,6 +149,9 @@ The archive.org Wayback Machine CDX API can sometimes can sometimes require a hu
 There is also a problem with the Wayback Machine CDX API where the number of pages returned is not correct when filters are applied and can cause issues (see https://github.com/internetarchive/wayback/issues/243). Until that issue is resolved, setting the `-lr` argument to a sensible value can help with that problem in the short term.
 
 **The provider API servers aren't designed to cope with huge volumes, so be sensible and considerate about what you hit them with!**
+
+When downloading archived responses, this can take a long time and can sometimes be killed by the machine for some reason, or manually killed by the user.
+In the targets `results` directory, a file called `responses.tmp` is created at the start of the process and contains all the response URLs that will be retrieved. There will also be a file called `continueResp.tmp` that stores the index of the latest response retrieved. If `waymore` is run to get responses (`-mode R` or `-mode B`), and these files exist, it means there was a previous incomplete run, and you will be asked if you want to continue with that one instead. It will then continue from where it stopped before.
 
 ## Some Basic Examples
 

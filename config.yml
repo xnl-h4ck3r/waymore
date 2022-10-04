@@ -3,3 +3,4 @@ FILTER_MIME: text/css,image/jpeg,image/jpg,image/png,image/svg+xml,image/gif,ima
 FILTER_URL: .css,.jpg,.jpeg,.png,.svg,.img,.gif,.mp4,.flv,.ogv,.webm,.webp,.mov,.mp3,.m4a,.m4p,.scss,.tif,.tiff,.ttf,.otf,.woff,.woff2,.bmp,.ico,.eot,.htc,.rtf,.swf,.image,/image,/img,/css,/wp-json,/wp-content,/wp-includes,/theme,/audio,/captcha,/font,node_modules,/jquery,/bootstrap
 FILTER_KEYWORDS: admin,login,logon,signin,register,dashboard,portal,ftp,cpanel,panel,.js,api,robots.txt,graph,gql
 URLSCAN_API_KEY:
+CONTINUE_RESPONSES_IF_PIPED: True
