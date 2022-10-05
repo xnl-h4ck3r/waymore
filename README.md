@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About - v1.9
+## About - v1.10
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -63,6 +63,7 @@ $ sudo pip3 install -r requirements.txt
 | -m            | --memory-threshold      | The memory threshold percentage. If the machines memory goes above the threshold, the program will be stopped and ended gracefully before running out of memory (default: 95)                                                                                                                                             |
 | -ko           | --keywords-only         | Only return links and responses that contain keywords that you are interested in. This can reduce the time it takes to get results. Keywords are given in a comma separated list in the `config.yml` file with the `FILTER_KEYWORDS` key                                                                                  |
 | -lr           | --limit-requests        | Limit the number of requests that will be made when getting links from a source (this doesn\'t apply to Common Crawl). Some targets can return a huge amount of requests needed that are just not feasible to get, so this can be used to manage that situation. This defaults to 0 (Zero) which means there is no limit. |
+| -ow           | --output-overwrite      | If the URL output file (`waymore.txt`) already exists, it will be overwritten instead of being appended to.                                                                                                                                                                                                               |
 | -v            | --verbose               | Verbose output                                                                                                                                                                                                                                                                                                            |
 | -h            | --help                  | show the help message and exit                                                                                                                                                                                                                                                                                            |
 
@@ -119,7 +120,7 @@ The `config.yml` file have values that can be updated to suit your needs. Filter
 In the path of the `waymore.py` file, a `results` directory will be created. Within that, a directory will be created with target domain (or domain with path) passed with `-i` (or for each line of a file passed with `-i`).
 When run, the following files are created in the target directory:
 
-- `waymore.txt` - If `-mode` is `U` or `B`, this file will contain links from archive.org. Also any additional links from commoncrawl.org (if `-xcc` wasn't passed) and otx.alienvault.com (if `-xav` wasn't passed).
+- `waymore.txt` - If `-mode` is `U` or `B`, this file will contain links from selected sources. Links will be retrieved from archive.org Wayback Machine (unless `-xwm` was passed), commoncrawl.org (unless `-xcc` was passed), otx.alienvault.com (unless `-xav` was passed) and urlscan.io (unless `-xus` was passed). If the `-ow` option was also passed, any existing `waymore.txt` file in the target results directory will be overwritten, otherwise new links will be appended and duplicates removed.
 - `index.txt` - If `-mode` is `R` or `B`, and `-url-filname` was not passed then archived responses will be downloaded and hash values will be used for the saved file names. This file contains a comma separated list of `<hash>,<archive URL>,<timestamp>` in case you need to know which URLs produced which response.
 - `ALL OTHER FILES` - These archived response files will be created if `-mode` was `R` or `B`. If `-url-filename` was passed the the file names will be the archive URL that generated the response, e.g. `https--example.com-robots.txt`, otherwise the file name will be a hash value, e.g. `7960113391501.xnl` (the extension of `.xnl` is used if the original file name cannot be derived from the URL). Using hash values mean that less files will be written as there will only be one file per unique response. These archived responses are edited, before being saved, to remove any reference to `web.archive.org`.
 

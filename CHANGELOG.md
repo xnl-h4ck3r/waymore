@@ -1,5 +1,13 @@
 ## Changelog
 
+- v1.10
+
+  - New
+    - If `-mode U` is run for the same target again, by default new links found will be added to the `waymore.txt` file and duplicates removed.
+    - Added argument `-ow`/`--output-overwrite` that can be passed to force the `waymore.txt` file to be overwritten with newly found links instead of being appended.
+  - Changed
+    - Change the README.md to reflect new changes
+
 - v1.9
 
   - New

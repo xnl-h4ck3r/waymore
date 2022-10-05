@@ -272,6 +272,9 @@ def showOptions():
                 write(colored('URLScan API Key:', 'magenta')+colored(' {none} - You can get a FREE or paid API Key at https://urlscan.io/user/signup which will let you get more bac, and quicker.','white'))
             else:
                 write(colored('URLScan API Key: ', 'magenta')+colored(URLSCAN_API_KEY))
+        
+        if args.mode in ['U','B']:
+            write(colored('-ow: ' +str(args.output_overwrite), 'magenta')+colored(' Whether the URL output file (waymore.txt) will be overwritten if it already exists. If False (default), it will be appended to, and duplicates removed.','white'))
             
         if args.mode in ['R','B']:
             if args.limit == 0:
@@ -710,6 +713,21 @@ def processURLOutput():
         # Create 'results' and domain directory if needed
         createDirs()
         
+        # If the -ow / --output_overwrite argument was passed and the file exists already, get the contents of the file to include
+        appendedUrls = False
+        if not args.output_overwrite:
+            try:
+                existingLinks = open(waymorePath
+                    / 'results'
+                    / str(argsInput).replace('/','-')
+                    / 'waymore.txt',
+                    'r',)
+                for link in existingLinks.readlines():
+                    linksFound.add(link.strip())
+                appendedUrls = True
+            except Exception as e:
+                pass
+        
         try:
             # Open the output file
             outFile = open(
@@ -756,13 +774,22 @@ def processURLOutput():
             if outputCount == 0:
                 write(colored('No links were found so nothing written to file.\n', 'cyan'))
             else:   
-                write(
-                    colored('Links successfully written to file ', 'cyan')+colored( 
-                    waymorePath
-                    / 'results'
-                    / str(argsInput).replace('/','-')
-                    / 'waymore.txt\n',
-                'white'))
+                if appendedUrls:
+                    write(
+                        colored('Links successfully appended to file ', 'cyan')+colored( 
+                        waymorePath
+                        / 'results'
+                        / str(argsInput).replace('/','-')
+                        / 'waymore.txt',
+                        'white')+colored(' and duplicates removed.\n','cyan'))
+                else:
+                    write(
+                        colored('Links successfully written to file ', 'cyan')+colored( 
+                        waymorePath
+                        / 'results'
+                        / str(argsInput).replace('/','-')
+                        / 'waymore.txt\n',
+                        'white'))
 
     except Exception as e:
         if verbose():
@@ -2038,6 +2065,12 @@ if __name__ == '__main__':
         type=int,
         help='Limit the number of requests that will be made when getting links from a source (this doesn\'t apply to Common Crawl). Some targets can return a huge amount of requests needed that are just not feasible to get, so this can be used to manage that situation. This defaults to 0 (Zero) which means there is no limit.',
         default=0,
+    )
+    parser.add_argument(
+        "-ow",
+        "--output-overwrite",
+        action="store_true",
+        help="If the URL output file (waymore.txt) already exists, it will be overwritten instead of being appended to.",
     )
     parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
     args = parser.parse_args()
