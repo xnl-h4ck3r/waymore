@@ -1,4 +1,4 @@
-<center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
+<center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
 ## About - v1.11
 
