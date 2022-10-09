@@ -275,6 +275,7 @@ def showOptions():
         
         if args.mode in ['U','B']:
             write(colored('-ow: ' +str(args.output_overwrite), 'magenta')+colored(' Whether the URL output file (waymore.txt) will be overwritten if it already exists. If False (default), it will be appended to, and duplicates removed.','white'))
+            write(colored('-nlf: ' +str(args.new_links_file), 'magenta')+colored(' Whether the URL output file waymore.new will also be written. It will include only new links found for the same target on subsequent runs. This can be used for continuous monitoring of a target.','white'))
             
         if args.mode in ['R','B']:
             if args.limit == 0:
@@ -713,33 +714,34 @@ def processURLOutput():
         # Create 'results' and domain directory if needed
         createDirs()
         
+        fullPath = str(waymorePath) + '/results/' + str(argsInput).replace('/','-') + '/'
+                
         # If the -ow / --output_overwrite argument was passed and the file exists already, get the contents of the file to include
         appendedUrls = False
         if not args.output_overwrite:
             try:
-                existingLinks = open(waymorePath
-                    / 'results'
-                    / str(argsInput).replace('/','-')
-                    / 'waymore.txt',
-                    'r',)
+                existingLinks = open(fullPath + 'waymore.txt','r',)
                 for link in existingLinks.readlines():
                     linksFound.add(link.strip())
                 appendedUrls = True
             except Exception as e:
                 pass
         
+        # If the -nlf / --new-links-file argument is passes, rename the old waymore.txt file if it exists
         try:
-            # Open the output file
-            outFile = open(
-                waymorePath
-                / 'results'
-                / str(argsInput).replace('/','-')
-                / 'waymore.txt',
-                'w',
-            )
+            if args.new_links_file: 
+                if os.path.exists(fullPath + 'waymore.txt'):
+                    os.rename(fullPath + 'waymore.txt', fullPath + 'waymore.old')    
         except Exception as e:
             if verbose():
-                writerr(colored("ERROR processURLOutput 2: " + str(e), "red"))
+                writerr(colored('ERROR processURLOutput 5: ' + str(e), 'red'))
+                    
+        try:
+            # Open the output file
+            outFile = open(fullPath + 'waymore.txt','w')
+        except Exception as e:
+            if verbose():
+                writerr(colored('ERROR processURLOutput 2: ' + str(e), 'red'))
                 sys.exit()
 
         # Go through all links, and output what was found
@@ -757,7 +759,7 @@ def processURLOutput():
                         outputCount = outputCount + 1
             except Exception as e:
                 if verbose():
-                    writerr(colored("ERROR processURLOutput 3: " + str(e), "red"))
+                    writerr(colored('ERROR processURLOutput 3: ' + str(e), 'red'))
 
         # If there are less links output because of filters, show the new total
         if args.regex_after is not None and linkCount > 0 and outputCount < linkCount:
@@ -768,7 +770,7 @@ def processURLOutput():
             outFile.close()
         except Exception as e:
             if verbose():
-                writerr(colored("ERROR processURLOutput 4: " + str(e), "red"))
+                writerr(colored('ERROR processURLOutput 4: ' + str(e), 'red'))
 
         if verbose():
             if outputCount == 0:
@@ -776,21 +778,40 @@ def processURLOutput():
             else:   
                 if appendedUrls:
                     write(
-                        colored('Links successfully appended to file ', 'cyan')+colored( 
-                        waymorePath
-                        / 'results'
-                        / str(argsInput).replace('/','-')
-                        / 'waymore.txt',
+                        colored('Links successfully appended to file ', 'cyan')+colored(fullPath + 'waymore.txt',
                         'white')+colored(' and duplicates removed.\n','cyan'))
                 else:
                     write(
-                        colored('Links successfully written to file ', 'cyan')+colored( 
-                        waymorePath
-                        / 'results'
-                        / str(argsInput).replace('/','-')
-                        / 'waymore.txt\n',
+                        colored('Links successfully written to file ', 'cyan')+colored(fullPath + 'waymore.txt\n',
                         'white'))
 
+        try:
+            # If the -nlf / --new-links-file argument is passes, create the waymore.new file
+            if args.new_links_file:
+                
+                # If waymore.old and waymore.txt exists then get the difference to write to waymore.new
+                if os.path.exists(fullPath + 'waymore.old') and os.path.exists(fullPath + 'waymore.txt'):
+                    
+                    # Get all the old links
+                    with open(fullPath + 'waymore.old','r') as oldFile:
+                        oldLinks=set(oldFile.readlines())
+
+                    # Get all the new links
+                    with open(fullPath + 'waymore.txt','r') as newFile:
+                        newLinks=set(newFile.readlines())
+
+                    # Create a file with most recent new links
+                    with open(fullPath + 'waymore.new','w') as newOnly:
+                        for line in list(newLinks-oldLinks):
+                            newOnly.write(line)
+
+                    # Delete the old file
+                    os.remove(fullPath + 'waymore.old')
+                
+        except Exception as e:
+            if verbose():
+                writerr(colored("ERROR processURLOutput 6: " + str(e), "red"))
+                
     except Exception as e:
         if verbose():
             writerr(colored("ERROR processURLOutput 1: " + str(e), "red"))
@@ -853,7 +874,7 @@ def validateArgInput(x):
     for i in inputValues:        
         if isInputFile:
             # Check if input seems to be valid domain or URL
-            match = re.search(r"^((?!-))(xn--)?([a-z0-9][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.)+(xn--)?([a-z0-9\-]{1,61}|[a-z0-9\-]{1,30}\.[a-z]{2,})(/[^\n|?#]*)?$", i.rstrip('\n'))
+            match = re.search(r"^((?!-))(xn--)?([a-z0-9][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.)+(xn--)?([a-z0-9\-]{1,61}|[a-z0-9\-]{1,30}\.[a-z]{2,})(/[^\n|?#]*)?$", i.strip().rstrip('\n'))
             if match is None:
                 error = 'Each line of the input file must contain a domain only (with no schema) to search for all links, or a domain and path (with no schema) to just get archived response for that URL. Do not pass a query string or fragment in any lines.'
                 if x == '<stdin>':
@@ -863,7 +884,7 @@ def validateArgInput(x):
                     raise argparse.ArgumentTypeError(error)
         else:
             # Check if input seems to be valid domain or URL
-            match = re.search(r"^((?!-))(xn--)?([a-z0-9][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.)+(xn--)?([a-z0-9\-]{1,61}|[a-z0-9\-]{1,30}\.[a-z]{2,})(/[^\n|?#]*)?$", i.rstrip('\n'))
+            match = re.search(r"^((?!-))(xn--)?([a-z0-9][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.)+(xn--)?([a-z0-9\-]{1,61}|[a-z0-9\-]{1,30}\.[a-z]{2,})(/[^\n|?#]*)?$", i.strip().rstrip('\n'))
             if match is None:
                 error = 'Pass a domain only (with no schema) to search for all links, or pass a domain and path (with no schema) to just get archived responses for that URL. Do not pass a query string or fragment.'
                 if x == '<stdin>':
@@ -1399,7 +1420,13 @@ def getWaybackUrls():
             if args.limit_requests != 0 and totalPages > args.limit_requests:
                 totalPages = args.limit_requests
         except Exception as e:
-            writerr(colored(getSPACER('[ ERR ] unable to get links from archive.org: ' + str(e)), 'red'))
+            try:
+                if resp.text.lower().find('blocked site error') > 0:
+                    writerr(colored(getSPACER('[ ERR ] unable to get links from archive.org: Blocked Site Error (they block the target site)'), 'red'))
+                else:
+                    writerr(colored(getSPACER('[ ERR ] unable to get links from archive.org: ' + str(resp.text.strip())), 'red'))
+            except:
+                writerr(colored(getSPACER('[ ERR ] unable to get links from archive.org: ' + str(e)), 'red'))
             return
         
         # If the rate limit was reached end now
@@ -1759,7 +1786,10 @@ def processResponses():
                         if args.keywords_only:
                             writerr(colored(getSPACER('Failed to get links from archive.org - consider removing -ko / --keywords-only argument, or changing FILTER_KEYWORDS in config.yml'), 'red'))
                         else:    
-                            writerr(colored(getSPACER('Failed to get links from archive.org - check input domain and try again.'), 'red'))
+                            if resp.text.lower().find('blocked site error') > 0:
+                                writerr(colored(getSPACER('Failed to get links from archive.org - Blocked Site Error (they block the target site)'), 'red'))
+                            else:
+                                writerr(colored(getSPACER('Failed to get links from archive.org - check input domain and try again.'), 'red'))
                         return
                 except:
                     pass
@@ -2072,9 +2102,21 @@ if __name__ == '__main__':
         action="store_true",
         help="If the URL output file (waymore.txt) already exists, it will be overwritten instead of being appended to.",
     )
+    parser.add_argument(
+        "-nlf",
+        "--new-links-file",
+        action="store_true",
+        help="If this argument is passed, a waymore.new file will also be written that will contain links for the latest run.",
+    )
     parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
+    parser.add_argument('--version', action='store_true', help="Show version number")
     args = parser.parse_args()
 
+    # If --version was passed, display version and exit
+    if args.version:
+        write(colored('Waymore - v' + __import__('waymore').__version__,'cyan'))
+        sys.exit()
+        
     # If no input was given, raise an error
     if sys.stdin.isatty():
         if args.input is None:
@@ -2096,7 +2138,7 @@ if __name__ == '__main__':
         # For each input (maybe multiple if a file was passed)
         for inpt in inputValues:
             
-            argsInput = inpt.rstrip('\n')
+            argsInput = inpt.strip().rstrip('\n')
             
             # Reset global variables
             linksFound = set()

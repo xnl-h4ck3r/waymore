@@ -1,5 +1,17 @@
 ## Changelog
 
+- v1.11
+
+  - New
+    - Added argument `-nlf`/`--new-links-file`. If passed, and you run `-mode U` or `-mode B` to get URLs more than once for the same target, the `waymore.txt` will still be appended with new links (unless `-ow` is passed), but a new output file called `waymore.new` will also be written. If there are no new links, the empty file will still be created. This can be used for continuous monitoring of a target.
+    - Added a `waymore` folder containing a new `__init__.py` file that contains the `__version__` value.
+    - Added argument `--verison` to display the current version.
+    - Show better error messages if the archive.org site returns a `Blocked Site Error`.
+  - Changed
+    - If a file of domains is passed as input, make sure spaces are stripped from the lines.
+    - Change `.gitignore` to include `__pycache__`.
+    - Move images to `waymore/images` folder.
+
 - v1.10
 
   - New

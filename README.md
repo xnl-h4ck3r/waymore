@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/raw/main/title.png"></center>
 
-## About - v1.10
+## About - v1.11
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -64,8 +64,10 @@ $ sudo pip3 install -r requirements.txt
 | -ko           | --keywords-only         | Only return links and responses that contain keywords that you are interested in. This can reduce the time it takes to get results. Keywords are given in a comma separated list in the `config.yml` file with the `FILTER_KEYWORDS` key                                                                                  |
 | -lr           | --limit-requests        | Limit the number of requests that will be made when getting links from a source (this doesn\'t apply to Common Crawl). Some targets can return a huge amount of requests needed that are just not feasible to get, so this can be used to manage that situation. This defaults to 0 (Zero) which means there is no limit. |
 | -ow           | --output-overwrite      | If the URL output file (`waymore.txt`) already exists, it will be overwritten instead of being appended to.                                                                                                                                                                                                               |
+| -nlf          | --new-links-file        | If this argument is passed, a waymore.new file will also be written that will contain links for the latest run. This can be used for continuous monitoring of a target.                                                                                                                                                   |
 | -v            | --verbose               | Verbose output                                                                                                                                                                                                                                                                                                            |
-| -h            | --help                  | show the help message and exit                                                                                                                                                                                                                                                                                            |
+|               | --version               | Show current version number.                                                                                                                                                                                                                                                                                              |
+| -h            | --help                  | Show the help message and exit.                                                                                                                                                                                                                                                                                           |
 
 ## Run with docker
 
@@ -160,7 +162,7 @@ In the targets `results` directory, a file called `responses.tmp` is created at 
 
 Just get the URLs from all sources for `redbull.com` (`-mode U` is just for URLs, so no responses are downloaded):
 
-<center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/example1.png"></center>
+<center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/example1.png"></center>
 
 The URLs are saved in the same path as `waymore.py` under `results/redbull.com/waymore.txt`
 
@@ -169,12 +171,12 @@ The URLs are saved in the same path as `waymore.py` under `results/redbull.com/w
 Get ALL the URLs from Wayback for `redbull.com` (no filters are applied with `-f`, and no URLs are retrieved from Commone Crawl because `-xcc` is passed, or from Alien Vault because `-xav` is passed).
 Save the FIRST 1000 responses that are found starting from 2015 (`-l 1000 -from 2015`):
 
-<center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/example2.png"></center>
+<center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/example2.png"></center>
 
 The `-mode` wasn't explicitly set so defaults to `B` (Both - retrieve URLs AND download responses).
 A file will be created for each unique response and also saved in `results/redbull.com/`:
 
-<center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/example3.png"></center>
+<center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/example3.png"></center>
 
 There will also be a file `results/redbull.com/index.txt` that will contain a reference to what URLs gave the response for what file, e.g.
 

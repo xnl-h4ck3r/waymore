@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 setup(
     name="waymore",
     packages=find_packages(),
-    version="1.10",
+    version=__import__('waymore').__version__,
     description="Find way more from the Wayback Machine",
     long_description=open("README.md").read(),
     author="@xnl-h4ck3r",
