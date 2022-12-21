@@ -1,5 +1,10 @@
 ## Changelog
 
+- v1.12
+
+  - New
+    - Added argument `-c` / `--config` to specify the full path of a YML config file. If not passed, it looks for file `config.yml` in the same directory as runtime file `waymore.py`
+
 - v1.11
 
   - New

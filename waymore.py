@@ -252,6 +252,9 @@ def showOptions():
             write(colored('-mode: ' + args.mode, 'magenta')+colored(' Only Responses will be downloaded for the input.','white'))
         elif args.mode == 'B':
             write(colored('-mode: ' + args.mode, 'magenta')+colored(' URLs will be retrieved AND Responses will be downloaded for the input.','white'))
+
+        if args.config is not None:
+            write(colored('-c: ' + args.config, 'magenta')+colored(' The path of the config.yml file.','white'))
             
         if not inputIsDomainANDPath:
             if args.no_subs:
@@ -366,16 +369,25 @@ def getConfig():
             HTTP_ADAPTER = HTTPAdapter(max_retries=retry)
         except Exception as e:
             writerr(colored('ERROR getConfig 2: ' + str(e), 'red'))
+            
         # Try to get the config file values
-        try:        
-            waymorePath = Path(
-                os.path.dirname(os.path.realpath(__file__))
-            )
-            waymorePath.absolute
-            if waymorePath == '':
-                configPath = 'config.yml'
+        try:
+            # Get the path of the config file. If -c / --config argument is not passed, then it defaults to config.yml in the same directory as the run file
+            if args.config is None:        
+                waymorePath = Path(
+                    os.path.dirname(os.path.realpath(__file__))
+                )
+                waymorePath.absolute
+                if waymorePath == '':
+                    configPath = 'config.yml'
+                else:
+                    configPath = Path(waymorePath / 'config.yml')
             else:
-                configPath = Path(waymorePath / 'config.yml')
+                try:
+                    waymorePath = args.config
+                    configPath = Path(waymorePath)
+                except Exception as e:
+                    print(str(e))
             config = yaml.safe_load(open(configPath))
             try:
                 FILTER_URL = config.get('FILTER_URL')
@@ -432,7 +444,10 @@ def getConfig():
                 CONTINUE_RESPONSES_IF_PIPED = True
                 
         except:
-            writerr(colored('WARNING: Cannot find config.yml, so using default values', 'yellow'))
+            if args.config is None:
+                writerr(colored('WARNING: Cannot find file "config.yml", so using default values', 'yellow'))
+            else:
+                writerr(colored('WARNING: Cannot find file "' + args.config + '", so using default values', 'yellow'))
             FILTER_URL = DEFAULT_FILTER_URL
             FILTER_MIME = DEFAULT_FILTER_MIME
             FILTER_CODE = DEFAULT_FILTER_CODE
@@ -2107,6 +2122,12 @@ if __name__ == '__main__':
         "--new-links-file",
         action="store_true",
         help="If this argument is passed, a waymore.new file will also be written that will contain links for the latest run.",
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        action="store",
+        help="Path to the YML config file. If not passed, it looks for file 'config.yml' in the same directory as runtime file 'waymore.py'.",
     )
     parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
     parser.add_argument('--version', action='store_true', help="Show version number")

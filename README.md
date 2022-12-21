@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
-## About - v1.11
+## About - v1.12
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -65,6 +65,7 @@ $ sudo pip3 install -r requirements.txt
 | -lr           | --limit-requests        | Limit the number of requests that will be made when getting links from a source (this doesn\'t apply to Common Crawl). Some targets can return a huge amount of requests needed that are just not feasible to get, so this can be used to manage that situation. This defaults to 0 (Zero) which means there is no limit. |
 | -ow           | --output-overwrite      | If the URL output file (`waymore.txt`) already exists, it will be overwritten instead of being appended to.                                                                                                                                                                                                               |
 | -nlf          | --new-links-file        | If this argument is passed, a waymore.new file will also be written that will contain links for the latest run. This can be used for continuous monitoring of a target.                                                                                                                                                   |
+| -c            | --config                | Path to the YML config file. If not passed, it looks for file `config.yml` in the same directory as runtime file `waymore.py`                                                                                                                                                                                             |
 | -v            | --verbose               | Verbose output                                                                                                                                                                                                                                                                                                            |
 |               | --version               | Show current version number.                                                                                                                                                                                                                                                                                              |
 | -h            | --help                  | Show the help message and exit.                                                                                                                                                                                                                                                                                           |
