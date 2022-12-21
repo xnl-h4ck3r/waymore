@@ -254,7 +254,7 @@ def showOptions():
             write(colored('-mode: ' + args.mode, 'magenta')+colored(' URLs will be retrieved AND Responses will be downloaded for the input.','white'))
 
         if args.config is not None:
-            write(colored('-c: ' + args.config, 'magenta')+colored(' The path of the config.yml file.','white'))
+            write(colored('-c: ' + args.config, 'magenta')+colored(' The path of the YML config file.','white'))
             
         if not inputIsDomainANDPath:
             if args.no_subs:
