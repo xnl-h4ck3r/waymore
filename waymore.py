@@ -383,11 +383,8 @@ def getConfig():
                 else:
                     configPath = Path(waymorePath / 'config.yml')
             else:
-                try:
-                    waymorePath = args.config
-                    configPath = Path(waymorePath)
-                except Exception as e:
-                    print(str(e))
+                waymorePath = args.config
+                configPath = Path(waymorePath)
             config = yaml.safe_load(open(configPath))
             try:
                 FILTER_URL = config.get('FILTER_URL')
