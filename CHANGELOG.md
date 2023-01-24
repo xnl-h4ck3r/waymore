@@ -1,5 +1,15 @@
 ## Changelog
 
+- v1.13
+
+  - New
+
+    - Added argument `-oU`/`--output-urls` to allow the user to specify a filename (including path) for the URL links file when `-mode U` (or `B`oth) is used. If not passed, then the file `waymore.txt` will be created in the `results/{target.domain}` directory as normal. If a path is passed with the file, then any directories will be created. For example: `-oU ~/Recon/Redbull/waymoreUrls.txt`
+    - Added argument `-oR`/`--output-responses` to allow the user to specify a directory (or path) where the archived responses and `index.txt` file is written when `-mode R` (or `B`oth) is used. If any directories in the path do not exist they will be created. For example: `-oR ~/Recon/Redbull/waymoreResponses`
+
+  - Changed
+    - When removing all web archive references in the downloaded archived response, there were a few occasions this wasn't working so the regex has been changed to be more specific to ensure this works.
+
 - v1.12
 
   - New

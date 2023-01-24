@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # Python 3
-# waymore - by @Xnl-h4ck3r: Find way more from the Wayback Machine
+# waymore - by @Xnl-h4ck3r: Find way more from the Wayback Machine (also get links from Common Crawl, AlienValut OTX and URLScan)
 # Full help here: https://github.com/xnl-h4ck3r/waymore/blob/main/README.md
 # Good luck and good hunting! If you really love the tool (or any others), or they helped you find an awesome bounty, consider BUYING ME A COFFEE! (https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
 
@@ -277,10 +277,14 @@ def showOptions():
                 write(colored('URLScan API Key: ', 'magenta')+colored(URLSCAN_API_KEY))
         
         if args.mode in ['U','B']:
-            write(colored('-ow: ' +str(args.output_overwrite), 'magenta')+colored(' Whether the URL output file (waymore.txt) will be overwritten if it already exists. If False (default), it will be appended to, and duplicates removed.','white'))
-            write(colored('-nlf: ' +str(args.new_links_file), 'magenta')+colored(' Whether the URL output file waymore.new will also be written. It will include only new links found for the same target on subsequent runs. This can be used for continuous monitoring of a target.','white'))
+            if args.output_urls != '':
+                write(colored('-oU: ' +str(args.output_urls), 'magenta')+colored(' The name of the output file for URL links.','white'))
+            write(colored('-ow: ' +str(args.output_overwrite), 'magenta')+colored(' Whether the URL output file will be overwritten if it already exists. If False (default), it will be appended to, and duplicates removed.','white'))
+            write(colored('-nlf: ' +str(args.new_links_file), 'magenta')+colored(' Whether the URL output file ".new" version will also be written. It will include only new links found for the same target on subsequent runs. This can be used for continuous monitoring of a target.','white'))
             
         if args.mode in ['R','B']:
+            if args.output_responses != '':
+                write(colored('-oR: ' +str(args.output_responses), 'magenta')+colored(' The directory to store archived responses and index file.','white'))
             if args.limit == 0:
                 write(colored('-l: ' +str(args.limit), 'magenta')+colored(' Save ALL responses found.','white'))
             else:
@@ -581,10 +585,11 @@ def processArchiveUrl(url):
                             archiveHtml = '/* Original URL: ' + archiveUrl + ' */\n' + archiveHtml
                         
                         # Remove all web archive references in the response
-                        archiveHtml = re.sub(r'\<head\>.*\<\!-- End Wayback Rewrite JS Include --\>','<head>',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
+                        archiveHtml = re.sub(r'\<script type=\"text\/javascript" src=\"\/_static\/js\/bundle-playback\.js\?v=[A-Za-z0-9]*" charset="utf-8"><\/script>\n<script type="text\/javascript" src="\/_static\/js\/wombat\.js.*\<\!-- End Wayback Rewrite JS Include --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
                         archiveHtml = re.sub(r'\<script src=\"\/\/archive\.org.*\<\!-- End Wayback Rewrite JS Include --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
                         archiveHtml = re.sub(r'\<\!-- BEGIN WAYBACK TOOLBAR INSERT --\>.*\<\!-- END WAYBACK TOOLBAR INSERT --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
-                        archiveHtml = re.sub(r'FILE ARCHIVED ON.*108\(a\)\(3\)\)\.','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
+                        archiveHtml = re.sub(r'(}\n)?(\/\*|<!--\n)\s*FILE ARCHIVED ON.*108\(a\)\(3\)\)\.\n(\*\/|-->)','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
+                        archiveHtml = re.sub(r'var\s_____WB\$wombat\$assign\$function.*WB\$wombat\$assign\$function_____\(\"opener\"\);','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
                         archiveHtml = re.sub(r'(\<\!--|\/\*)\nplayback timings.*(--\>|\*\/)','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
                         archiveHtml = re.sub(r'((https:)?\/\/web\.archive\.org)?\/web\/[0-9]{14}([A-Za-z]{2}\_)?\/','',archiveHtml,flags=re.IGNORECASE)
                         archiveHtml = re.sub(r'((https:)?\\\/\\\/web\.archive\.org)?\\\/web\\\/[0-9]{14}([A-Za-z]{2}\_)?\\\/','',archiveHtml,flags=re.IGNORECASE)
@@ -617,13 +622,18 @@ def processArchiveUrl(url):
                                 extension = 'xnl'
                             fileName = fileName + '.' + extension
                         
-                        filePath = (
-                                waymorePath
-                                / 'results'
-                                / str(argsInput).replace('/','-')
-                                / f'{fileName}'
-                        )
-
+                        # If -oR / --output-responses was passed then add the file to that directory, 
+                        # else add to the default "results/{target.domain}" directory in the same path as the .py file
+                        if args.output_responses != '':
+                            filePath = args.output_responses + '/' + f'{fileName}'
+                        else: 
+                            filePath = (
+                                    waymorePath
+                                    / 'results'
+                                    / str(argsInput).replace('/','-')
+                                    / f'{fileName}'
+                            )
+                            
                         # Write the file
                         try:
                             responseFile = open(filePath, 'w', encoding='utf8')
@@ -644,8 +654,16 @@ def processArchiveUrl(url):
 
                         # FOR DEBUGGING PURPOSES
                         try:
-                            if archiveHtml.find('archive.org') > 0 and os.environ.get('USER') == 'xnl':
-                                writerr(colored(getSPACER('"' + fileName + '" CONTAINS ARCHIVE.ORG - CHECK ITS A VALID REFERENCE'), 'yellow'))
+                            if os.environ.get('USER') == 'xnl':
+                                debugText = ''
+                                if archiveHtml.lower().find('archive.org') > 0:
+                                    debugText = 'ARCHIVE.ORG'
+                                elif archiveHtml.lower().find('internet archive') > 0:
+                                    debugText = 'INTERNET ARCHIVE'
+                                elif archiveHtml.lower().find('wombat') > 0:
+                                    debugText = 'WOMBAT (JS)'
+                                if debugText != '':
+                                    writerr(colored(getSPACER('"' + fileName + '" CONTAINS ' + debugText + ' - CHECK ITS A VALID REFERENCE'), 'yellow'))
                         except:
                             pass
                             
@@ -726,31 +744,53 @@ def processURLOutput():
         # Create 'results' and domain directory if needed
         createDirs()
         
-        fullPath = str(waymorePath) + '/results/' + str(argsInput).replace('/','-') + '/'
+        # If -oU / --output-urls was passed then use that file name, else use "waymore.txt" in the path of the .py file
+        if args.output_urls == '':
+            # If -oR / --output-responses was passed then set the path to that, otherwise it will be the "results/{target.domain}}" path
+            if args.output_responses != '':
+                fullPath = args.output_responses + '/'
+            else:
+                fullPath = str(waymorePath) + '/results/' + str(argsInput).replace('/','-') + '/'
+            filename = fullPath + 'waymore.txt'
+            filenameNew = fullPath + 'waymore.new'
+            filenameOld = fullPath + 'waymore.old'
+        else:
+            filename = args.output_urls
+            filenameNew = filename + '.new'
+            filenameOld = filename + '.old'
+            # If the filename has any "/" in it, remove the contents after the last one to just get the path and create the directories if necessary
+            try:
+                f = os.path.basename(filename)
+                p = filename[:-(len(f))-1]
+                if not os.path.exists(p):
+                    os.makedirs(p)
+            except Exception as e:
+                if verbose():
+                    writerr(colored('ERROR processURLOutput 6: ' + str(e), 'red'))
                 
         # If the -ow / --output_overwrite argument was passed and the file exists already, get the contents of the file to include
         appendedUrls = False
         if not args.output_overwrite:
             try:
-                existingLinks = open(fullPath + 'waymore.txt','r',)
+                existingLinks = open(filename,'r',)
                 for link in existingLinks.readlines():
                     linksFound.add(link.strip())
                 appendedUrls = True
             except Exception as e:
                 pass
         
-        # If the -nlf / --new-links-file argument is passes, rename the old waymore.txt file if it exists
+        # If the -nlf / --new-links-file argument is passed, rename the old links file if it exists
         try:
             if args.new_links_file: 
-                if os.path.exists(fullPath + 'waymore.txt'):
-                    os.rename(fullPath + 'waymore.txt', fullPath + 'waymore.old')    
+                if os.path.exists(filename):
+                    os.rename(filename, filenameOld)    
         except Exception as e:
             if verbose():
                 writerr(colored('ERROR processURLOutput 5: ' + str(e), 'red'))
                     
         try:
             # Open the output file
-            outFile = open(fullPath + 'waymore.txt','w')
+            outFile = open(filename,'w')
         except Exception as e:
             if verbose():
                 writerr(colored('ERROR processURLOutput 2: ' + str(e), 'red'))
@@ -790,35 +830,35 @@ def processURLOutput():
             else:   
                 if appendedUrls:
                     write(
-                        colored('Links successfully appended to file ', 'cyan')+colored(fullPath + 'waymore.txt',
+                        colored('Links successfully appended to file ', 'cyan')+colored(filename,
                         'white')+colored(' and duplicates removed.\n','cyan'))
                 else:
                     write(
-                        colored('Links successfully written to file ', 'cyan')+colored(fullPath + 'waymore.txt\n',
+                        colored('Links successfully written to file ', 'cyan')+colored(filename + '\n',
                         'white'))
 
         try:
-            # If the -nlf / --new-links-file argument is passes, create the waymore.new file
+            # If the -nlf / --new-links-file argument is passes, create the .new file
             if args.new_links_file:
                 
-                # If waymore.old and waymore.txt exists then get the difference to write to waymore.new
-                if os.path.exists(fullPath + 'waymore.old') and os.path.exists(fullPath + 'waymore.txt'):
+                # If the file and .old version exists then get the difference to write to .new file
+                if os.path.exists(filenameOld) and os.path.exists(filename):
                     
                     # Get all the old links
-                    with open(fullPath + 'waymore.old','r') as oldFile:
+                    with open(filenameOld,'r') as oldFile:
                         oldLinks=set(oldFile.readlines())
 
                     # Get all the new links
-                    with open(fullPath + 'waymore.txt','r') as newFile:
+                    with open(filename,'r') as newFile:
                         newLinks=set(newFile.readlines())
 
                     # Create a file with most recent new links
-                    with open(fullPath + 'waymore.new','w') as newOnly:
+                    with open(filenameNew,'w') as newOnly:
                         for line in list(newLinks-oldLinks):
                             newOnly.write(line)
 
                     # Delete the old file
-                    os.remove(fullPath + 'waymore.old')
+                    os.remove(filenameOld)
                 
         except Exception as e:
             if verbose():
@@ -832,12 +872,24 @@ def processResponsesOutput():
     """
     Show results of the archive responses saved
     """
-    global successCount, failureCount, subs, fileCount, argsInput
+    global successCount, failureCount, subs, fileCount, argsInput, waymorePath
     try:
-        if failureCount > 0:
-            write(colored('\nResponses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' failed)\n','red'))
+        # Get the output directory for responses
+        if args.output_responses != '':
+            outputDir = args.output_responses + '/'
         else:
-            write(colored('\nResponses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
+            outputDir = str(waymorePath) + '/results/' + str(argsInput).replace('/','-') + '/'
+            
+        if failureCount > 0:
+            if verbose():
+                write(colored('\nResponses saved to ','cyan')+colored(outputDir,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' failed)\n','red'))
+            else:
+                write(colored('\nResponses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' failed)\n','red'))
+        else:
+            if verbose():
+                write(colored('\nResponses saved to ','cyan')+colored(outputDir,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
+            else:
+                write(colored('\nResponses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
     except Exception as e:
         if verbose():
             writerr(colored("ERROR processResponsesOutput 1: " + str(e), "red"))    
@@ -1662,36 +1714,43 @@ def processResponses():
        
         # Create 'results' and domain directory if needed
         createDirs()
-            
+        
+        # Get the path of the files, depending on whether -oR / --output_responses was passed
+        try:
+            if args.output_responses != '':
+                continuePath = args.output_responses + '/continueResp.tmp'
+                responsesPath = args.output_responses + '/responses.tmp'
+                indexPath = args.output_responses + '/index.txt'
+            else:
+                continuePath = (waymorePath
+                    / 'results'
+                    / str(argsInput).replace('/','-')
+                    / 'continueResp.tmp')
+                responsesPath = (waymorePath
+                    / 'results'
+                    / str(argsInput).replace('/','-')
+                    / 'responses.tmp')
+                indexPath = (waymorePath
+                    / 'results'
+                    / str(argsInput).replace('/','-')
+                    / 'index.txt')
+        except Exception as e:
+            if verbose():
+                writerr(colored('ERROR processResponses 4: ' + str(e), 'red'))
+                
         # Check if a continueResp.tmp and responses.tmp files exists
         runPrevious = 'n'
-        if os.path.exists(waymorePath
-                / 'results'
-                / str(argsInput).replace('/','-')
-                / 'continueResp.tmp') and os.path.exists(waymorePath
-                / 'results'
-                / str(argsInput).replace('/','-')
-                / 'responses.tmp'):
+        if os.path.exists(continuePath) and os.path.exists(responsesPath):
             
             # Load the links into the set
-            with open(
-                waymorePath
-                / 'results'
-                / str(argsInput).replace('/','-')
-                / 'responses.tmp',
-                'rb',
-            ) as fl:
+            with open(responsesPath,'rb') as fl:
                 linkRequests = pickle.load(fl)
             totalPrevResponses = len(linkRequests)        
                
             # Get the previous end position to start again at this point
             try:
-                with open(waymorePath
-                    / 'results'
-                    / str(argsInput).replace('/','-')
-                    / 'continueResp.tmp',
-                    'r') as fc:
-                        successCount = int(fc.readline().strip())
+                with open(continuePath,'r') as fc:
+                    successCount = int(fc.readline().strip())
             except Exception as e:
                 successCount = 0
                 
@@ -1827,13 +1886,7 @@ def processResponses():
                     linkRequests.append(link)
                     
             # Write the links to a temp file
-            with open(
-                    waymorePath
-                    / 'results'
-                    / str(argsInput).replace('/','-')
-                    / 'responses.tmp',
-                    'wb',
-                ) as f:
+            with open(responsesPath,'wb') as f:
                 pickle.dump(linkRequests, f)
                 
         # Get the total number of responses we will try to get and set the current file count to the success count
@@ -1849,22 +1902,10 @@ def processResponses():
         
         # Open the index file if hash value is going to be used (not URL)
         if not args.url_filename:
-            indexFile = open(
-                waymorePath
-                / 'results'
-                / str(argsInput).replace('/','-')
-                / 'index.txt',
-                'a',
-            )
+            indexFile = open(indexPath,'a')
         
         # Open the continue.tmp file to store what record we are upto
-        continueRespFile = open(
-                waymorePath
-                / 'results'
-                / str(argsInput).replace('/','-')
-                / 'continueResp.tmp',
-                'w+',
-            )
+        continueRespFile = open(continuePath,'w+')
         
         # Process the URLs from web archive   
         if stopProgram is None:
@@ -1876,14 +1917,8 @@ def processResponses():
         # Delete the tmp files now it has run successfully
         if stopProgram is None:
             try:
-                os.remove(waymorePath
-                    / 'results'
-                    / str(argsInput).replace('/','-')
-                    / 'continueResp.tmp')
-                os.remove(waymorePath
-                    / 'results'
-                    / str(argsInput).replace('/','-')
-                    / 'responses.tmp')
+                os.remove(continuePath)
+                os.remove(responsesPath)
             except:
                 pass
         
@@ -1901,24 +1936,32 @@ def processResponses():
 
 def createDirs():
     """
-    Create a directory for the 'results' and the sub directory for the passed domain/URL
+    Create a directory for the 'results' and the sub directory for the passed domain/URL, unless if
+    -oR / --output-responses was passed, just create those directories
     """
     global waymorePath, argsInput
-    # Create a directory for "results" if it doesn't already exist
-    try:
-        results_dir = Path(waymorePath / 'results')
-        results_dir.mkdir(exist_ok=True)
-    except:
-        pass
-    # Create a directory for the target domain
-    try:
-        domain_dir = Path(
-            waymorePath / 'results' / str(argsInput).replace('/','-')
-        )
-        domain_dir.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        pass     
-
+    if args.output_responses == '':
+        # Create a directory for "results" if it doesn't already exist
+        try:
+            results_dir = Path(waymorePath / 'results')
+            results_dir.mkdir(exist_ok=True)
+        except:
+            pass
+        # Create a directory for the target domain
+        try:
+            domain_dir = Path(
+                waymorePath / 'results' / str(argsInput).replace('/','-')
+            )
+            domain_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            pass     
+    else:
+        try:
+            responseDir = Path(args.output_responses)
+            responseDir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            pass
+            
 # Get width of the progress bar based on the width of the terminal
 def getProgressBarLength():
     global terminalWidth
@@ -1977,6 +2020,20 @@ if __name__ == '__main__':
         help='The mode to run: U (retrieve URLs only), R (download Responses only) or B (Both).',
         choices = ['U','R','B'],
         default='B'
+    )
+    parser.add_argument(
+        '-oU',
+        '--output-urls',
+        action='store',
+        help='The file to save the Links output to, including path if necessary. If the "-oR" argument is not passed, a "results" directory will be created in the path of the "waymore.py" file. Within that, a directory will be created with target domain (or domain with path) passed with "-i" (or for each line of a file passed with "-i").' ,
+        default='',
+    )
+    parser.add_argument(
+        '-oR',
+        '--output-responses',
+        action='store',
+        help='The directory to save the response output files to, including path if necessary. If the argument is not passed, a "results" directory will be created in the path of the "waymore.py" file. Within that, a directory will be created with target domain (or domain with path) passed with "-i" (or for each line of a file passed with "-i").' ,
+        default='',
     )
     parser.add_argument(
         '-f',
@@ -2112,13 +2169,13 @@ if __name__ == '__main__':
         "-ow",
         "--output-overwrite",
         action="store_true",
-        help="If the URL output file (waymore.txt) already exists, it will be overwritten instead of being appended to.",
+        help="If the URL output file (default waymore.txt) already exists, it will be overwritten instead of being appended to.",
     )
     parser.add_argument(
         "-nlf",
         "--new-links-file",
         action="store_true",
-        help="If this argument is passed, a waymore.new file will also be written that will contain links for the latest run.",
+        help="If this argument is passed, a .new file will also be written that will contain links for the latest run.",
     )
     parser.add_argument(
         "-c",
