@@ -376,19 +376,18 @@ def getConfig():
             
         # Try to get the config file values
         try:
-            # Get the path of the config file. If -c / --config argument is not passed, then it defaults to config.yml in the same directory as the run file
-            if args.config is None:        
-                waymorePath = Path(
-                    os.path.dirname(os.path.realpath(__file__))
-                )
-                waymorePath.absolute
+            # Get the path of the config file. If -c / --config argument is not passed, then it defaults to config.yml in the same directory as the run file      
+            waymorePath = Path(
+                os.path.dirname(os.path.realpath(__file__))
+            )
+            waymorePath.absolute
+            if args.config is None:  
                 if waymorePath == '':
                     configPath = 'config.yml'
                 else:
                     configPath = Path(waymorePath / 'config.yml')
             else:
-                waymorePath = args.config
-                configPath = Path(waymorePath)
+                configPath = Path(args.config)
             config = yaml.safe_load(open(configPath))
             try:
                 FILTER_URL = config.get('FILTER_URL')

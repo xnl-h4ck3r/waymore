@@ -1,5 +1,10 @@
 ## Changelog
 
+- v1.14
+
+  - Changed
+    - Fix a bug with the `-c`/`--config` option
+
 - v1.13
 
   - New
