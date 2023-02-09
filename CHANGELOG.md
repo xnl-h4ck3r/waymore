@@ -1,5 +1,10 @@
 ## Changelog
 
+- v1.15
+
+  - Changed
+    - Fix bug that shows an error when `-v` is passed and `-oU` does not specify a directory, just a filename
+
 - v1.14
 
   - Changed

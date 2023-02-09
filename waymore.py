@@ -761,7 +761,7 @@ def processURLOutput():
             try:
                 f = os.path.basename(filename)
                 p = filename[:-(len(f))-1]
-                if not os.path.exists(p):
+                if p != '' and not os.path.exists(p):
                     os.makedirs(p)
             except Exception as e:
                 if verbose():
