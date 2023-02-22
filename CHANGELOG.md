@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.17
+
+  - Changed
+    - If an input file has a sub domain starting with \_ or - then an error was raised, but these are valid. This bug has been fixed.
+    - In addition to the fix above, the error message will show what line was flagged in error so the user can raise an issue on Github about it if they believe it is an error.
+
 - v1.16
 
   - Changed
