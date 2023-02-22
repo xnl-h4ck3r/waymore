@@ -1,5 +1,10 @@
 ## Changelog
 
+- v1.16
+
+  - Changed
+    - Fix a bug that raises `ERROR processURLOutput 6: [Errno 2] No such file or directory: ''` if the value passed to `-oU` has no directory specified as part of the file name.
+
 - v1.15
 
   - Changed

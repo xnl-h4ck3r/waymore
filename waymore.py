@@ -759,10 +759,11 @@ def processURLOutput():
             filenameOld = filename + '.old'
             # If the filename has any "/" in it, remove the contents after the last one to just get the path and create the directories if necessary
             try:
-                f = os.path.basename(filename)
-                p = filename[:-(len(f))-1]
-                if p != '' and not os.path.exists(p):
-                    os.makedirs(p)
+                if filename.find('/') > 0:
+                    f = os.path.basename(filename)
+                    p = filename[:-(len(f))-1]
+                    if p != '' and not os.path.exists(p):
+                        os.makedirs(p)
             except Exception as e:
                 if verbose():
                     writerr(colored('ERROR processURLOutput 6: ' + str(e), 'red'))
