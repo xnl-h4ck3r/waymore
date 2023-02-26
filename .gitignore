@@ -3,3 +3,4 @@ build/
 dist/
 waymore.egg-info
 __pycache__
+collinfo.json

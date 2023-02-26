@@ -13,7 +13,7 @@ import argparse
 from signal import SIGINT, signal
 import multiprocessing.dummy as mp
 from termcolor import colored
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import yaml
 import os
@@ -66,6 +66,7 @@ currentMemUsage = 0
 maxMemoryPercent = 0
 currentMemPercent = 0
 HTTP_ADAPTER = None
+HTTP_ADAPTER_CC = None
 
 # Source Provider URLs
 WAYBACK_URL = 'https://web.archive.org/cdx/search/cdx?url={DOMAIN}&collapse={COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest'
@@ -339,7 +340,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, argsInput, terminalWidth
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth
     try:
         
         # Set terminal width
@@ -373,6 +374,19 @@ def getConfig():
             HTTP_ADAPTER = HTTPAdapter(max_retries=retry)
         except Exception as e:
             writerr(colored('ERROR getConfig 2: ' + str(e), 'red'))
+            
+        # Set up an HTTPAdaptor for retry strategy for Common Crawl when making requests
+        try:
+            retry= Retry(
+                total=args.retries+2,
+                backoff_factor=1.1,
+                status_forcelist=[429, 500, 502, 503, 504],
+                raise_on_status=False,
+                respect_retry_after_header=False
+            )
+            HTTP_ADAPTER_CC = HTTPAdapter(max_retries=retry)
+        except Exception as e:
+            writerr(colored('ERROR getConfig 3: ' + str(e), 'red'))
             
         # Try to get the config file values
         try:
@@ -1561,11 +1575,11 @@ def processCommonCrawlCollection(cdxApiUrl):
                 # Choose a random user agent string to use for any requests
                 userAgent = random.choice(USER_AGENT)
                 session = requests.Session()
-                session.mount('https://', HTTP_ADAPTER)
-                session.mount('http://', HTTP_ADAPTER)
+                session.mount('https://', HTTP_ADAPTER_CC)
+                session.mount('http://', HTTP_ADAPTER_CC)
                 resp = session.get(url, stream=True, headers={"User-Agent":userAgent})   
             except ConnectionError as ce:
-                writerr(colored(getSPACER('[ ERR ] Common Crawl connection error'), 'red'))
+                writerr(colored(getSPACER('[ ERR ] Common Crawl connection error for index '+cdxApiUrl), 'red'))
                 resp = None
                 return
             except Exception as e:
@@ -1592,7 +1606,7 @@ def processCommonCrawlCollection(cdxApiUrl):
                         # If a status other than 200, then stop
                         if resp.status_code != 200:
                             if verbose(): 
-                                writerr(colored(getSPACER('[ '+str(resp.status_code)+' ] Error for '+url),'red'))
+                                writerr(colored(getSPACER('[ '+str(resp.status_code)+' ] Error for '+cdxApiUrl),'red'))
                             return
                 except:
                     pass
@@ -1616,7 +1630,87 @@ def processCommonCrawlCollection(cdxApiUrl):
             pass
     except Exception as e:
         writerr(colored('ERROR processCommonCrawlCollection 1: ' + str(e), 'red'))
+
+def getCommonCrawlIndexes():
+    """
+    Requests the Common Crawl index file "collinfo.json" if it is not cached locally, or if the local file is older than a month.
+    """
+    try:
+        # Check if a local copy of the index file exists
+        createFile = False
+        collinfoPath = str(Path(__file__).parent.resolve())+'/collinfo.json'
+        if os.path.exists(collinfoPath):
+            # Check if the file was created over a month ago
+            monthAgo = datetime.now() - timedelta(days=30)
+            fileModTime = datetime.fromtimestamp(os.path.getctime(collinfoPath))
+            if fileModTime < monthAgo:
+                createFile = True
+                # Delete the current file
+                try:
+                    os.remove(collinfoPath)
+                except Exception as e:
+                    writerr(colored(getSPACER('[ ERR ] Couldn\'t delete local version of Common Crawl index file: ' + str(e)), 'red'))
+        else:
+            createFile = True
             
+        # If the local file exists then read that instead of requesting the index file again
+        if not createFile:
+            # Read the indexes from the local file    
+            try:
+                with open(collinfoPath,'r') as file:
+                    jsonResp = file.read()
+                file.close()
+            except Exception as e:
+                createFile = True
+                writerr(colored(getSPACER('[ ERR ] Couldn\'t read local version of Common Crawl index file: ' + str(e)),'red'))
+                
+        # If the local file needs creating again then make a new request
+        if createFile:
+            try:
+                # Choose a random user agent string to use for any requests
+                userAgent = random.choice(USER_AGENT)
+                session = requests.Session()
+                session.mount('https://', HTTP_ADAPTER_CC)
+                session.mount('http://', HTTP_ADAPTER_CC)
+                indexes = session.get(CCRAWL_INDEX_URL, headers={"User-Agent":userAgent})
+            except ConnectionError as ce:
+                writerr(colored(getSPACER('[ ERR ] Common Crawl connection error getting Index file'), 'red'))
+                return
+            except Exception as e:
+                writerr(colored(getSPACER('[ ERR ] Error getting Common Crawl index collection - ' + str(e)),'red'))
+                return
+            
+            # If the rate limit was reached end now
+            if indexes.status_code == 429:
+                writerr(colored(getSPACER('[ 429 ] Common Crawl rate limit reached so unable to get links.'),'red'))
+                return
+            
+            # Get the the returned JSON
+            jsonResp = indexes.text
+
+            # Write the contents of the response to a local file so we don't request in future. Overwrite it if it exists
+            try:
+                f = open(collinfoPath, 'w')
+                f.write(jsonResp)
+                f.close()
+            except Exception as e:
+                writerr(colored(getSPACER('[ ERR ] Couldn\'t create local version of Common Crawl index file: ' + str(e)),'red'))
+        
+        # Get the API URLs from the returned JSON
+        cdxApiUrls = set()
+        collection = 0
+        for values in json.loads(jsonResp):
+            for key in values:
+                if key == 'cdx-api':
+                    cdxApiUrls.add(values[key])
+            collection = collection + 1
+            if collection == args.lcc: break
+                    
+        return cdxApiUrls
+        
+    except Exception as e:
+        writerr(colored('ERROR getCommonCrawlIndexes 1: ' + str(e), 'red'))
+        
 def getCommonCrawlUrls():
     """
     Get all Common Crawl index collections to get all URLs from each one
@@ -1648,36 +1742,8 @@ def getCommonCrawlUrls():
         
         write(colored('\rGetting commoncrawl.org index collections list...\r','cyan'))
                   
-        # Get all the Common Crawl index collections
-        try:
-            # Choose a random user agent string to use for any requests
-            userAgent = random.choice(USER_AGENT)
-            session = requests.Session()
-            session.mount('https://', HTTP_ADAPTER)
-            session.mount('http://', HTTP_ADAPTER)
-            indexes = session.get(CCRAWL_INDEX_URL, headers={"User-Agent":userAgent})
-        except ConnectionError as ce:
-            writerr(colored(getSPACER('[ ERR ] Common Crawl connection error'), 'red'))
-            return
-        except Exception as e:
-            writerr(colored(getSPACER('[ ERR ] Error getting Common Crawl index collection - ' + str(e)),'red'))
-            return
-        
-        # If the rate limit was reached end now
-        if indexes.status_code == 429:
-            writerr(colored(getSPACER('[ 429 ] Common Crawl rate limit reached so unable to get links.'),'red'))
-            return
-        
-        # Get the API URLs from the returned JSON
-        jsonResp = indexes.json()
-        cdxApiUrls = set()
-        collection = 0
-        for values in jsonResp:
-            for key in values:
-                if key == 'cdx-api':
-                    cdxApiUrls.add(values[key])
-            collection = collection + 1
-            if collection == args.lcc: break
+        # Get the Common Crawl index collections
+        cdxApiUrls = getCommonCrawlIndexes()
         
         write(colored('\rGetting links from the latest ' + str(len(cdxApiUrls)) + ' commoncrawl.org index collections (this can take a while for some domains)...\r','cyan'))
              

@@ -1,5 +1,12 @@
 ## Changelog
 
+- v1.18
+
+  - Changed
+
+    - Cache the Common Crawl `collinfo.json` file locally. The file is only updated a few times per year so there is no point in requesting it every time **waymore** is run. Common Crawl can struggle with volume against it's API which can cause timeouts, and currently, about 10% of all requests they get are for the `collinfo.json`!
+    - Add a HTTPAdapter specifically for Common Crawl to have `retries` and `backoff_factor` increased which seems to reduce the errors and maximize the results found.
+
 - v1.17
 
   - Changed
