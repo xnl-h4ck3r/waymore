@@ -951,19 +951,20 @@ def validateArgInput(x):
     
     for i in inputValues:        
         
-        # Check if input seems to be valid domain or URL
-        match = re.search(r"^([a-z0-9\-\_][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.)+([a-z0-9\-\_]{1,61}|[a-z0-9\-\_]{1,30}\.[a-z]{2,})(/[^\n|?#]*)?$", i.strip().rstrip('\n'))
-        if match is None:
-            if isInputFile:
-                error = 'Each line of the input file must contain a domain only (with no schema) to search for all links, or a domain and path (with no schema) to just get archived response for that URL. Do not pass a query string or fragment in any lines.'
-            else:
-                error = 'Pass a domain only (with no schema) to search for all links, or pass a domain and path (with no schema) to just get archived responses for that URL. Do not pass a query string or fragment.'
-            error = error + ' The first line that seems invalid is: ' + str(i) + '\nIf you believe this is flagged in error, please raise an issue on Github :)'
-            if x == '<stdin>':
-                writerr(colored(error,'red'))
-                sys.exit()
-            else:
-                raise argparse.ArgumentTypeError(error)
+        if i.strip().rstrip('\n') != '':
+            # Check if input seems to be valid domain or URL
+            match = re.search(r"^([a-z0-9\-\_][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.)+([a-z0-9\-\_]{1,61}|[a-z0-9\-\_]{1,30}\.[a-z]{2,})(/[^\n|?#]*)?$", i.strip().rstrip('\n'))
+            if match is None:
+                if isInputFile:
+                    error = 'Each line of the input file must contain a domain only (with no schema) to search for all links, or a domain and path (with no schema) to just get archived response for that URL. Do not pass a query string or fragment in any lines.'
+                else:
+                    error = 'Pass a domain only (with no schema) to search for all links, or pass a domain and path (with no schema) to just get archived responses for that URL. Do not pass a query string or fragment.'
+                error = error + ' The first line that seems invalid is: ' + str(i) + '\nIf you believe this is flagged in error, please raise an issue on Github :)'
+                if x == '<stdin>':
+                    writerr(colored(error,'red'))
+                    sys.exit()
+                else:
+                    raise argparse.ArgumentTypeError(error)
     return x
 
 def processAlienVaultPage(url):

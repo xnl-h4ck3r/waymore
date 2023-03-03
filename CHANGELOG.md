@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.19
+
+  - Changed
+
+    - Bug fix - ignore any blank lines in the input file when validating if input is in the correct format
+
 - v1.18
 
   - Changed
