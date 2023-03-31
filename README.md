@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
-## About - v1.19
+## About - v1.20
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -48,6 +48,8 @@ $ sudo pip3 install -r requirements.txt
 | -oR           | --output-responses      | The directory to save the response output files to, including path if necessary. If the argument is not passed, a `/results` directory will be created in the path of the `waymore.py` file. Within that, a directory will be created with target domain (or domain with path) passed with `-i` (or for each line of a file passed with `-i`). For example: `-oR ~/Recon/Redbull/waymoreResponses` |
 | -n            | --no-subs               | Don't include subdomains of the target domain (only used if input is not a domain with a specific path).                                                                                                                                                                                                                                                                                           |
 | -f            | --filter-responses-only | The initial links from Wayback Machine will not be filtered, only the responses that are downloaded, , e.g. it maybe useful to still see all available paths from the links even if you don't want to check the content.                                                                                                                                                                           |
+| -fc           |                         | Filter HTTP status codes for retrieved URLs and responses. Comma separated list of codes (default: the FILTER_CODE values from config.yml). Passing this argument will override the value from config.yml                                                                                                                                                                                          |
+| -mc           |                         | Only Match HTTP status codes for retrieved URLs and responses. Comma separated list of codes. Passing this argument overrides the config FILTER_CODE and -fc.                                                                                                                                                                                                                                      |
 | -l            | --limit                 | How many responses will be saved (if `-mode R` or `-mode B` is passed). A positive value will get the **first N** results, a negative value will will get the **last N** results. A value of 0 will get **ALL** responses (default: 5000))                                                                                                                                                         |
 | -from         | --from-date             | What date to get responses from. If not specified it will get from the earliest possible results. A partial value can be passed, e.g. `2016`, `201805`, etc.                                                                                                                                                                                                                                       |
 | -to           | --to-date               | What date to get responses to. If not specified it will get to the latest possible results. A partial value can be passed, e.g. `2021`, `202112`, etc.                                                                                                                                                                                                                                             |
@@ -111,7 +113,7 @@ If the input is just a domain, e.g. `redbull.com` then the `-mode` defaults to `
 
 The `config.yml` file have values that can be updated to suit your needs. Filters are all provided as comma separated lists:
 
-- `FILTER_CODE` - Exclusions used to exclude responses we will try to get from web.archive.org, and also for file names when `-i` is a directory, e.g. `301,302`
+- `FILTER_CODE` - Exclusions used to exclude responses we will try to get from web.archive.org, and also for file names when `-i` is a directory, e.g. `301,302`. This can be overridden with the `-fc` argument. Passing the `-mc` (to match status codes instead of filter) will override any value in `FILTER_CODE` or `-fc`
 - `FILTER_MIME` - MIME Content-Type exclusions used to filter links and responses from web.archive.org through their API, e.g. `'text/css,image/jpeg`
 - `FILTER_URL` - Response code exclusions we will use to filter links and responses from web.archive.org through their API, e.g. `.css,.jpg`
 - `FILTER_KEYWORDS` - Only links and responses will be returned that contain the specified keywords if the `-ko`/`--keywords-only` argument is passed, e.g. `admin,portal`
@@ -145,6 +147,8 @@ It should be noted that sometimes the MIME type on archive.org is stored as `unk
 If `config.yml` doesn't exist, or the entries for filters, aren't in the file, then default filters are used. It's better to have the file and review these to ensure you are getting what you need.
 
 There can potentially be millions of responses so make sure you set filters, but also the Limit (`-l`), From Date (`-from`), To Date (`-to`) and/or Capture Interval (`-ci`) if you need to. The limit defaults to 5000, but say you wanted to get the latest 20,000 responses from 2015 up until January 2018... you would pass `-l -20000 -from 2015 -to 201801`. The Capture Interval determines how many responses will get downloaded for a particular URL within a specified period, e.g. if you set to `m` you will only get one response per month for a URL. The default `d` will likely greatly reduce the number of responses and unlikely to miss many unique responses unless a target changed something more than once in a given day.
+
+Another useful argument is `-mc` that will only get results where the HTTP status code matches the comma separated list passed, e.g. `-mc 200` or `-mc 200,403`.
 
 You can also greatly reduce the number (and therefore reduce the execution time) of links and responses by only returning ones that contain keywords you are interested in. You can list these keywords in `config.yml` with the `FILTER_KEYWORDS` key and then pass argument `-ko`/`--keywords-only` to use these.
 
@@ -221,6 +225,7 @@ If you come across any problems at all, or have ideas for improvements, please f
 ## TODO
 
 - Add an `-oss` argument that accepts a file of Out Of Scope subdomains/URLs that will not be returned in the output, or have any responses downloaded
+- When URLScan returns a 429 response it gives the number of seconds to wait before it will work again. Add an argument to wait for that delay in order to complete requests.
 
 ## References
 

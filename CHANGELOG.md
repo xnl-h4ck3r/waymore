@@ -1,5 +1,16 @@
 ## Changelog
 
+- v1.20
+
+  - New
+
+    - Add argument `-fc` for filtering HTTP status codes. Using this will override the `FILTER_CODE` value from `config.yml`. This is for specifying HTTP status codes you want to exclude from the results, and are provided in a comma separated list.
+    - Add argument `-mc` for matching HTTP status codes. Using this will override the `FILTER_CODE` value from `config.yml` AND the `-fc` argument. This is for specifying HTTP status codes you want to match from the results, and are provided in a comma separated list.
+
+  - Changed
+
+    - Changed how filters are specified in the request to the Common Crawl API. Removes the regex negative lookahead which is not needed if you use `filter=!`
+
 - v1.19
 
   - Changed

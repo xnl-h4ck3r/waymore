@@ -24,6 +24,7 @@ import sys
 import math
 import enum
 import pickle
+import time
 
 # Try to import psutil to show memory usage
 try:
@@ -109,6 +110,7 @@ DEFAULT_FILTER_KEYWORDS = 'admin,login,logon,signin,register,dashboard,portal,ft
 FILTER_URL = ''
 FILTER_MIME = ''
 FILTER_CODE = ''
+MATCH_CODE  = ''
 FILTER_KEYWORDS = ''
 URLSCAN_API_KEY = ''
 CONTINUE_RESPONSES_IF_PIPED = True
@@ -314,8 +316,14 @@ def showOptions():
         write(colored('-f: ' +str(args.filter_responses_only), 'magenta')+colored(' If True, the initial links from wayback machine will not be filtered, only the responses that are downloaded will be filtered. It maybe useful to still see all available paths even if you don\'t want to check the file for content.','white'))
         write(colored('-ko: ' +str(args.keywords_only), 'magenta')+colored(' If True, we will only get results that contain the given keywords.','white'))
         write(colored('-lr: ' +str(args.limit_requests), 'magenta')+colored(' The limit of requests made per source when getting links. A value of 0 (Zero) means no limit is applied.','white'))
+        if args.mc:
+            write(colored('-mc: ' +str(args.mc), 'magenta')+colored(' Only retrieve URLs and Responses that match these HTTP Status codes.','white'))
+        else:
+            if args.fc:
+                write(colored('-fc: ' +str(args.mc), 'magenta')+colored(' Don\'t retrieve URLs and Responses that match these HTTP Status codes.','white'))
         write(colored('MIME Type exclusions: ', 'magenta')+colored(FILTER_MIME))
-        write(colored('Response Code exclusions: ', 'magenta')+colored(FILTER_CODE))      
+        if not args.mc and args.fc:
+            write(colored('Response Code exclusions: ', 'magenta')+colored(FILTER_CODE))      
         write(colored('Response URL exclusions: ', 'magenta')+colored(FILTER_URL))  
         if args.keywords_only:
             if FILTER_KEYWORDS == '':
@@ -340,7 +348,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE
     try:
         
         # Set terminal width
@@ -421,15 +429,23 @@ def getConfig():
                 writerr(colored('Unable to read "FILTER_MIME" from config.yml - default set', 'red'))
                 FILTER_MIME = DEFAULT_FILTER_MIME
             
-            try:
-                FILTER_CODE = config.get('FILTER_CODE')
-                if str(FILTER_CODE) == 'None':
-                    writerr(colored('No value for "FILTER_CODE" in config.yml - default set', 'yellow'))
-                    FILTER_CODE = ''
-            except Exception as e:
-                writerr(colored('Unable to read "FILTER_CODE" from config.yml - default set', 'red'))
-                FILTER_CODE = DEFAULT_FILTER_CODE
-                
+            # If the argument -fc was passed, don't try to get from the config
+            if args.fc:
+                FILTER_CODE = args.fc
+            else:
+                try:
+                    FILTER_CODE = config.get('FILTER_CODE')
+                    if str(FILTER_CODE) == 'None':
+                        writerr(colored('No value for "FILTER_CODE" in config.yml - default set', 'yellow'))
+                        FILTER_CODE = ''
+                except Exception as e:
+                    writerr(colored('Unable to read "FILTER_CODE" from config.yml - default set', 'red'))
+                    FILTER_CODE = DEFAULT_FILTER_CODE
+            
+            # Set the match codes if they were passed
+            if args.mc:
+                MATCH_CODE = args.mc
+            
             try:
                 URLSCAN_API_KEY = config.get('URLSCAN_API_KEY')
                 if str(URLSCAN_API_KEY) == 'None':
@@ -967,6 +983,21 @@ def validateArgInput(x):
                     raise argparse.ArgumentTypeError(error)
     return x
 
+def validateArgStatusCodes(x):
+    """
+    Validate the -fc and -mc arguments
+    Only allow 3 digit numbers separated by a comma
+    """
+    invalid = False
+    codes = x.split(',')
+    for code in codes:
+        if len(code) != 3 or not code.isdigit():
+            invalid = True
+            break
+    if invalid:
+        raise argparse.ArgumentTypeError('Pass HTTP status codes separated by a comma')     
+    return x
+
 def processAlienVaultPage(url):
     """
     Get URLs from a specific page of otx.alienvault.org API for the input domain
@@ -1046,10 +1077,15 @@ def processAlienVaultPage(url):
                             try:
                                 httpCode = str(urlSection['httpcode'])
                             except:
-                                httpCode = ''
+                                httpCode = 'UNKNOWN'
                             
-                            # If we have a HTTP Code, compare against the Code exclusions
-                            if httpCode != '':
+                            # Compare the HTTP code gainst the Code exclusions and matches
+                            if MATCH_CODE != '':
+                                match = re.search(r'('+re.escape(MATCH_CODE).replace(',','|')+')', httpCode, flags=re.IGNORECASE)
+                                #print('('+re.escape(MATCH_CODE).replace(',','|')+')')
+                                if match is None:
+                                    addLink = False
+                            else:
                                 match = re.search(r'('+re.escape(FILTER_CODE).replace(',','|')+')', httpCode, flags=re.IGNORECASE)
                                 if match is not None:
                                     addLink = False
@@ -1175,8 +1211,12 @@ def processURLScanUrl(url, httpCode, mimeType):
             # Note we can't check MIME filter because it is not returned by URLScan API
             if addLink and not args.filter_responses_only: 
                 
-                # If we have a HTTP Code, compare against the Code exclusions
-                if httpCode != '':
+                # Compare the HTTP code against the Code exclusions and matches
+                if MATCH_CODE != '':
+                    match = re.search(r'('+re.escape(MATCH_CODE).replace(',','|')+')', httpCode, flags=re.IGNORECASE)
+                    if match is None:
+                        addLink = False
+                else:
                     match = re.search(r'('+re.escape(FILTER_CODE).replace(',','|')+')', httpCode, flags=re.IGNORECASE)
                     if match is not None:
                         addLink = False
@@ -1322,7 +1362,7 @@ def getURLScanUrls():
                     try:
                         httpCode = str(urlSection['page']['status'])
                     except:
-                        httpCode = ''
+                        httpCode = 'UNKNOWN'
                     
                     # Get the MIME type
                     try:
@@ -1465,7 +1505,10 @@ def getWaybackUrls():
     try:
         stopSource = False
         filterMIME = '&filter=!mimetype:warc/revisit|' + re.escape(FILTER_MIME).replace(',','|') 
-        filterCode = '&filter=!statuscode:' + re.escape(FILTER_CODE).replace(',','|')
+        if MATCH_CODE != '':
+            filterCode = '&filter=statuscode:' + re.escape(MATCH_CODE).replace(',','|')
+        else:
+            filterCode = '&filter=!statuscode:' + re.escape(FILTER_CODE).replace(',','|')
         
         # Set keywords filter if -ko argument passed
         filterKeywords = ''
@@ -1550,15 +1593,17 @@ def processCommonCrawlCollection(cdxApiUrl):
         
         if not stopSource:
             # Set mime content type filter
-            filterMIME = '&filter=~mime:^(?!warc/revisit|' 
+            filterMIME = '&filter=!~mime:(warc/revisit|' 
             if FILTER_MIME.strip() != '':
                 filterMIME = filterMIME + re.escape(FILTER_MIME).replace(',','|')
             filterMIME = filterMIME + ')'
             
             # Set status code filter
             filterCode = ''
-            if FILTER_CODE.strip() != '':
-                filterCode = '&filter=~status:^(?!' + re.escape(FILTER_CODE).replace(',','|') + ')'
+            if MATCH_CODE.strip() != '':
+                filterCode = '&filter=~status:(' + re.escape(MATCH_CODE).replace(',','|') + ')'
+            else:
+                filterCode = '&filter=!~status:(' + re.escape(FILTER_CODE).replace(',','|') + ')'
             
             # Set keywords filter if -ko argument passed
             filterKeywords = ''
@@ -1724,15 +1769,17 @@ def getCommonCrawlUrls():
         originalLinkCount = len(linksFound)
         
         # Set mime content type filter
-        filterMIME = '&filter=~mime:^(?!warc/revisit|' 
+        filterMIME = '&filter=!~mime:(warc/revisit|' 
         if FILTER_MIME.strip() != '':
             filterMIME = filterMIME + re.escape(FILTER_MIME).replace(',','|')
         filterMIME = filterMIME + ')'
         
         # Set status code filter
         filterCode = ''
-        if FILTER_CODE.strip() != '':
-            filterCode = '&filter=~status:^(?!' + re.escape(FILTER_CODE).replace(',','|') + ')'
+        if MATCH_CODE.strip() != '':
+            filterCode = '&filter=~status:(' + re.escape(MATCH_CODE).replace(',','|') + ')'
+        else:
+            filterCode = '&filter=!~status:(' + re.escape(FILTER_CODE).replace(',','|') + ')'
     
         if verbose():
             if args.filter_responses_only:
@@ -1860,7 +1907,9 @@ def processResponses():
                 
             # Set status code filter
             filterCode = ''
-            if FILTER_CODE.strip() != '':
+            if MATCH_CODE.strip() != '':
+                filterCode = '&filter=statuscode:' + re.escape(MATCH_CODE).replace(',','|')
+            else:
                 filterCode = '&filter=!statuscode:' + re.escape(FILTER_CODE).replace(',','|')
             
             # Set the collapse parameter value in the archive.org URL. From the Wayback API docs:
@@ -2101,6 +2150,18 @@ if __name__ == '__main__':
         '--filter-responses-only',
         action='store_true',
         help='The initial links from Wayback Machine will not be filtered (MIME Type and Response Code), only the responses that are downloaded, e.g. it maybe useful to still see all available paths from the links even if you don\'t want to check the content.',
+    )
+    parser.add_argument(
+        '-fc',
+        action='store',
+        help='Filter HTTP status codes for retrieved URLs and responses. Comma separated list of codes (default: the FILTER_CODE values from config.yml). Passing this argument will override the value from config.yml',
+        type=validateArgStatusCodes,
+    )
+    parser.add_argument(
+        '-mc',
+        action='store',
+        help='Only Match HTTP status codes for retrieved URLs and responses. Comma separated list of codes. Passing this argument overrides the config FILTER_CODE and -fc.',
+        type=validateArgStatusCodes,
     )
     parser.add_argument(
         '-l',
