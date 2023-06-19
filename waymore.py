@@ -434,7 +434,7 @@ def getConfig():
                 FILTER_CODE = args.fc
             else:
                 try:
-                    FILTER_CODE = config.get('FILTER_CODE')
+                    FILTER_CODE = str(config.get('FILTER_CODE'))
                     if str(FILTER_CODE) == 'None':
                         writerr(colored('No value for "FILTER_CODE" in config.yml - default set', 'yellow'))
                         FILTER_CODE = ''

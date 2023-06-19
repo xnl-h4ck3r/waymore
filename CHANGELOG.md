@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.21
+
+  - Changed
+
+    - Fix issue https://github.com/xnl-h4ck3r/waymore/issues/24. If the `FILTER_CODE` in `config.yml` is set to one status code then it is needs to be explicitly set to a string in `getConfig()`
+
 - v1.20
 
   - New
