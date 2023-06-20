@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.22
+
+  - Changed
+
+    - Fix issue https://github.com/xnl-h4ck3r/waymore/issues/23. If a file is passed as input, an error would occur if any of the domains in the file contained a capital letter or ended with a full stop. The regex in `validateArgInput` has been amended to fix this, adn any `.` on the end of a domain is stripped and domain converted to lowercase before processing.
+
 - v1.21
 
   - Changed

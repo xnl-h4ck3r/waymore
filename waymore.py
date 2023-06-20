@@ -969,7 +969,7 @@ def validateArgInput(x):
         
         if i.strip().rstrip('\n') != '':
             # Check if input seems to be valid domain or URL
-            match = re.search(r"^([a-z0-9\-\_][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.)+([a-z0-9\-\_]{1,61}|[a-z0-9\-\_]{1,30}\.[a-z]{2,})(/[^\n|?#]*)?$", i.strip().rstrip('\n'))
+            match = re.search(r"^([a-z0-9\-\_][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.)+([a-z0-9\-\_]{1,61}|[a-z0-9\-\_]{1,30}\.[a-z]{2,})(/[^\n|?#]*)?\.?$", i.strip().rstrip('\n'), flags=re.IGNORECASE)
             if match is None:
                 if isInputFile:
                     error = 'Each line of the input file must contain a domain only (with no schema) to search for all links, or a domain and path (with no schema) to just get archived response for that URL. Do not pass a query string or fragment in any lines.'
@@ -2335,7 +2335,7 @@ if __name__ == '__main__':
         # For each input (maybe multiple if a file was passed)
         for inpt in inputValues:
             
-            argsInput = inpt.strip().rstrip('\n')
+            argsInput = inpt.strip().rstrip('\n').rstrip('.').lower()
             
             # Reset global variables
             linksFound = set()
