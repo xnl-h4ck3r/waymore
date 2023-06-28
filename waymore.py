@@ -314,7 +314,9 @@ def showOptions():
                 write(colored('-url-filename: ' +str(args.url_filename), 'magenta')+colored(' The filenames of downloaded responses wil be set to the URL rather than the hash value of the response.','white'))
 
         write(colored('-f: ' +str(args.filter_responses_only), 'magenta')+colored(' If True, the initial links from wayback machine will not be filtered, only the responses that are downloaded will be filtered. It maybe useful to still see all available paths even if you don\'t want to check the file for content.','white'))
-        write(colored('-ko: ' +str(args.keywords_only), 'magenta')+colored(' If True, we will only get results that contain the given keywords.','white'))
+        if args.keywords_only is not None and args.keywords_only != '#CONFIG':
+            write(colored('-ko: ' +str(args.keywords_only), 'magenta')+colored(' Only get results that match the given Regex.','white'))
+        
         write(colored('-lr: ' +str(args.limit_requests), 'magenta')+colored(' The limit of requests made per source when getting links. A value of 0 (Zero) means no limit is applied.','white'))
         if args.mc:
             write(colored('-mc: ' +str(args.mc), 'magenta')+colored(' Only retrieve URLs and Responses that match these HTTP Status codes.','white'))
@@ -325,7 +327,7 @@ def showOptions():
         if not args.mc and args.fc:
             write(colored('Response Code exclusions: ', 'magenta')+colored(FILTER_CODE))      
         write(colored('Response URL exclusions: ', 'magenta')+colored(FILTER_URL))  
-        if args.keywords_only:
+        if args.keywords_only and args.keywords_only == '#CONFIG':
             if FILTER_KEYWORDS == '':
                 write(colored('Keywords only: ', 'magenta')+colored('It looks like no keywords have been set in config.yml file.','red'))
             else: 
@@ -1098,7 +1100,10 @@ def processAlienVaultPage(url):
                             
                             # Set keywords filter if -ko argument passed
                             if addLink and args.keywords_only:
-                                match = re.search(r'('+re.escape(FILTER_KEYWORDS).replace(',','|')+')', foundUrl, flags=re.IGNORECASE)
+                                if args.keywords_only == '#CONFIG':
+                                    match = re.search(r'('+re.escape(FILTER_KEYWORDS).replace(',','|')+')', foundUrl, flags=re.IGNORECASE)
+                                else:
+                                    match = re.search(r'('+args.keywords_only+')', foundUrl, flags=re.IGNORECASE)
                                 if match is None:
                                     addLink = False
                 
@@ -1229,7 +1234,10 @@ def processURLScanUrl(url, httpCode, mimeType):
                 
                 # Set keywords filter if -ko argument passed
                 if addLink and args.keywords_only:
-                    match = re.search(r'('+re.escape(FILTER_KEYWORDS).replace(',','|')+')', url, flags=re.IGNORECASE)
+                    if args.keywords_only == '#CONFIG':
+                        match = re.search(r'('+re.escape(FILTER_KEYWORDS).replace(',','|')+')', url, flags=re.IGNORECASE)
+                    else:
+                        match = re.search(r'('+args.keywords_only+')', url, flags=re.IGNORECASE)
                     if match is None:
                         addLink = False
                                     
@@ -1513,7 +1521,10 @@ def getWaybackUrls():
         # Set keywords filter if -ko argument passed
         filterKeywords = ''
         if args.keywords_only:
-            filterKeywords = '&filter=original:.*(' + re.escape(FILTER_KEYWORDS).replace(',','|') + ').*'
+            if args.keywords_only == '#CONFIG':
+                filterKeywords = '&filter=original:.*(' + re.escape(FILTER_KEYWORDS).replace(',','|') + ').*'
+            else:
+                filterKeywords = '&filter=original:.*(' + args.keywords_only + ').*'
             
         if args.filter_responses_only:
             url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}','') + '&page='
@@ -1608,7 +1619,10 @@ def processCommonCrawlCollection(cdxApiUrl):
             # Set keywords filter if -ko argument passed
             filterKeywords = ''
             if args.keywords_only:
-                filterKeywords = '&filter=~url:.*(' + re.escape(FILTER_KEYWORDS).replace(',','|') + ').*'
+                if args.keywords_only == '#CONFIG':
+                    filterKeywords = '&filter=~url:.*(' + re.escape(FILTER_KEYWORDS).replace(',','|') + ').*'
+                else:
+                    filterKeywords = '&filter=~url:.*(' + args.keywords_only + ').*'
                 
             commonCrawlUrl = cdxApiUrl + '?output=json&fl=timestamp,url,mime,status,digest&url=' 
                
@@ -1895,7 +1909,10 @@ def processResponses():
             # Set keywords filter if -ko argument passed
             filterKeywords = ''
             if args.keywords_only:
-                filterKeywords = '&filter=original:.*(' + re.escape(FILTER_KEYWORDS).replace(',','|') + ').*'
+                if args.keywords_only == '#CONFIG':
+                    filterKeywords = '&filter=original:.*(' + re.escape(FILTER_KEYWORDS).replace(',','|') + ').*'
+                else:
+                    filterKeywords = '&filter=original:.*(' + args.keywords_only + ').*'
                 
             # Get the list again with filters and include timestamp
             linksFound = set()
@@ -1965,7 +1982,10 @@ def processResponses():
                             success = False
                     if not success:
                         if args.keywords_only:
-                            writerr(colored(getSPACER('Failed to get links from archive.org - consider removing -ko / --keywords-only argument, or changing FILTER_KEYWORDS in config.yml'), 'red'))
+                            if args.keywords_only == '#CONFIG':
+                                writerr(colored(getSPACER('Failed to get links from archive.org - consider removing -ko / --keywords-only argument, or changing FILTER_KEYWORDS in config.yml'), 'red'))
+                            else:
+                                writerr(colored(getSPACER('Failed to get links from archive.org - consider removing -ko / --keywords-only argument, or changing the Regex value you passed'), 'red'))
                         else:    
                             if resp.text.lower().find('blocked site error') > 0:
                                 writerr(colored(getSPACER('Failed to get links from archive.org - Blocked Site Error (they block the target site)'), 'red'))
@@ -2276,9 +2296,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '-ko',
         '--keywords-only',
-        action='store_true',
-        help='Only return links and responses that contain keywords that you are interested in. This can reduce the time it takes to get results. Keywords are given in a comma separated list in the "config.yml" file with the "FILTER_KEYWORDS" key',
-        default=False
+        action='store',
+        help='Only return links and responses that contain keywords that you are interested in. This can reduce the time it takes to get results. If you provide the flag with no value, Keywords are taken from the comma separated list in the "config.yml" file with the "FILTER_KEYWORDS" key, otherwise you can pass an specific Regex value to use, e.g. -ko "admin" to only get links containing the word admin, or -ko "\.js(\?|$)" to only get JS files. The Regex check is NOT case sensitive.',
+        nargs='?',
+        const="#CONFIG"
     )
     parser.add_argument(
         '-lr',

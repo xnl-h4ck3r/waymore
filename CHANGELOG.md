@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.23
+
+  - Changed
+
+    - The `-ko`/`--keywords-only` argument can now be passed without a value, which will use the `FILTER_KEYWORDS` in `config.yml` as before, or passed with a Regex value that will be used instead. For example, `-ko "admin"` to only get links containing the word `admin`, or `-ko "\.js(\?\|$)"` to only get JS files. The Regex check is NOT case sensitive.
+
 - v1.22
 
   - Changed
