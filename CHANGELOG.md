@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.24
+
+  - Changed
+
+    - Handle errors with the config file better. Display specific message to say if the file isn't found or if there is a formatting error. If there is any other kind of error, the error message will be displayed. THe default values will be used in the case of any of these errors.
+
 - v1.23
 
   - Changed

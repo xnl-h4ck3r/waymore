@@ -399,6 +399,7 @@ def getConfig():
             writerr(colored('ERROR getConfig 3: ' + str(e), 'red'))
             
         # Try to get the config file values
+        useDefaults = False
         try:
             # Get the path of the config file. If -c / --config argument is not passed, then it defaults to config.yml in the same directory as the run file      
             waymorePath = Path(
@@ -475,11 +476,29 @@ def getConfig():
                 writerr(colored('Unable to read "FILTER_KEYWORDS" from config.yml - default set', 'red'))
                 CONTINUE_RESPONSES_IF_PIPED = True
                 
-        except:
+        except yaml.YAMLError as e: # A scan error occurred reading the file
+            useDefaults = True
+            if args.config is None:
+                writerr(colored('WARNING: There seems to be a formatting error in "config.yml", so using default values', 'yellow'))
+            else:
+                writerr(colored('WARNING: There seems to be a formatting error in "' + args.config + '", so using default values', 'yellow'))
+                
+        except FileNotFoundError as e: # The config file wasn't found
+            useDefaults = True
             if args.config is None:
                 writerr(colored('WARNING: Cannot find file "config.yml", so using default values', 'yellow'))
             else:
                 writerr(colored('WARNING: Cannot find file "' + args.config + '", so using default values', 'yellow'))
+                
+        except Exception as e: # Another error occurred
+            useDefaults = True
+            if args.config is None:
+                writerr(colored('WARNING: Cannot read file "config.yml", so using default values. The following error occurred: ' + str(e), 'yellow'))
+            else:
+                writerr(colored('WARNING: Cannot read file "' + args.config + '", so using default values. The following error occurred: ' + str(e), 'yellow'))
+            
+        # Use defaults if required
+        if useDefaults:
             FILTER_URL = DEFAULT_FILTER_URL
             FILTER_MIME = DEFAULT_FILTER_MIME
             FILTER_CODE = DEFAULT_FILTER_CODE
