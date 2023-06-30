@@ -590,7 +590,7 @@ def linksFoundAdd(link):
     # If the link specifies port 80 or 443, e.g. http://example.com:80, then remove the port 
     try:
         parsed = urlparse(link.strip())
-        if parsed.netloc.find(':80') or parsed.netloc.fnd(':443'):
+        if parsed.netloc.find(':80') >= 0 or parsed.netloc.fnd(':443') >= 0:
             newNetloc = parsed.netloc.split(':')[0]
             parsed = parsed._replace(netloc=newNetloc).geturl()
         linksFound.add(parsed)
@@ -1103,7 +1103,6 @@ def processAlienVaultPage(url):
                             # Compare the HTTP code gainst the Code exclusions and matches
                             if MATCH_CODE != '':
                                 match = re.search(r'('+re.escape(MATCH_CODE).replace(',','|')+')', httpCode, flags=re.IGNORECASE)
-                                #print('('+re.escape(MATCH_CODE).replace(',','|')+')')
                                 if match is None:
                                     addLink = False
                             else:

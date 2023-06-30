@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.25
+
+  - Changed
+
+    - Fix a bug that always strips the port number from URLs found. It should only remove the port if it is :80 or :443
+
 - v1.24
 
   - Changed
