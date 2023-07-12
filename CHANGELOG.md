@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.26
+
+  - Changed
+
+    - Allow an input value of just a TLD, e.g. `.mil`. If a TLD is passed then resources for all domains with that TLD will be retrieved. NOTE: If a TLD is passed then the Alien Vault OTX source is excluded because it needs a full domain.
+
 - v1.25
 
   - Changed
