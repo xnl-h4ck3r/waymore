@@ -823,7 +823,7 @@ def processURLOutput():
         appendedUrls = False
         if not args.output_overwrite:
             try:
-                with open(filename,'r') as f:
+                with open(filename,'r') as existingLinks:
                     for link in existingLinks.readlines():
                         linksFound.add(link.strip())
                 appendedUrls = True
