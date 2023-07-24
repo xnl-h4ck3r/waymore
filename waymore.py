@@ -823,9 +823,9 @@ def processURLOutput():
         appendedUrls = False
         if not args.output_overwrite:
             try:
-                existingLinks = open(filename,'r',)
-                for link in existingLinks.readlines():
-                    linksFound.add(link.strip())
+                with open(filename,'r') as f:
+                    for link in existingLinks.readlines():
+                        linksFound.add(link.strip())
                 appendedUrls = True
             except Exception as e:
                 pass
@@ -977,8 +977,8 @@ def validateArgInput(x):
         if os.path.isfile(x):
             isInputFile = True
             # Open file and put all values in input list
-            inputFile = open(x, 'r')
-            lines = inputFile.readlines()          
+            with open(x, 'r') as inputFile:
+                lines = inputFile.readlines()          
             # Check if any lines start with a *. and replace without the *.
             for line in lines:
                 inputValues.add(line.lstrip('*.'))
