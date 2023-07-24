@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.27
+
+  - Changed
+
+    - Set the default for `-lcc` to 3 instead of 0 to only search the 3 latest indexes for Common Crawl instead of all of them.
+
 - v1.26
 
   - Changed
