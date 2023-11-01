@@ -1,5 +1,15 @@
 ## Changelog
 
+- v1.28
+
+  - New
+
+    - Added `application/font-otf` to `DEFAULT_FILTER_MIME`
+
+  - Changed
+
+    - Fix a bug that overwrites the output URLs file if the input is a file that contains different hosts.
+
 - v1.27
 
   - Changed

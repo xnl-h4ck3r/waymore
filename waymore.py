@@ -98,7 +98,7 @@ DEFAULT_TIMEOUT = 30
 DEFAULT_FILTER_URL = '.css,.jpg,.jpeg,.png,.svg,.img,.gif,.mp4,.flv,.ogv,.webm,.webp,.mov,.mp3,.m4a,.m4p,.scss,.tif,.tiff,.ttf,.otf,.woff,.woff2,.bmp,.ico,.eot,.htc,.rtf,.swf,.image,/image,/img,/css,/wp-json,/wp-content,/wp-includes,/theme,/audio,/captcha,/font,node_modules,/jquery,/bootstrap'
 
 # MIME Content-Type exclusions used to filter links and responses from web.archive.org through their API
-DEFAULT_FILTER_MIME = 'text/css,image/jpeg,image/jpg,image/png,image/svg+xml,image/gif,image/tiff,image/webp,image/bmp,image/vnd,image/x-icon,image/vnd.microsoft.icon,font/ttf,font/woff,font/woff2,font/x-woff2,font/x-woff,font/otf,audio/mpeg,audio/wav,audio/webm,audio/aac,audio/ogg,audio/wav,audio/webm,video/mp4,video/mpeg,video/webm,video/ogg,video/mp2t,video/webm,video/x-msvideo,video/x-flv,application/font-woff,application/font-woff2,application/x-font-woff,application/x-font-woff2,application/vnd.ms-fontobject,application/font-sfnt,application/vnd.android.package-archive,binary/octet-stream,application/octet-stream,application/pdf,application/x-font-ttf,application/x-font-otf,video/webm,video/3gpp,application/font-ttf,audio/mp3,audio/x-wav,image/pjpeg,audio/basic'
+DEFAULT_FILTER_MIME = 'text/css,image/jpeg,image/jpg,image/png,image/svg+xml,image/gif,image/tiff,image/webp,image/bmp,image/vnd,image/x-icon,image/vnd.microsoft.icon,font/ttf,font/woff,font/woff2,font/x-woff2,font/x-woff,font/otf,audio/mpeg,audio/wav,audio/webm,audio/aac,audio/ogg,audio/wav,audio/webm,video/mp4,video/mpeg,video/webm,video/ogg,video/mp2t,video/webm,video/x-msvideo,video/x-flv,application/font-woff,application/font-woff2,application/x-font-woff,application/x-font-woff2,application/vnd.ms-fontobject,application/font-sfnt,application/vnd.android.package-archive,binary/octet-stream,application/octet-stream,application/pdf,application/x-font-ttf,application/x-font-otf,video/webm,video/3gpp,application/font-ttf,audio/mp3,audio/x-wav,image/pjpeg,audio/basic,application/font-otf'
 
 # Response code exclusions we will use to filter links and responses from web.archive.org through their API
 DEFAULT_FILTER_CODE = '404,301,302'
@@ -586,14 +586,16 @@ def fixArchiveOrgUrl(url):
 
 # Add a link to the linksFound collection
 def linksFoundAdd(link):
-    global linksFound
+    global linksFound, argsInput
     # If the link specifies port 80 or 443, e.g. http://example.com:80, then remove the port 
     try:
-        parsed = urlparse(link.strip())
-        if parsed.netloc.find(':80') >= 0 or parsed.netloc.fnd(':443') >= 0:
-            newNetloc = parsed.netloc.split(':')[0]
-            parsed = parsed._replace(netloc=newNetloc).geturl()
-        linksFound.add(parsed)
+        # Don't write it if the link does not contain the requested domain (this can sometimes happen)
+        if link.find(argsInput) >= 0:
+            parsed = urlparse(link.strip())
+            if parsed.netloc.find(':80') >= 0 or parsed.netloc.fnd(':443') >= 0:
+                newNetloc = parsed.netloc.split(':')[0]
+                parsed = parsed._replace(netloc=newNetloc).geturl()
+            linksFound.add(parsed)
     except:
         linksFound.add(link)
     
@@ -853,13 +855,11 @@ def processURLOutput():
         for link in linksFound:
             try:
                 if args.regex_after is None or re.search(args.regex_after, link, flags=re.IGNORECASE):
-                    # Don't write it if the link does not contain the requested domain (this can sometimes happen)
-                    if link.find(argsInput) >= 0:
-                        outFile.write(link + "\n")
-                        # If the tool is piped to pass output to something else, then write the link
-                        if not sys.stdout.isatty():
-                            write(link,True)
-                        outputCount = outputCount + 1
+                    outFile.write(link + "\n")
+                    # If the tool is piped to pass output to something else, then write the link
+                    if not sys.stdout.isatty():
+                        write(link,True)
+                    outputCount = outputCount + 1
             except Exception as e:
                 if verbose():
                     writerr(colored('ERROR processURLOutput 3: ' + str(e), 'red'))
