@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.29
+
+  - New
+
+    - Check for specific text in response code of 503 (which usually means the site is down for maintenance or not available) and return a specific message instead of the full response.
+
 - v1.28
 
   - New

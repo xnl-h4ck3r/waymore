@@ -302,11 +302,11 @@ def showOptions():
                 write(colored('-to: ' +str(args.to_date), 'magenta')+colored(' The date/time to get responses up to.','white'))
             
             if args.capture_interval == 'h': 
-                write(colored('-ci: ' +args.capture_interval, 'magenta')+colored(' Get at most 1 archived response per hour from archive.org','white'))
+                write(colored('-ci: ' +args.capture_interval, 'magenta')+colored(' Get at most 1 archived response per hour from Wayback Machine (archive.org)','white'))
             elif args.capture_interval == 'd':
-                write(colored('-ci: ' +args.capture_interval, 'magenta')+colored(' Get at most 1 archived response per day from archive.org','white'))
+                write(colored('-ci: ' +args.capture_interval, 'magenta')+colored(' Get at most 1 archived response per day from Wayback Machine (archive.org)','white'))
             elif args.capture_interval == 'm':
-                write(colored('-ci: ' +args.capture_interval, 'magenta')+colored(' Get at most 1 archived response per month from archive.org','white'))
+                write(colored('-ci: ' +args.capture_interval, 'magenta')+colored(' Get at most 1 archived response per month from Wayback Machine (archive.org)','white'))
             elif args.capture_interval == 'none':
                 write(colored('-ci: ' +args.capture_interval, 'magenta')+colored(' There will not be any filtering based on the capture interval.','white'))
                     
@@ -334,7 +334,7 @@ def showOptions():
                 write(colored('Keywords only: ', 'magenta')+colored(FILTER_KEYWORDS))
                 
         if args.regex_after is not None:
-            write(colored('-ra: ' + args.regex_after, 'magenta')+colored(' RegEx for filtering purposes against found links from archive.org AND responses downloaded. Only positive matches will be output.','white'))
+            write(colored('-ra: ' + args.regex_after, 'magenta')+colored(' RegEx for filtering purposes against found links from Wayback Machine (archive.org) AND responses downloaded. Only positive matches will be output.','white'))
         if args.mode in ['R','B']:
             write(colored('-t: ' + str(args.timeout), 'magenta')+colored(' The number of seconds to wait for a an archived response.','white'))
         if args.mode in ['R','B'] or (args.mode == 'U' and not args.xcc):
@@ -724,11 +724,11 @@ def processArchiveUrl(url):
                 except WayBackException as wbe:
                     failureCount = failureCount + 1
                     if verbose():
-                        writerr(colored(getSPACER('[ ERR ] archive.org returned a problem for "' + archiveUrl + '"'), 'red'))
+                        writerr(colored(getSPACER('[ ERR ] Wayback Machine (archive.org) returned a problem for "' + archiveUrl + '"'), 'red'))
                 except ConnectionError as ce:
                     failureCount = failureCount + 1
                     if verbose():
-                        writerr(colored(getSPACER('[ ERR ] archive.org connection error for "' + archiveUrl + '"'), 'red'))
+                        writerr(colored(getSPACER('[ ERR ] Wayback Machine (archive.org) connection error for "' + archiveUrl + '"'), 'red'))
                 except Exception as e:
                     failureCount = failureCount + 1
                     if verbose():
@@ -952,7 +952,7 @@ def validateArgProcesses(x):
     """
     x = int(x) 
     if x < 1 or x > 5:
-        raise argparse.ArgumentTypeError('The number of processes must be between 1 and 5. Be kind to archive.org and commoncrawl.org! :)')     
+        raise argparse.ArgumentTypeError('The number of processes must be between 1 and 5. Be kind to Wayback Machine (archive.org) and commoncrawl.org! :)')     
     return x
 
 def validateArgInput(x):
@@ -1469,7 +1469,7 @@ def processWayBackPage(url):
                 session.mount('http://', HTTP_ADAPTER)
                 resp = session.get(url, headers={"User-Agent":userAgent})  
             except ConnectionError as ce:
-                writerr(colored(getSPACER('[ ERR ] archive.org connection error for page ' + page), 'red'))
+                writerr(colored(getSPACER('[ ERR ] Wayback Machine (archive.org) connection error for page ' + page), 'red'))
                 resp = None
                 return
             except Exception as e:
@@ -1479,9 +1479,14 @@ def processWayBackPage(url):
             finally:
                 try:
                     if resp is not None:
-                         # If a status other of 429, then stop processing Alien Vault
+                        # If a status other of 429, then stop processing Alien Vault
                         if resp.status_code == 429:
-                            writerr(colored(getSPACER('[ 429 ] Archive.org rate limit reached, so stopping. Links that have already been retrieved will be saved.'),'red'))
+                            writerr(colored(getSPACER('[ 429 ] Wayback Machine (archive.org) rate limit reached, so stopping. Links that have already been retrieved will be saved.'),'red'))
+                            stopSource = True
+                            return
+                        # If a status other of 503, then the site is unavailable
+                        if resp.status_code == 503:
+                            writerr(colored(getSPACER('[ 503 ] Wayback Machine (archive.org) is currently unavailable. It may be down for maintenance. You can check https://web.archive.org/cdx/ to verify.'),'red'))
                             stopSource = True
                             return
                         # If the response from archive.org is empty then skip
@@ -1552,7 +1557,7 @@ def getWaybackUrls():
         # Get the number of pages (i.e. separate requests) that are going to be made to archive.org
         totalPages = 0
         try:
-            write(colored('\rGetting the number of archive.org pages to search...\r','cyan'))
+            write(colored('\rGetting the number of Wayback Machine (archive.org) pages to search...\r','cyan'))
             # Choose a random user agent string to use for any requests
             userAgent = random.choice(USER_AGENT)
             session = requests.Session()
@@ -1566,24 +1571,29 @@ def getWaybackUrls():
                 totalPages = args.limit_requests
         except Exception as e:
             try:
+                # If the rate limit was reached end now
+                if resp.status_code == 429:
+                    writerr(colored(getSPACER('[ 429 ] Wayback Machine (Archive.org) rate limit reached so unable to get links.'),'red'))
+                    return
+                
+                # If a status other of 503, then the site is unavailable
+                if resp.status_code == 503:
+                    writerr(colored(getSPACER('[ 503 ] Wayback Machine (Archive.org) is currently unavailable. It may be down for maintenance. You can check https://web.archive.org/cdx/ to verify.'),'red'))
+                    return
+        
                 if resp.text.lower().find('blocked site error') > 0:
-                    writerr(colored(getSPACER('[ ERR ] unable to get links from archive.org: Blocked Site Error (they block the target site)'), 'red'))
+                    writerr(colored(getSPACER('[ ERR ] unable to get links from Wayback Machine (archive.org): Blocked Site Error (they block the target site)'), 'red'))
                 else:
-                    writerr(colored(getSPACER('[ ERR ] unable to get links from archive.org: ' + str(resp.text.strip())), 'red'))
+                    writerr(colored(getSPACER('[ ERR ] unable to get links from Wayback Machine (archive.org): ' + str(resp.text.strip())), 'red'))
             except:
-                writerr(colored(getSPACER('[ ERR ] unable to get links from archive.org: ' + str(e)), 'red'))
+                writerr(colored(getSPACER('[ ERR ] unable to get links from Wayback Machine (archive.org): ' + str(e)), 'red'))
             return
-        
-        # If the rate limit was reached end now
-        if resp.status_code == 429:
-            writerr(colored(getSPACER('[ 429 ] Archive.org rate limit reached so unable to get links.'),'red'))
-            return
-        
+                        
         if verbose():
             write(colored('The archive URL requested to get links: ','magenta')+colored(url+'\n','white'))
          
         # if the page number was found then display it, but otherwise we will just try to increment until we have everything       
-        write(colored('\rGetting links from ' + str(totalPages) + ' archive.org API requests (this can take a while for some domains)...\r','cyan'))
+        write(colored('\rGetting links from ' + str(totalPages) + ' Wayback Machine (archive.org) API requests (this can take a while for some domains)...\r','cyan'))
 
         # Get a list of all the page URLs we need to visit
         pages = set()
@@ -1605,7 +1615,7 @@ def getWaybackUrls():
         
         if not args.xwm:
             linkCount = len(linksFound)
-            write(getSPACER(colored('Links found on archive.org: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+            write(getSPACER(colored('Links found on Wayback Machine (archive.org): ', 'cyan')+colored(str(linkCount),'white'))+'\n')
             
     except Exception as e:
         writerr(colored('ERROR getWaybackUrls 1: ' + str(e), 'red'))
@@ -1847,7 +1857,7 @@ def getCommonCrawlUrls():
 
 def processResponses():
     """
-    Get archived responses from archive.org
+    Get archived responses from Wayback Machine (archive.org)
     """
     global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput, continueRespFile, successCount, fileCount
     try:
@@ -1977,7 +1987,7 @@ def processResponses():
                 session.mount('http://', HTTP_ADAPTER)
                 resp = session.get(url, stream=True, headers={"User-Agent":userAgent}, timeout=args.timeout)  
             except ConnectionError as ce:
-                writerr(colored(getSPACER('[ ERR ] archive.org connection error'), 'red'))
+                writerr(colored(getSPACER('[ ERR ] Wayback Machine (archive.org) connection error'), 'red'))
                 resp = None
                 success = False
                 return 
@@ -1991,24 +2001,32 @@ def processResponses():
                     if resp is not None:
                         # If the response from archive.org is empty, then no responses were found
                         if resp.text == '':
-                            writerr(colored(getSPACER('No archived responses were found on archive.org for the given search parameters.'),'red'))
+                            writerr(colored(getSPACER('No archived responses were found on Wayback Machine (archive.org) for the given search parameters.'),'red'))
+                            success = False
+                        # If a status other of 429, then stop processing Alien Vault
+                        if resp.status_code == 429:
+                            writerr(colored(getSPACER('[ 429 ] Wayback Machine (archive.org) rate limit reached, so stopping. Links that have already been retrieved will be saved.'),'red'))
+                            success = False
+                        # If a status other of 503, then the site is unavailable
+                        elif resp.status_code == 503:
+                            writerr(colored(getSPACER('[ 503 ] Wayback Machine (archive.org) is currently unavailable. It may be down for maintenance. You can check https://web.archive.org/cdx/ to verify.'),'red'))
                             success = False
                         # If a status other than 200, then stop
-                        if resp.status_code != 200:
+                        elif resp.status_code != 200:
                             if verbose(): 
                                 writerr(colored(getSPACER('[ '+str(resp.status_code)+' ] Error for '+url),'red'))
                             success = False
                     if not success:
                         if args.keywords_only:
                             if args.keywords_only == '#CONFIG':
-                                writerr(colored(getSPACER('Failed to get links from archive.org - consider removing -ko / --keywords-only argument, or changing FILTER_KEYWORDS in config.yml'), 'red'))
+                                writerr(colored(getSPACER('Failed to get links from Wayback Machine (archive.org) - consider removing -ko / --keywords-only argument, or changing FILTER_KEYWORDS in config.yml'), 'red'))
                             else:
-                                writerr(colored(getSPACER('Failed to get links from archive.org - consider removing -ko / --keywords-only argument, or changing the Regex value you passed'), 'red'))
+                                writerr(colored(getSPACER('Failed to get links from Wayback Machine (archive.org) - consider removing -ko / --keywords-only argument, or changing the Regex value you passed'), 'red'))
                         else:    
                             if resp.text.lower().find('blocked site error') > 0:
-                                writerr(colored(getSPACER('Failed to get links from archive.org - Blocked Site Error (they block the target site)'), 'red'))
+                                writerr(colored(getSPACER('Failed to get links from Wayback Machine (archive.org) - Blocked Site Error (they block the target site)'), 'red'))
                             else:
-                                writerr(colored(getSPACER('Failed to get links from archive.org - check input domain and try again.'), 'red'))
+                                writerr(colored(getSPACER('Failed to get links from Wayback Machine (archive.org) - check input domain and try again.'), 'red'))
                         return
                 except:
                     pass
@@ -2231,7 +2249,7 @@ if __name__ == '__main__':
         '--capture-interval',
         action='store',
         choices=['h', 'd', 'm', 'none'],
-        help='Filters the search on archive.org to only get at most 1 capture per hour (h), day (d) or month (m). This filter is used for responses only. The default is \'d\' but can also be set to \'none\' to not filter anything and get all responses.',
+        help='Filters the search on Wayback Machine (archive.org) to only get at most 1 capture per hour (h), day (d) or month (m). This filter is used for responses only. The default is \'d\' but can also be set to \'none\' to not filter anything and get all responses.',
         default='d'
     )
     parser.add_argument(
@@ -2444,7 +2462,7 @@ if __name__ == '__main__':
                 elif stopProgram == StopProgram.WEBARCHIVE_PROBLEM:
                     writerr(
                         colored(
-                            "THE PROGRAM WAS STOPPED DUE TO PROBLEM GETTING DATA FROM WEBARCHIVE.ORG\n",
+                            "THE PROGRAM WAS STOPPED DUE TO PROBLEM GETTING DATA FROM WAYBACK MACHINE (ARCHIVE.ORG)\n",
                             "red",
                         )
                     )
