@@ -1,5 +1,12 @@
 ## Changelog
 
+- v1.30
+
+  - Changed
+
+    - If there any `+` in the MIME types, e.g. `image/svg+xml`, then replace the `+` with a `.` otherwise the wayback API does not recognise it.
+    - Add `application/font-otf` to the `FILTER_MIME` value in `config.yml`.
+
 - v1.29
 
   - New

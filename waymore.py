@@ -1535,7 +1535,8 @@ def getWaybackUrls():
     # Write the file of URL's for the passed domain/URL
     try:
         stopSource = False
-        filterMIME = '&filter=!mimetype:warc/revisit|' + re.escape(FILTER_MIME).replace(',','|') 
+        # If there any + in the MIME types, e.g. image/svg+xml, then replace the + with a . otherwise the wayback API does not recognise it
+        filterMIME = '&filter=!mimetype:warc/revisit|' + re.escape(FILTER_MIME).replace(',','|').replace('+','.') 
         if MATCH_CODE != '':
             filterCode = '&filter=statuscode:' + re.escape(MATCH_CODE).replace(',','|')
         else:
