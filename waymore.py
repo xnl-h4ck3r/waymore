@@ -1439,7 +1439,7 @@ def getURLScanUrls():
                 if searchAfter != '':
                 
                     keepTrying = True
-                    while keepTrying:
+                    while not stopSource and keepTrying:
                         keepTrying = False
                         # Get the next page from urlscan.io
                         try:
