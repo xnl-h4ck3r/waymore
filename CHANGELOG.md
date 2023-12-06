@@ -1,5 +1,18 @@
 ## Changelog
 
+- v1.31
+
+  - New
+
+    - Add new argument `-urlr`/`--urlscan-rate-limit-retry` to pass the number of minutes that you want to wait between each rate-limit pause from URLScan.
+    - Add new MIME exclusions `application/x-msdownload` and `application/x-ms-application`.
+
+  - Changed
+
+    - When getting URLs from the results of URLScsn, also get the `[task][url]` values. Thanks to @Ali45598547 for highlighting this!
+    - When the URLScan rate limits, it says how many seconds you need to wait until you can try again. If less than 1 minute, the program will wait automatically to get more results. If more than 1 minute, then the code will wait for the length of time specified by the `-urlr`/`--urlscan-rate-limit-retry` argument, if passed.
+    - For CommonCrawl, do at least 20 retires. This helps reduce the problem of `503`` errors and doing many retries was suggested by CommonCrawl them selves to deal with the problem.
+
 - v1.30
 
   - Changed

@@ -61,7 +61,7 @@ inputIsDomainANDPath = False
 subs = '*.'
 path = ''
 waymorePath = ''
-terminalWidth = 120
+terminalWidth = 128
 maxMemoryUsage = 0
 currentMemUsage = 0
 maxMemoryPercent = 0
@@ -98,7 +98,7 @@ DEFAULT_TIMEOUT = 30
 DEFAULT_FILTER_URL = '.css,.jpg,.jpeg,.png,.svg,.img,.gif,.mp4,.flv,.ogv,.webm,.webp,.mov,.mp3,.m4a,.m4p,.scss,.tif,.tiff,.ttf,.otf,.woff,.woff2,.bmp,.ico,.eot,.htc,.rtf,.swf,.image,/image,/img,/css,/wp-json,/wp-content,/wp-includes,/theme,/audio,/captcha,/font,node_modules,/jquery,/bootstrap'
 
 # MIME Content-Type exclusions used to filter links and responses from web.archive.org through their API
-DEFAULT_FILTER_MIME = 'text/css,image/jpeg,image/jpg,image/png,image/svg+xml,image/gif,image/tiff,image/webp,image/bmp,image/vnd,image/x-icon,image/vnd.microsoft.icon,font/ttf,font/woff,font/woff2,font/x-woff2,font/x-woff,font/otf,audio/mpeg,audio/wav,audio/webm,audio/aac,audio/ogg,audio/wav,audio/webm,video/mp4,video/mpeg,video/webm,video/ogg,video/mp2t,video/webm,video/x-msvideo,video/x-flv,application/font-woff,application/font-woff2,application/x-font-woff,application/x-font-woff2,application/vnd.ms-fontobject,application/font-sfnt,application/vnd.android.package-archive,binary/octet-stream,application/octet-stream,application/pdf,application/x-font-ttf,application/x-font-otf,video/webm,video/3gpp,application/font-ttf,audio/mp3,audio/x-wav,image/pjpeg,audio/basic,application/font-otf'
+DEFAULT_FILTER_MIME = 'text/css,image/jpeg,image/jpg,image/png,image/svg+xml,image/gif,image/tiff,image/webp,image/bmp,image/vnd,image/x-icon,image/vnd.microsoft.icon,font/ttf,font/woff,font/woff2,font/x-woff2,font/x-woff,font/otf,audio/mpeg,audio/wav,audio/webm,audio/aac,audio/ogg,audio/wav,audio/webm,video/mp4,video/mpeg,video/webm,video/ogg,video/mp2t,video/webm,video/x-msvideo,video/x-flv,application/font-woff,application/font-woff2,application/x-font-woff,application/x-font-woff2,application/vnd.ms-fontobject,application/font-sfnt,application/vnd.android.package-archive,binary/octet-stream,application/octet-stream,application/pdf,application/x-font-ttf,application/x-font-otf,video/webm,video/3gpp,application/font-ttf,audio/mp3,audio/x-wav,image/pjpeg,audio/basic,application/font-otf,application/x-ms-application,application/x-msdownload'
 
 # Response code exclusions we will use to filter links and responses from web.archive.org through their API
 DEFAULT_FILTER_CODE = '404,301,302'
@@ -341,6 +341,9 @@ def showOptions():
             write(colored('-p: ' + str(args.processes), 'magenta')+colored(' The number of parallel requests made.','white'))
         write(colored('-r: ' + str(args.retries), 'magenta')+colored(' The number of retries for requests that get connection error or rate limited.','white'))
         
+        if not args.xus:
+            write(colored('-urlr: ' + str(args.urlscan_rate_limit_retry), 'magenta')+colored(' The number of minutes to wait for a rate limit pause on URLScan.io instead of stopping with a 429 error.','white'))
+            
         write()
 
     except Exception as e:
@@ -357,7 +360,7 @@ def getConfig():
         try:
             terminalWidth = os.get_terminal_size().columns
         except:
-            terminalWidth = 120
+            terminalWidth = 128
         
         # If the input doesn't have a / then assume it is a domain rather than a domain AND path
         if str(argsInput).find('/') < 0:
@@ -388,7 +391,7 @@ def getConfig():
         # Set up an HTTPAdaptor for retry strategy for Common Crawl when making requests
         try:
             retry= Retry(
-                total=args.retries+2,
+                total=args.retries+20,
                 backoff_factor=1.1,
                 status_forcelist=[429, 500, 502, 503, 504],
                 raise_on_status=False,
@@ -1158,7 +1161,7 @@ def getAlienVaultUrls():
             session.mount('http://', HTTP_ADAPTER)
             resp = session.get(url+'&showNumPages=True', headers={"User-Agent":userAgent}) 
         except Exception as e:
-            writerr(colored(getSPACER('[ ERR ] unable to get links from alienvault.com: ' + str(e)), 'red'))
+            writerr(colored(getSPACER('[ ERR ] Unable to get links from alienvault.com: ' + str(e)), 'red'))
             return
         
         # If the rate limit was reached end now
@@ -1315,9 +1318,25 @@ def getURLScanUrls():
             resp = session.get(url, headers={'User-Agent':userAgent, 'API-Key':URLSCAN_API_KEY})
             requestsMade = requestsMade + 1
         except Exception as e:
-            write(colored(getSPACER('[ ERR ] unable to get links from urlscan.io: ' + str(e)), 'red'))
+            write(colored(getSPACER('[ ERR ] Unable to get links from urlscan.io: ' + str(e)), 'red'))
             return
         
+        # If the rate limit was reached then determine if to wait and then try again
+        if resp.status_code == 429:
+            # Get the number of seconds the rate limit resets
+            match = re.search(r'Reset in (\d+) seconds', resp.text, flags=re.IGNORECASE)
+            if match is not None:
+                seconds = int(match.group(1))
+                if seconds <= args.urlscan_rate_limit_retry * 60:
+                    writerr(colored(getSPACER('[ 429 ] URLScan rate limit reached, so waiting for another '+str(seconds)+' seconds before continuing...'),'yellow'))
+                    time.sleep(seconds+1)
+                    try:
+                        resp = session.get(url, headers={'User-Agent':userAgent, 'API-Key':URLSCAN_API_KEY})
+                        requestsMade = requestsMade + 1
+                    except Exception as e:
+                        write(colored(getSPACER('[ ERR ] Unable to get links from urlscan.io: ' + str(e)), 'red'))
+                        return
+                        
         # If the rate limit was reached or if a 401 (which likely means the API key isn't valid), try without API key
         if resp.status_code in (401,429): 
             if URLSCAN_API_KEY != '':
@@ -1330,7 +1349,7 @@ def getURLScanUrls():
                     URLSCAN_API_KEY = ''
                     resp = requests.get(url, headers={'User-Agent':userAgent}) 
                 except Exception as e:
-                    writerr(colored(getSPACER('[ ERR ] unable to get links from urlscan.io: ' + str(e)), 'red'))
+                    writerr(colored(getSPACER('[ ERR ] Unable to get links from urlscan.io: ' + str(e)), 'red'))
                     return
                 
                 # If the rate limit was reached end now
@@ -1341,7 +1360,7 @@ def getURLScanUrls():
                 writerr(colored(getSPACER('[ 429 ] URLScan rate limit reached so unable to get links.'),'red'))
                 return
         elif resp.status_code != 200:
-            writerr(colored(getSPACER('[ ' + str(resp.status_code) + ' ] unable to get links from urlscan.io'),'red'))
+            writerr(colored(getSPACER('[ ' + str(resp.status_code) + ' ] Unable to get links from urlscan.io'),'red'))
             return
         
         # Get the JSON response
@@ -1377,6 +1396,14 @@ def getURLScanUrls():
                     except:
                         pointer = ''
 
+                    # Also get the "task" url field
+                    try:
+                        taskUrl = urlSection['task']['url']
+                        if not taskUrl.startswith('http'):
+                            taskUrl = 'http://' + taskUrl
+                    except:
+                        taskUrl = ''
+                    
                     # Get the sort value used for the search_after parameter to get to the next page later
                     try:
                         sort = urlSection['sort']
@@ -1397,46 +1424,67 @@ def getURLScanUrls():
                         mimeType = ''
                     
                     # If a URL was found the process it
-                    if foundUrl != '':    
+                    if foundUrl != '':
                         processURLScanUrl(foundUrl, httpCode, mimeType)
                     
                     # If a pointer was found the process it
                     if pointer != '':    
                         processURLScanUrl(pointer, httpCode, mimeType)
+                        
+                    # If a task url was found the process it
+                    if taskUrl != '':    
+                        processURLScanUrl(taskUrl, httpCode, mimeType)
                 
                 # If we have the field value to go to the next page...
                 if searchAfter != '':
                 
-                    # Get the next page from urlscan.io
-                    try:
-                        # Choose a random user agent string to use for any requests
-                        userAgent = random.choice(USER_AGENT)
-                        session = requests.Session()
-                        session.mount('https://', HTTP_ADAPTER)
-                        session.mount('http://', HTTP_ADAPTER)
-                        # Pass the API-Key header too. This can change the max endpoints per page, depending on URLScan subscription
-                        resp = session.get(url+searchAfter, headers={'User-Agent':userAgent, 'API-Key':URLSCAN_API_KEY}) 
-                        requestsMade = requestsMade + 1
-                    except Exception as e:
-                        writerr(colored(getSPACER('[ ERR ] unable to get links from urlscan.io: ' + str(e)), 'red'))
-                        pass
-                    
-                    # If the rate limit was reached end now
-                    if resp.status_code == 429:
-                        writerr(colored(getSPACER('[ 429 ] URLScan rate limit reached, so stopping. Links that have already been retrieved will be saved.'),'red'))
-                        stopSource = True
-                        pass
-                    elif resp.status_code != 200:
-                        writerr(colored(getSPACER('[ ' + str(resp.status_code) + ' ] unable to get links from urlscan.io'),'red'))
-                        stopSource = True
-                        pass
+                    keepTrying = True
+                    while keepTrying:
+                        keepTrying = False
+                        # Get the next page from urlscan.io
+                        try:
+                            # Choose a random user agent string to use for any requests
+                            userAgent = random.choice(USER_AGENT)
+                            session = requests.Session()
+                            session.mount('https://', HTTP_ADAPTER)
+                            session.mount('http://', HTTP_ADAPTER)
+                            # Pass the API-Key header too. This can change the max endpoints per page, depending on URLScan subscription
+                            resp = session.get(url+searchAfter, headers={'User-Agent':userAgent, 'API-Key':URLSCAN_API_KEY}) 
+                            requestsMade = requestsMade + 1
+                        except Exception as e:
+                            writerr(colored(getSPACER('[ ERR ] Unable to get links from urlscan.io: ' + str(e)), 'red'))
+                            pass
+                        
+                        # If the rate limit was reached 
+                        if resp.status_code == 429:
+                            # Get the number of seconds the rate limit resets
+                            match = re.search(r'Reset in (\d+) seconds', resp.text, flags=re.IGNORECASE)
+                            if match is not None:
+                                seconds = int(match.group(1))
+                                if seconds <= args.urlscan_rate_limit_retry * 60:
+                                    writerr(colored(getSPACER('[ 429 ] URLScan rate limit reached, so waiting for another '+str(seconds)+' seconds before continuing...'),'yellow'))
+                                    time.sleep(seconds+1)
+                                    keepTrying = True
+                                    continue
+                                else:
+                                    writerr(colored(getSPACER('[ 429 ] URLScan rate limit reached (waiting time of '+str(seconds)+'), so stopping. Links that have already been retrieved will be saved.'),'red'))
+                                    stopSource = True
+                                    pass
+                            else:
+                                writerr(colored(getSPACER('[ 429 ] URLScan rate limit reached, so stopping. Links that have already been retrieved will be saved.'),'red'))
+                                stopSource = True
+                                pass
+                        elif resp.status_code != 200:
+                            writerr(colored(getSPACER('[ ' + str(resp.status_code) + ' ] Unable to get links from urlscan.io'),'red'))
+                            stopSource = True
+                            pass
 
                     if not stopSource:
                         # Get the JSON response
                         jsonResp = json.loads(resp.text.strip())
                         
                         # If there are no more results, or if the requests limit was specified and has been exceeded, then stop
-                        if len(jsonResp['results']) == 0 or (args.limit_requests != 0 and requestsMade > args.limit_requests):
+                        if jsonResp['results'] is None or len(jsonResp['results']) == 0 or (args.limit_requests != 0 and requestsMade > args.limit_requests):
                             stopSource = True
         
         # Show the MIME types found (in case user wants to exclude more)
@@ -1583,11 +1631,11 @@ def getWaybackUrls():
                     return
         
                 if resp.text.lower().find('blocked site error') > 0:
-                    writerr(colored(getSPACER('[ ERR ] unable to get links from Wayback Machine (archive.org): Blocked Site Error (they block the target site)'), 'red'))
+                    writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): Blocked Site Error (they block the target site)'), 'red'))
                 else:
-                    writerr(colored(getSPACER('[ ERR ] unable to get links from Wayback Machine (archive.org): ' + str(resp.text.strip())), 'red'))
+                    writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): ' + str(resp.text.strip())), 'red'))
             except:
-                writerr(colored(getSPACER('[ ERR ] unable to get links from Wayback Machine (archive.org): ' + str(e)), 'red'))
+                writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): ' + str(e)), 'red'))
             return
                         
         if verbose():
@@ -2362,6 +2410,14 @@ if __name__ == '__main__':
         "--config",
         action="store",
         help="Path to the YML config file. If not passed, it looks for file 'config.yml' in the same directory as runtime file 'waymore.py'.",
+    )
+    parser.add_argument(
+        '-urlr',
+        '--urlscan-rate-limit-retry',
+        action='store',
+        type=int,
+        help='The number of minutes the user wants to wait for a rate limit pause on URLScan.io instead of stopping with a 429 error (default: 1).',
+        default=1
     )
     parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
     parser.add_argument('--version', action='store_true', help="Show version number")
