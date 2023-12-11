@@ -61,7 +61,7 @@ inputIsDomainANDPath = False
 subs = '*.'
 path = ''
 waymorePath = ''
-terminalWidth = 128
+terminalWidth = 135
 maxMemoryUsage = 0
 currentMemUsage = 0
 maxMemoryPercent = 0
@@ -114,15 +114,6 @@ MATCH_CODE  = ''
 FILTER_KEYWORDS = ''
 URLSCAN_API_KEY = ''
 CONTINUE_RESPONSES_IF_PIPED = True
-
-# Define colours
-class tc:
-    NORMAL = '\x1b[39m'
-    RED = '\x1b[31m'
-    GREEN = '\x1b[32m'
-    YELLOW = '\x1b[33m'
-    MAGENTA = '\x1b[35m'
-    CYAN = '\x1b[36m'
 
 # Get memory usage for 
 def getMemory():
@@ -195,12 +186,12 @@ def writerr(text='',pipe=False):
             
 def showBanner():
     write()
-    write(tc.RED+" _ _ _       _   _ "+tc.NORMAL+"____                    ")
-    write(tc.RED+"| | | |_____| | | "+tc.NORMAL+"/    \  ___   ____ _____ ")
-    write(tc.RED+"| | | (____ | | | "+tc.NORMAL+"| | | |/ _ \ / ___) ___ |")
-    write(tc.RED+"| | | / ___ | |_| "+tc.NORMAL+"| | | | |_| | |   | |_| |")
-    write(tc.RED+" \___/\_____|\__  "+tc.NORMAL+"|_|_|_|\___/| |   | ____/")
-    write(tc.RED+"            (____/ "+tc.MAGENTA+"  by Xnl-h4ck3r "+tc.NORMAL+" \_____)")
+    write(colored(" _ _ _       _   _ ","red")+"____                    ")
+    write(colored("| | | |_____| | | ","red")+r"/    \  ___   ____ _____ ")
+    write(colored("| | | (____ | | | ","red")+r"| | | |/ _ \ / ___) ___ |")
+    write(colored("| | | / ___ | |_| ","red")+"| | | | |_| | |   | |_| |")
+    write(colored(r" \___/\_____|\__  ","red")+r"|_|_|_|\___/| |   | ____/")
+    write(colored("            (____/ ","red")+colored("  by Xnl-h4ck3r ","magenta")+r" \_____)")
     write()
 
 def verbose():
@@ -223,7 +214,7 @@ def handler(signal_received, frame):
         elif stopProgramCount == 2:
             writerr(colored(getSPACER(">>> SERIOUSLY... YOU DON'T WANT YOUR DATA SAVED?!"), 'red'))
         elif stopProgramCount == 3:
-            writerr(colored(getSPACER(">>> Patience isn't your strong suit eh? ¯\_(ツ)_/¯"), 'red'))
+            writerr(colored(getSPACER(r">>> Patience isn't your strong suit eh? ¯\_(ツ)_/¯"), 'red'))
             sys.exit()
     else:
         stopProgram = StopProgram.SIGINT
@@ -2382,7 +2373,7 @@ if __name__ == '__main__':
         '-ko',
         '--keywords-only',
         action='store',
-        help='Only return links and responses that contain keywords that you are interested in. This can reduce the time it takes to get results. If you provide the flag with no value, Keywords are taken from the comma separated list in the "config.yml" file with the "FILTER_KEYWORDS" key, otherwise you can pass an specific Regex value to use, e.g. -ko "admin" to only get links containing the word admin, or -ko "\.js(\?|$)" to only get JS files. The Regex check is NOT case sensitive.',
+        help=r'Only return links and responses that contain keywords that you are interested in. This can reduce the time it takes to get results. If you provide the flag with no value, Keywords are taken from the comma separated list in the "config.yml" file with the "FILTER_KEYWORDS" key, otherwise you can pass an specific Regex value to use, e.g. -ko "admin" to only get links containing the word admin, or -ko "\.js(\?|$)" to only get JS files. The Regex check is NOT case sensitive.',
         nargs='?',
         const="#CONFIG"
     )
