@@ -1604,7 +1604,7 @@ def getWaybackUrls():
             session.mount('https://', HTTP_ADAPTER)
             session.mount('http://', HTTP_ADAPTER)
             resp = session.get(url+'&showNumPages=True', headers={"User-Agent":userAgent}) 
-            totalPages = int(resp.text.strip())+1
+            totalPages = int(resp.text.strip())
             
             # If the argument to limit the requests was passed and the total pages is larger than that, set to the limit
             if args.limit_requests != 0 and totalPages > args.limit_requests:
@@ -1637,8 +1637,11 @@ def getWaybackUrls():
 
         # Get a list of all the page URLs we need to visit
         pages = set()
-        for page in range(0, totalPages):
-            pages.add(url+str(page))
+        if totalPages == 1:
+            pages.add(url)
+        else:
+            for page in range(0, totalPages):
+                pages.add(url+str(page))
         
         # Process the URLs from web archive        
         if stopProgram is None:
@@ -2184,7 +2187,7 @@ def getProgressBarLength():
 # Get the length of the space to add to a string to fill line up to width of terminal
 def getSPACER(text):
     global terminalWidth
-    lenSpacer = terminalWidth - len(text) -1
+    lenSpacer = terminalWidth - len(text) +5
     SPACER = ' ' * lenSpacer
     return text + SPACER
 

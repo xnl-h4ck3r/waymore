@@ -1,5 +1,12 @@
 ## Changelog
 
+- v1.33
+
+  - Changed
+
+    - A bug existed that would cause any site that had only had one page of links to not be completely retrieved. Change the processing for Wayback Machine that gets the number of pages. If the total number of pages is 1, then don't pass page number at all.
+    - In the `getSPACER` function, add 5 to the length instead of taking 1 away, to text artifacts aren't left.
+
 - v1.32
 
   - Changed
