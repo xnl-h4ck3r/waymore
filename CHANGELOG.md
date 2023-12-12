@@ -1,5 +1,14 @@
 ## Changelog
 
+- v1.34
+
+  - Changed
+
+    - Any scheme, port number, query string, or URL fragment will be removed from the input values.
+    - Only show the warning `No value for "URLSCAN_API_KEY" in config.yml - consider adding (you can get a FREE api key at urlscan.io)` if the `-xus` argument wasn't passed.
+    - If the input has a domain AND path, then it will still be searched for links, and the mode will not be forced to R.
+    - When input value is validated and `<stdin>` is used, just assume one line is a domain/url, and multiple lines are treated as a file (so the correct description is shown).
+
 - v1.33
 
   - Changed

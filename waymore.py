@@ -236,9 +236,9 @@ def showOptions():
         else:
             inputArgDesc = '-i: '
         if inputIsDomainANDPath:
-            write(colored(inputArgDesc + argsInput, 'magenta')+colored(' The target URL to download responses for.','white'))
+            write(colored(inputArgDesc + argsInput, 'magenta')+colored(' The target URL to search for.','white'))
         else: # input is a domain
-            write(colored(inputArgDesc + argsInput, 'magenta')+colored(' The target domain to find links for.','white'))
+            write(colored(inputArgDesc + argsInput, 'magenta')+colored(' The target domain to search for.','white'))
         
         if args.mode == 'U':
             write(colored('-mode: ' + args.mode, 'magenta')+colored(' Only URLs will be retrieved for the input.','white'))
@@ -250,25 +250,24 @@ def showOptions():
         if args.config is not None:
             write(colored('-c: ' + args.config, 'magenta')+colored(' The path of the YML config file.','white'))
             
-        if not inputIsDomainANDPath:
-            if args.no_subs:
-                write(colored('-n: ' +str(args.no_subs), 'magenta')+colored(' Sub domains are excluded in the search.','white'))
+        if args.no_subs:
+            write(colored('-n: ' +str(args.no_subs), 'magenta')+colored(' Sub domains are excluded in the search.','white'))
+        else:
+            write(colored('-n: ' +str(args.no_subs), 'magenta')+colored(' Sub domains are included in the search.','white'))
+        
+        write(colored('-xwm: ' +str(args.xwm), 'magenta')+colored(' Whether to exclude checks for links from Wayback Machine (archive.org)','white'))    
+        write(colored('-xcc: ' +str(args.xcc), 'magenta')+colored(' Whether to exclude checks for links from commoncrawl.org','white'))
+        if not args.xcc:
+            if args.lcc == 0:
+                write(colored('-lcc: ' +str(args.lcc), 'magenta')+colored(' Search ALL Common Crawl index collections.','white'))
             else:
-                write(colored('-n: ' +str(args.no_subs), 'magenta')+colored(' Sub domains are included in the search.','white'))
-            
-            write(colored('-xwm: ' +str(args.xwm), 'magenta')+colored(' Whether to exclude checks for links from Wayback Machine (archive.org)','white'))    
-            write(colored('-xcc: ' +str(args.xcc), 'magenta')+colored(' Whether to exclude checks for links from commoncrawl.org','white'))
-            if not args.xcc:
-                if args.lcc == 0:
-                    write(colored('-lcc: ' +str(args.lcc), 'magenta')+colored(' Search ALL Common Crawl index collections.','white'))
-                else:
-                    write(colored('-lcc: ' +str(args.lcc), 'magenta')+colored(' The number of latest Common Crawl index collections to be searched.','white'))
-            write(colored('-xav: ' +str(args.xav), 'magenta')+colored(' Whether to exclude checks for links from alienvault.com','white'))
-            write(colored('-xus: ' +str(args.xus), 'magenta')+colored(' Whether to exclude checks for links from urlscan.io','white'))
-            if URLSCAN_API_KEY == '':
-                write(colored('URLScan API Key:', 'magenta')+colored(' {none} - You can get a FREE or paid API Key at https://urlscan.io/user/signup which will let you get more bac, and quicker.','white'))
-            else:
-                write(colored('URLScan API Key: ', 'magenta')+colored(URLSCAN_API_KEY))
+                write(colored('-lcc: ' +str(args.lcc), 'magenta')+colored(' The number of latest Common Crawl index collections to be searched.','white'))
+        write(colored('-xav: ' +str(args.xav), 'magenta')+colored(' Whether to exclude checks for links from alienvault.com','white'))
+        write(colored('-xus: ' +str(args.xus), 'magenta')+colored(' Whether to exclude checks for links from urlscan.io','white'))
+        if URLSCAN_API_KEY == '':
+            write(colored('URLScan API Key:', 'magenta')+colored(' {none} - You can get a FREE or paid API Key at https://urlscan.io/user/signup which will let you get more bac, and quicker.','white'))
+        else:
+            write(colored('URLScan API Key: ', 'magenta')+colored(URLSCAN_API_KEY))
         
         if args.mode in ['U','B']:
             if args.output_urls != '':
@@ -358,12 +357,11 @@ def getConfig():
             path = '/*'
             inputIsDomainANDPath = False
         else:
-            # If the input is a URL then -mode will have to be R (Responses only)
+            path = '*'
             inputIsDomainANDPath = True
-            args.mode = 'R'
             
-        # If the -no-subs argument was passed, OR the input is a path, don't include subs
-        if args.no_subs or inputIsDomainANDPath:
+        # If the -no-subs argument was passed, don't include subs
+        if args.no_subs:
             subs = ''
         
         # Set up an HTTPAdaptor for retry strategy when making requests
@@ -446,7 +444,8 @@ def getConfig():
             try:
                 URLSCAN_API_KEY = config.get('URLSCAN_API_KEY')
                 if str(URLSCAN_API_KEY) == 'None':
-                    writerr(colored('No value for "URLSCAN_API_KEY" in config.yml - consider adding (you can get a FREE api key at urlscan.io)', 'yellow'))
+                    if not args.xus:
+                        writerr(colored('No value for "URLSCAN_API_KEY" in config.yml - consider adding (you can get a FREE api key at urlscan.io)', 'yellow'))
                     URLSCAN_API_KEY = ''
             except Exception as e:
                 writerr(colored('Unable to read "URLSCAN_API_KEY" from config.yml - consider adding (you can get a FREE api key at urlscan.io)', 'red'))
@@ -949,6 +948,21 @@ def validateArgProcesses(x):
         raise argparse.ArgumentTypeError('The number of processes must be between 1 and 5. Be kind to Wayback Machine (archive.org) and commoncrawl.org! :)')     
     return x
 
+def stripUnwanted(url):
+    """
+    Strip the scheme, port number, query string and fragment form any input values if they have them
+    """
+    parsed = urlparse(url)
+    # Strip scheme
+    scheme = "%s://" % parsed.scheme
+    strippedUrl = parsed.geturl().replace(scheme, '', 1)
+    # Strip query string and fragment
+    strippedUrl = strippedUrl.split('#')[0].split('?')[0]
+    # Strip port number
+    if re.search(r'^[^/]*:[0-9]+', strippedUrl):
+        strippedUrl = re.sub(r':[0-9]+','', strippedUrl, 1)
+    return strippedUrl
+
 def validateArgInput(x):
     """
     Validate the -i / --input argument.
@@ -959,10 +973,10 @@ def validateArgInput(x):
     # If the input was given through STDIN (piped from another program) then 
     if x == '<stdin>':
         stdinFile = sys.stdin.readlines()
-        count = 1
+        count = 0
         for line in stdinFile:
             # Remove newline characters, and also *. if the domain starts with this
-            inputValues.add(line.rstrip('\n').lstrip('*.'))
+            inputValues.add(stripUnwanted(line.rstrip('\n').lstrip('*.')))
             count = count + 1
         if count > 1:
             isInputFile = True
@@ -975,27 +989,10 @@ def validateArgInput(x):
                 lines = inputFile.readlines()          
             # Check if any lines start with a *. and replace without the *.
             for line in lines:
-                inputValues.add(line.lstrip('*.'))
+                inputValues.add(stripUnwanted(line.lstrip('*.')))
         else:
             # Just add the input value to the input list
-            inputValues.add(x)
-    
-    for i in inputValues:        
-        
-        if i.strip().rstrip('\n') != '':
-            # Check if input seems to be valid domain or URL
-            match = re.search(r"^([a-z0-9\-\_][a-z0-9\-\_]{0,61}[a-z0-9]{0,1}\.|\.)+([a-z0-9\-\_]{1,61}|[a-z0-9\-\_]{1,30}\.[a-z]{2,})(\/[^\n|?#]*)?\.?$", i.strip().rstrip('\n'), flags=re.IGNORECASE)
-            if match is None:
-                if isInputFile:
-                    error = 'Each line of the input file must contain a domain only (with no schema) to search for all links, or a domain and path (with no schema) to just get archived response for that URL. Do not pass a query string or fragment in any lines.'
-                else:
-                    error = 'Pass a domain only (with no schema) to search for all links, or pass a domain and path (with no schema) to just get archived responses for that URL. Do not pass a query string or fragment.'
-                error = error + ' The first line that seems invalid is: ' + str(i) + '\nIf you believe this is flagged in error, please raise an issue on Github :)'
-                if x == '<stdin>':
-                    writerr(colored(error,'red'))
-                    sys.exit()
-                else:
-                    raise argparse.ArgumentTypeError(error)
+            inputValues.add(stripUnwanted(x))
     return x
 
 def validateArgStatusCodes(x):
@@ -2489,7 +2486,7 @@ if __name__ == '__main__':
                 linkMimes = None
                 
             # If we want to get actual archived responses from archive.org...
-            if (args.mode in ['R','B'] or inputIsDomainANDPath) and stopProgram is None:
+            if (args.mode in ['R','B']) and stopProgram is None:
                 processResponses()
                 
                 # Output details of the responses downloaded
