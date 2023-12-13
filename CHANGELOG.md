@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.35
+
+  - New
+
+    - I had a specific problem with my ISP blocking archive.org for adult content (!) which resulted in a large and confusing error message. This has been replaced by a more useful message if this happens for anyone else.
+
 - v1.34
 
   - Changed
