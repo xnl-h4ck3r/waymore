@@ -4,6 +4,7 @@
 
   - New
 
+    - Add argument `-wrlr`/`--wayback-rate-limit-retry` which is the number of minutes the user wants to wait for a rate limit pause on Wayback Machine (archive.org) instead of stopping with a `429` error. This defaults to 3 minutes which is a time that seems to work for a while after.
     - Add some additional User-Agents to use when making requests to the API providers.
     - Add new MIME exclusions `video/x-ms-wmv`,`image/x-png`,`video/quicktime`,`image/x-ms-bmp`,`font/opentype`,`application/x-font-opentype`,`application/x-woff` and `audio/aiff`.
 
