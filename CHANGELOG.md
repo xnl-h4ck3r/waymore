@@ -1,5 +1,18 @@
 ## Changelog
 
+- v1.36
+
+  - New
+
+    - Add some additional User-Agents to use when making requests to the API providers.
+    - Add new MIME exclusions `video/x-ms-wmv`,`image/x-png`,`video/quicktime`,`image/x-ms-bmp`,`font/opentype`,`application/x-font-opentype`,`application/x-woff` and `audio/aiff`.
+
+  - Changed
+
+    - Change the default `-p`/`--processes` to 1 instead of 3. This is to help with the rate limiting now put in place by web.archive.org. If set to 1 we can also ensure that the pages are processed in order and save where we stopped.
+    - Change the `backoff_factor` on `HTTP_ADAPTER` from 1 to 1.1 to help with the rate limiting now put in place by web.archive.org.
+    - Change the `pages` set to a list to ensure pages are processed in order (only does if `--processes` is 1).
+
 - v1.35
 
   - New

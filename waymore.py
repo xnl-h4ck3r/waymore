@@ -77,15 +77,25 @@ URLSCAN_URL = 'https://urlscan.io/api/v1/search/?q=domain:{DOMAIN}&size=10000'
 
 # User Agents to use when making requests, chosen at random
 USER_AGENT  = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246",
-    "Mozilla/5.0 (X11; CrOS x86_64 8172.45.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.64 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_2) AppleWebKit/601.3.9 (KHTML, like Gecko) Version/9.0.2 Safari/601.3.9",
-    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.111 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36 Edg/99.0.1150.36",
-    "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.131 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1 Safari/605.1.15",
     "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.75 Safari/537.36 Edg/99.0.1150.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.84 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:66.0) Gecko/20100101 Firefox/66.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:67.0) Gecko/20100101 Firefox/67.0",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:99.0) Gecko/20100101 Firefox/99.0",
+    "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/47.0.2526.111 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/68.0.3440.106 Safari/537.36",
+    "Mozilla/5.0 (X11; CrOS x86_64 8172.45.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.64 Safari/537.36",
+    "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.1; Trident/6.0)",
+    "Mozilla/5.0 (iPad; CPU OS 7_1_2 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D257 Safari/9537.53",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 8_4_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12H321 Safari/600.1.4",
 ]
 
 # The default maximum number of responses to download
@@ -98,7 +108,7 @@ DEFAULT_TIMEOUT = 30
 DEFAULT_FILTER_URL = '.css,.jpg,.jpeg,.png,.svg,.img,.gif,.mp4,.flv,.ogv,.webm,.webp,.mov,.mp3,.m4a,.m4p,.scss,.tif,.tiff,.ttf,.otf,.woff,.woff2,.bmp,.ico,.eot,.htc,.rtf,.swf,.image,/image,/img,/css,/wp-json,/wp-content,/wp-includes,/theme,/audio,/captcha,/font,node_modules,/jquery,/bootstrap'
 
 # MIME Content-Type exclusions used to filter links and responses from web.archive.org through their API
-DEFAULT_FILTER_MIME = 'text/css,image/jpeg,image/jpg,image/png,image/svg+xml,image/gif,image/tiff,image/webp,image/bmp,image/vnd,image/x-icon,image/vnd.microsoft.icon,font/ttf,font/woff,font/woff2,font/x-woff2,font/x-woff,font/otf,audio/mpeg,audio/wav,audio/webm,audio/aac,audio/ogg,audio/wav,audio/webm,video/mp4,video/mpeg,video/webm,video/ogg,video/mp2t,video/webm,video/x-msvideo,video/x-flv,application/font-woff,application/font-woff2,application/x-font-woff,application/x-font-woff2,application/vnd.ms-fontobject,application/font-sfnt,application/vnd.android.package-archive,binary/octet-stream,application/octet-stream,application/pdf,application/x-font-ttf,application/x-font-otf,video/webm,video/3gpp,application/font-ttf,audio/mp3,audio/x-wav,image/pjpeg,audio/basic,application/font-otf,application/x-ms-application,application/x-msdownload'
+DEFAULT_FILTER_MIME = 'text/css,image/jpeg,image/jpg,image/png,image/svg+xml,image/gif,image/tiff,image/webp,image/bmp,image/vnd,image/x-icon,image/vnd.microsoft.icon,font/ttf,font/woff,font/woff2,font/x-woff2,font/x-woff,font/otf,audio/mpeg,audio/wav,audio/webm,audio/aac,audio/ogg,audio/wav,audio/webm,video/mp4,video/mpeg,video/webm,video/ogg,video/mp2t,video/webm,video/x-msvideo,video/x-flv,application/font-woff,application/font-woff2,application/x-font-woff,application/x-font-woff2,application/vnd.ms-fontobject,application/font-sfnt,application/vnd.android.package-archive,binary/octet-stream,application/octet-stream,application/pdf,application/x-font-ttf,application/x-font-otf,video/webm,video/3gpp,application/font-ttf,audio/mp3,audio/x-wav,image/pjpeg,audio/basic,application/font-otf,application/x-ms-application,application/x-msdownload,video/x-ms-wmv,image/x-png,video/quicktime,image/x-ms-bmp,font/opentype,application/x-font-opentype,application/x-woff,audio/aiff'
 
 # Response code exclusions we will use to filter links and responses from web.archive.org through their API
 DEFAULT_FILTER_CODE = '404,301,302'
@@ -331,6 +341,8 @@ def showOptions():
             write(colored('-p: ' + str(args.processes), 'magenta')+colored(' The number of parallel requests made.','white'))
         write(colored('-r: ' + str(args.retries), 'magenta')+colored(' The number of retries for requests that get connection error or rate limited.','white'))
         
+        if not args.xwm:
+            write(colored('-wrlr: ' + str(args.wayback_rate_limit_retry), 'magenta')+colored(' The number of minutes to wait for a rate limit pause on Wayback Machine (archive.org) instead of stopping with a 429 error.','white'))
         if not args.xus:
             write(colored('-urlr: ' + str(args.urlscan_rate_limit_retry), 'magenta')+colored(' The number of minutes to wait for a rate limit pause on URLScan.io instead of stopping with a 429 error.','white'))
             
@@ -350,7 +362,7 @@ def getConfig():
         try:
             terminalWidth = os.get_terminal_size().columns
         except:
-            terminalWidth = 128
+            terminalWidth = 135
         
         # If the input doesn't have a / then assume it is a domain rather than a domain AND path
         if str(argsInput).find('/') < 0:
@@ -368,7 +380,7 @@ def getConfig():
         try:
             retry= Retry(
                 total=args.retries,
-                backoff_factor=1,
+                backoff_factor=1.1,
                 status_forcelist=[429, 500, 502, 503, 504],
                 raise_on_status=False,
                 respect_retry_after_header=False
@@ -1183,9 +1195,9 @@ def getAlienVaultUrls():
                 write(colored('\rGetting links from ' + str(totalPages) + ' alienvault.com API requests (this can take a while for some domains)...\r','cyan'))
 
                 # Get a list of all the page URLs we need to visit
-                pages = set()
+                pages = []
                 for page in range(1, totalPages + 1):
-                    pages.add(url+str(page))
+                    pages.append(url+str(page))
 
                 # Process the URLs from alien vault 
                 if stopProgram is None:
@@ -1515,8 +1527,27 @@ def processWayBackPage(url):
             finally:
                 try:
                     if resp is not None:
-                        # If a status other of 429, then stop processing Alien Vault
+                        # If a status other of 429, then stop processing Wayback Machine
                         if resp.status_code == 429:
+                            if args.wayback_rate_limit_retry > 0:
+                                seconds = args.wayback_rate_limit_retry * 60
+                                if args.processes == 1:
+                                    writerr(colored('\r[ 429 ] Wayback Machine (archive.org) rate limit reached on page '+str(page)+' of '+str(totalPages)+', so waiting for '+str(seconds)+' seconds before continuing...\r','yellow'))
+                                else:
+                                    writerr(colored('\r[ 429 ] Wayback Machine (archive.org) rate limit reached, so waiting for '+str(seconds)+' seconds before continuing...\r','yellow'))
+                                time.sleep(seconds)
+                                try:
+                                    resp = session.get(url, headers={"User-Agent":userAgent})
+                                except ConnectionError as ce:
+                                    writerr(colored(getSPACER('[ ERR ] Wayback Machine (archive.org) connection error for page ' + page), 'red'))
+                                    resp = None
+                                    return
+                                except Exception as e:
+                                    writerr(colored(getSPACER('[ ERR ] Error getting response for page ' + page + ' - ' + str(e)),'red'))
+                                    resp = None
+                                    return
+                                
+                        if resp.status_code == 429:    
                             writerr(colored(getSPACER('[ 429 ] Wayback Machine (archive.org) rate limit reached, so stopping. Links that have already been retrieved will be saved.'),'red'))
                             stopSource = True
                             return
@@ -1535,8 +1566,14 @@ def processWayBackPage(url):
                             if verbose():
                                 writerr(colored(getSPACER('[ '+str(resp.status_code)+' ] Error for '+url),'red'))
                             return
-                except:
-                    pass
+                except ConnectionError as ce:
+                    writerr(colored(getSPACER('[ ERR ] Wayback Machine (archive.org) connection error for page ' + page), 'red'))
+                    resp = None
+                    return
+                except Exception as e:
+                    writerr(colored(getSPACER('[ ERR ] Error getting response for page ' + page + ' - ' + str(e)),'red'))
+                    resp = None
+                    return
             
             # Get the URLs and MIME types. Each line is a separate JSON string
             for line in resp.iter_lines():
@@ -1636,14 +1673,14 @@ def getWaybackUrls():
         write(colored('\rGetting links from ' + str(totalPages) + ' Wayback Machine (archive.org) API requests (this can take a while for some domains)...\r','cyan'))
 
         # Get a list of all the page URLs we need to visit
-        pages = set()
+        pages = []
         if totalPages == 1:
-            pages.add(url)
+            pages.append(url)
         else:
             for page in range(0, totalPages):
-                pages.add(url+str(page))
+                pages.append(url+str(page))
         
-        # Process the URLs from web archive        
+        # Process the URLs from web archive
         if stopProgram is None:
             p = mp.Pool(args.processes)
             p.map(processWayBackPage, pages)
@@ -2349,10 +2386,10 @@ if __name__ == '__main__':
     parser.add_argument(
         '-p',
         '--processes',
-        help='Basic multithreading is done when getting requests for a file of URLs. This argument determines the number of processes (threads) used (default: 3)',
+        help='Basic multithreading is done when getting requests for a file of URLs. This argument determines the number of processes (threads) used (default: 1)',
         action='store',
         type=validateArgProcesses,
-        default=3,
+        default=1,
         metavar="<integer>",
     )
     parser.add_argument(
@@ -2404,6 +2441,14 @@ if __name__ == '__main__':
         "--config",
         action="store",
         help="Path to the YML config file. If not passed, it looks for file 'config.yml' in the same directory as runtime file 'waymore.py'.",
+    )
+    parser.add_argument(
+        '-wrlr',
+        '--wayback-rate-limit-retry',
+        action='store',
+        type=int,
+        help='The number of minutes the user wants to wait for a rate limit pause on Watback Machine (archive.org) instead of stopping with a 429 error (default: 3).',
+        default=3
     )
     parser.add_argument(
         '-urlr',
