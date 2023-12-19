@@ -801,7 +801,7 @@ def processURLOutput():
         
         if args.check_only:
             totalRequests = checkWayback + checkCommonCrawl + checkAlienVault + checkURLScan
-            minutes = totalRequests*2 // 60
+            minutes = totalRequests*1 // 60
             hours = minutes // 60
             days = hours // 24
             if minutes < 5:
