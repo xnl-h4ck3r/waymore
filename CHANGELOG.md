@@ -1,5 +1,11 @@
 ## Changelog
 
+- v1.37
+
+  - New
+
+    - Add argument `-co`/`--check-only`. If passed, then it will just get the count of requests that need to be made to get URLs from the sources, and how many archived responses will be downloaded. It will try to give an idea of the time the tool could take with the settings given.
+
 - v1.36
 
   - New

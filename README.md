@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
-## About - v1.35
+## About - v1.37
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -72,6 +72,7 @@ $ sudo pip3 install -r requirements.txt
 | -c            | --config                   | Path to the YML config file. If not passed, it looks for file `config.yml` in the same directory as runtime file `waymore.py`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | -wrlr         | --wayback-rate-limit-retry | The number of minutes the user wants to wait for a rate limit pause on Wayback Machine (archive.org) instead of stopping with a `429` error (default: 3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | -urlr         | --urlscan-rate-limit-retry | The number of minutes the user wants to wait for a rate limit pause on URLScan.io instead of stopping with a `429` error (default: 1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| -co           | --check-only               | This will make a few minimal requests to show you how many requests, and roughly how long it could take, to get URLs from the sources and downloaded responses from Wayback Machine.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | -v            | --verbose                  | Verbose output                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 |               | --version                  | Show current version number.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | -h            | --help                     | Show the help message and exit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -208,6 +209,16 @@ You can also pass the input through `stdin` instead of `-i`.
 ```
 cat redbull_subs.txt | python3 waymore.py
 ```
+
+## Example 4
+
+Sometimes you may just want to check how many request, and how long `waymore` is likely to take if you ran it for a particular domain. You can do a quick check by using the `-co`/`--check-only` argument. For example:
+
+```
+python3 waymore.py -i redbull.com --check-only
+```
+
+<center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/example4.png"></center>
 
 ## Finding Way More URLs!
 
