@@ -208,13 +208,16 @@ def showBanner():
     write(colored("| | | / ___ | |_| ","red")+"| | | | |_| | |   | |_| |")
     write(colored(r" \___/\_____|\__  ","red")+r"|_|_|_|\___/| |   | ____/")
     write(colored("            (____/ ","red")+colored("  by Xnl-h4ck3r ","magenta")+r" \_____)")
-    currentDate = datetime.now().date()
-    if currentDate.month == 12 and currentDate.day == 25:
-        write(colored("            *** 🎅 HAPPY CHRISTMAS! 🎅 ***","green",attrs=["blink"]))
-    elif currentDate.month == 10 and currentDate.day == 31:
-        write(colored("            *** 🎃 HAPPY HALLOWEEN! 🎃 ***","red",attrs=["blink"]))
-    elif currentDate.month == 10 and currentDate.day == 31:
-        write(colored("            *** 🥳 HAPPY NEW YEAR!! 🥳 ***","yellow",attrs=["blink"]))
+    try:
+        currentDate = datetime.now().date()
+        if currentDate.month == 12 and currentDate.day == 25:
+            write(colored("            *** 🎅 HAPPY CHRISTMAS! 🎅 ***","green",attrs=["blink"]))
+        elif currentDate.month == 10 and currentDate.day == 31:
+            write(colored("            *** 🎃 HAPPY HALLOWEEN! 🎃 ***","red",attrs=["blink"]))
+        elif currentDate.month == 1 and currentDate.day == 1:
+            write(colored("            *** 🥳 HAPPY NEW YEAR!! 🥳 ***","yellow",attrs=["blink"]))
+    except:
+        pass
     write()
 
 def verbose():
