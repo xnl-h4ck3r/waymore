@@ -1,5 +1,13 @@
 ## Changelog
 
+- v2.0
+
+  - New
+
+    - Add VirusTotal as a source for URLs. We will get URLs from the v2 API domain report. This can include sub domains, detected URLs, and undetected URLs in the response. It does not give you the status code or MIME type of the links, so we will just check against extension.
+    - Show a specific message for Wayback Machine if there is a Connection Refused error. This happens when they have blocked the users IP.
+    - Add some pointless celebration messages to the banner for a few different dates!
+
 - v1.37
 
   - New

@@ -72,12 +72,14 @@ checkWayback = 0
 checkCommonCrawl = 0
 checkAlienVault = 0
 checkURLScan = 0
+checkVirusTotal = 0
 
 # Source Provider URLs
 WAYBACK_URL = 'https://web.archive.org/cdx/search/cdx?url={DOMAIN}&collapse={COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest'
 CCRAWL_INDEX_URL = 'https://index.commoncrawl.org/collinfo.json'
 ALIENVAULT_URL = 'https://otx.alienvault.com/api/v1/indicators/domain/{DOMAIN}/url_list?limit=500'
 URLSCAN_URL = 'https://urlscan.io/api/v1/search/?q=domain:{DOMAIN}&size=10000'
+VIRUSTOTAL_URL = 'https://www.virustotal.com/vtapi/v2/domain/report?apikey={APIKEY}&domain={DOMAIN}'
 
 # User Agents to use when making requests, chosen at random
 USER_AGENT  = [
@@ -206,6 +208,13 @@ def showBanner():
     write(colored("| | | / ___ | |_| ","red")+"| | | | |_| | |   | |_| |")
     write(colored(r" \___/\_____|\__  ","red")+r"|_|_|_|\___/| |   | ____/")
     write(colored("            (____/ ","red")+colored("  by Xnl-h4ck3r ","magenta")+r" \_____)")
+    currentDate = datetime.now().date()
+    if currentDate.month == 12 and currentDate.day == 25:
+        write(colored("            *** 🎅 HAPPY CHRISTMAS! 🎅 ***","green",attrs=["blink"]))
+    elif currentDate.month == 10 and currentDate.day == 31:
+        write(colored("            *** 🎃 HAPPY HALLOWEEN! 🎃 ***","red",attrs=["blink"]))
+    elif currentDate.month == 10 and currentDate.day == 31:
+        write(colored("            *** 🥳 HAPPY NEW YEAR!! 🥳 ***","yellow",attrs=["blink"]))
     write()
 
 def verbose():
@@ -279,9 +288,14 @@ def showOptions():
         write(colored('-xav: ' +str(args.xav), 'magenta')+colored(' Whether to exclude checks for links from alienvault.com','white'))
         write(colored('-xus: ' +str(args.xus), 'magenta')+colored(' Whether to exclude checks for links from urlscan.io','white'))
         if URLSCAN_API_KEY == '':
-            write(colored('URLScan API Key:', 'magenta')+colored(' {none} - You can get a FREE or paid API Key at https://urlscan.io/user/signup which will let you get more bac, and quicker.','white'))
+            write(colored('URLScan API Key:', 'magenta')+colored(' {none} - You can get a FREE or paid API Key at https://urlscan.io/user/signup which will let you get more back, and quicker.','white'))
         else:
             write(colored('URLScan API Key: ', 'magenta')+colored(URLSCAN_API_KEY))
+        write(colored('-xvt: ' +str(args.xvt), 'magenta')+colored(' Whether to exclude checks for links from virustotal.com','white'))
+        if VIRUSTOTAL_API_KEY == '':
+            write(colored('VirusTotal API Key:', 'magenta')+colored(' {none} - You can get a FREE or paid API Key at https://www.virustotal.com/gui/join-us which will let you get some extra URLs.','white'))
+        else:
+            write(colored('VirusTotal API Key: ', 'magenta')+colored(VIRUSTOTAL_API_KEY))
         
         if args.mode in ['U','B']:
             if args.output_urls != '':
@@ -359,7 +373,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE
     try:
         
         # Set terminal width
@@ -466,6 +480,16 @@ def getConfig():
             except Exception as e:
                 writerr(colored('Unable to read "URLSCAN_API_KEY" from config.yml - consider adding (you can get a FREE api key at urlscan.io)', 'red'))
                 URLSCAN_API_KEY = ''
+                
+            try:
+                VIRUSTOTAL_API_KEY = config.get('VIRUSTOTAL_API_KEY')
+                if str(VIRUSTOTAL_API_KEY) == 'None':
+                    if not args.xvt:
+                        writerr(colored('No value for "VIRUSTOTAL_API_KEY" in config.yml - consider adding (you can get a FREE api key at virustotal.com)', 'yellow'))
+                    VIRUSTOTAL_API_KEY = ''
+            except Exception as e:
+                writerr(colored('Unable to read "VIRUSTOTAL_API_KEY" from config.yml - consider adding (you can get a FREE api key at virustotal.com)', 'red'))
+                VIRUSTOTAL_API_KEY = ''
             
             try:
                 FILTER_KEYWORDS = config.get('FILTER_KEYWORDS')
@@ -512,6 +536,7 @@ def getConfig():
             FILTER_MIME = DEFAULT_FILTER_MIME
             FILTER_CODE = DEFAULT_FILTER_CODE
             URLSCAN_API_KEY = ''
+            VIRUSTOTAL_API_KEY = ''
             FILTER_KEYWORDS = ''
             CONTINUE_RESPONSES_IF_PIPED = True
             
@@ -795,12 +820,12 @@ def processURLOutput():
     """
     Show results of the URL output, i.e. getting URLs from archive.org and commoncrawl.org and write results to file
     """
-    global linksFound, subs, path, argsInput, checkWayback, checkCommonCrawl, checkAlienVault, checkURLScan
+    global linksFound, subs, path, argsInput, checkWayback, checkCommonCrawl, checkAlienVault, checkURLScan, checkVirusTotal
 
     try:
         
         if args.check_only:
-            totalRequests = checkWayback + checkCommonCrawl + checkAlienVault + checkURLScan
+            totalRequests = checkWayback + checkCommonCrawl + checkAlienVault + checkURLScan + checkVirusTotal
             minutes = totalRequests*1 // 60
             hours = minutes // 60
             days = hours // 24
@@ -1704,6 +1729,8 @@ def getWaybackUrls():
             except:
                 if str(e).lower().find('alert access denied'):
                     writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): Access Denied. Are you able to manually visit https://web.archive.org/? Your ISP may be blocking you, e.g. your adult content filter is on (why it triggers that filter I don\'t know, but it has happened!)'), 'red'))
+                elif str(e).lower().find('connection refused'):
+                    writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): Connection Refused. Are you able to manually visit https://web.archive.org/? Your ISP may be blocking your IP)'), 'red'))
                 else:
                     writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): ' + str(e)), 'red'))
             return
@@ -1989,6 +2016,156 @@ def getCommonCrawlUrls():
     except Exception as e:
         writerr(colored('ERROR getCommonCrawlUrls 1: ' + str(e), 'red'))
 
+def processVirusTotalUrl(url):
+    """
+    Process a specific URL from virustotal.io to determine whether to save the link
+    """
+    global argsInput
+    
+    addLink = True
+    
+    # If the url passed doesn't have a scheme, prefix with http://
+    match = re.search(r'^[A-za-z]*\:\/\/', url, flags=re.IGNORECASE)
+    if match is None: 
+        url = 'http://'+url
+        
+    try:      
+        # If filters are required then test them
+        if not args.filter_responses_only:
+            
+            # If the user requested -n / --no-subs then we don't want to add it if it has a sub domain (www. will not be classed as a sub domain)
+            if args.no_subs:
+                match = re.search(r'^[A-za-z]*\:\/\/(www\.)?'+re.escape(argsInput), url, flags=re.IGNORECASE)
+                if match is None:
+                    addLink = False
+        
+            # If the user didn't requested -f / --filter-responses-only then check http code
+            # Note we can't check MIME filter because it is not returned by VirusTotal API
+            if addLink and not args.filter_responses_only: 
+                
+                # Check the URL exclusions
+                if addLink:
+                    match = re.search(r'('+re.escape(FILTER_URL).replace(',','|')+')', url, flags=re.IGNORECASE)
+                    if match is not None:
+                        addLink = False            
+                
+                # Set keywords filter if -ko argument passed
+                if addLink and args.keywords_only:
+                    if args.keywords_only == '#CONFIG':
+                        match = re.search(r'('+re.escape(FILTER_KEYWORDS).replace(',','|')+')', url, flags=re.IGNORECASE)
+                    else:
+                        match = re.search(r'('+args.keywords_only+')', url, flags=re.IGNORECASE)
+                    if match is None:
+                        addLink = False     
+                    
+        # Add link if it passed filters        
+        if addLink:
+            # Just get the domain of the url found by removing anything after ? and then from 3rd / 
+            domainOnly = url.split('?',1)[0]
+            domainOnly = '/'.join(domainOnly.split('/',3)[:3])
+
+            # VirusTotal might return URLs that aren't for the domain passed so we need to check for those and not process them
+            # Check the URL
+            match = re.search(r'^[A-za-z]*\:\/.*(\/|\.)'+re.escape(argsInput)+'$', domainOnly, flags=re.IGNORECASE)
+            if match is not None:
+                linksFoundAdd(url)  
+                
+    except Exception as e:
+        writerr(colored('ERROR processVirusTotalUrl 1: ' + str(e), 'red'))
+    
+def getVirusTotalUrls():
+    """
+    Get URLs from the VirusTotal API v2
+    """
+    global VIRUSTOTAL_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSource, argsInput, checkVirusTotal
+    
+    # Write the file of URL's for the passed domain/URL
+    try:
+        requestsMade = 0
+        stopSource = False
+        linkMimes = set()
+        originalLinkCount = len(linksFound)
+        
+        url = VIRUSTOTAL_URL.replace('{DOMAIN}',quote(argsInput)).replace('{APIKEY}',VIRUSTOTAL_API_KEY)
+        
+        if verbose():
+            write(colored('The VirusTotal URL requested to get links: ','magenta')+colored(url+'\n','white'))
+        
+        if not args.check_only:           
+            write(colored('\rGetting links from virustotal.com API...\r','cyan'))
+       
+        # Get the domain report from virustotal
+        try:
+            # Choose a random user agent string to use for any requests
+            userAgent = random.choice(USER_AGENT)
+            session = requests.Session()
+            session.mount('https://', HTTP_ADAPTER)
+            session.mount('http://', HTTP_ADAPTER)
+            # Pass the API-Key header too. This can change the max endpoints per page, depending on URLScan subscription
+            resp = session.get(url, headers={'User-Agent':userAgent})
+            requestsMade = requestsMade + 1
+        except Exception as e:
+            write(colored(getSPACER('[ ERR ] Unable to get links from virustotal.io: ' + str(e)), 'red'))
+            return
+                        
+        # Deal with any errors
+        if resp.status_code == 429:
+            writerr(colored(getSPACER('[ 429 ] VirusTotal rate limit reached so unable to get links.'),'red'))
+            return
+        elif resp.status_code == 403:
+            writerr(colored(getSPACER('[ 403 ] VirusTotal: Permission denied. Check your API key is correct.'),'red'))
+            return
+        elif resp.status_code != 200:
+            print(resp.text)
+            writerr(colored(getSPACER('[ ' + str(resp.status_code) + ' ] Unable to get links from virustotal.com'),'red'))
+            return
+        
+        # Get the JSON response
+        jsonResp = json.loads(resp.text.strip())
+  
+        # Get the different URLs
+        if args.no_subs:
+            subDomains = []
+        else:
+            try:
+                subDomains = jsonResp['subdomains']
+            except Exception as e:
+                subDomains = []
+        try:  
+            detectedUrls = [entry['url'] for entry in jsonResp.get('detected_urls', [])]
+        except Exception as e:
+            detectedUrls = []
+        try:
+            undetectedUrls = [entry[0] for entry in jsonResp.get('undetected_urls', [])]
+        except Exception as e:
+            undetectedUrls = []
+        try:
+            totalUrls = set(subDomains + detectedUrls + undetectedUrls)
+        except Exception as e:
+            totalUrls = []
+        
+        if args.check_only:
+            write(colored('Get URLs from VirusTotal: ','cyan')+colored('1 request','white'))
+            checkVirusTotal = 1
+        else:
+            # Carry on if something was found
+            for vturl in totalUrls:
+                
+                if stopSource:
+                    break
+                
+                # Get memory in case it exceeds threshold
+                getMemory()
+                
+                # Work out whether to include it
+                processVirusTotalUrl(vturl)
+                        
+            linkCount = len(linksFound) - originalLinkCount
+            write(getSPACER(colored('Extra links found on virustotal.com: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+        
+    except Exception as e:
+        writerr(colored('ERROR getVirusTotalUrls 1: ' + str(e), 'red'))
+        
 def processResponses():
     """
     Get archived responses from Wayback Machine (archive.org)
@@ -2449,6 +2626,12 @@ if __name__ == '__main__':
         default=False
     )
     parser.add_argument(
+        '-xvt',
+        action='store_true',
+        help='Exclude checks for links from virustotal.com',
+        default=False
+    )
+    parser.add_argument(
         '-lcc',
         action='store',
         type=int,
@@ -2615,6 +2798,10 @@ if __name__ == '__main__':
                 # If not requested to exclude, get URLs from urlscan.io
                 if not args.xus and stopProgram is None:
                     getURLScanUrls()
+
+                # If not requested to exclude, get URLs from virustotal.com if we have an API key
+                if not args.xvt and VIRUSTOTAL_API_KEY != '' and stopProgram is None:
+                    getVirusTotalUrls()
                     
                 # Output results of all searches
                 processURLOutput()
