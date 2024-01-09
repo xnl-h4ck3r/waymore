@@ -1,5 +1,11 @@
 ## Changelog
 
+- v2.1
+
+  - New
+
+    - When the responses are downloaded from archive.org they include some archive.orf code such as scripts and stylesheets. This is usually removed but they may have changed this so was being included again. This change will ensure the new code is removed so the response doesn't include the archive.org code.
+
 - v2.0
 
   - New

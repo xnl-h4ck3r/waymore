@@ -684,7 +684,10 @@ def processArchiveUrl(url):
                         archiveHtml = re.sub(r'((https:)?\\\/\\\/web\.archive\.org)?\\\/web\\\/[0-9]{14}([A-Za-z]{2}\_)?\\\/','',archiveHtml,flags=re.IGNORECASE)
                         archiveHtml = re.sub(r'((https:)?%2F%2Fweb\.archive\.org)?%2Fweb%2F[0-9]{14}([A-Za-z]{2}\_)?%2F','',archiveHtml,flags=re.IGNORECASE)
                         archiveHtml = re.sub(r'((https:)?\\u002F\\u002Fweb\.archive\.org)?\\u002Fweb\\u002F[0-9]{14}([A-Za-z]{2}\_)?\\u002F','',archiveHtml,flags=re.IGNORECASE)
-                       
+                        archiveHtml = re.sub(r'\<script type=\"text\/javascript\">\s*__wm\.init\(\"https:\/\/web\.archive\.org\/web\"\);[^\<]*\<\/script\>','',archiveHtml,flags=re.IGNORECASE)
+                        archiveHtml = re.sub(r'\<script type=\"text\/javascript\" src="https:\/\/web-static\.archive\.org[^\<]*\<\/script\>','',archiveHtml,flags=re.IGNORECASE)
+                        archiveHtml = re.sub(r'\<link rel=\"stylesheet\" type=\"text\/css\" href=\"https:\/\/web-static\.archive\.org[^\<]*\/\>','',archiveHtml,flags=re.IGNORECASE)
+                        
                         # If there is a specific Wayback error in the response, raise an exception 
                         if archiveHtml.lower().find('wayback machine has not archived that url') > 0 or archiveHtml.lower().find('snapshot cannot be displayed due to an internal error') > 0:
                             raise WayBackException
