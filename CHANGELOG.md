@@ -1,5 +1,11 @@
 ## Changelog
 
+- v2.2
+
+  - New
+
+    - Add `-lcy` argument. This lets you limit the number of Common Crawl index collections searched by the year of the index data. The earliest index has data from 2008. Setting to 0 (default) will search collections or any year (but in conjuction with `-lcc`). For example, if you are only interested in data from 2015 and after, pass `-lcy 2015`. This will override the value of `-lcc` if passed.
+
 - v2.1
 
   - New
