@@ -1,5 +1,11 @@
 ## Changelog
 
+- v2.3
+
+  - New
+
+    - Add `jira` as a search term to the `DEFAULT_FILTER_KEYWORDS` and `FILTER_KEYWORDS` in `config.yml`
+
 - v2.2
 
   - New
