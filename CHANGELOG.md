@@ -1,5 +1,15 @@
 ## Changelog
 
+- v2.4
+
+  - New
+
+    - Add lots of extra search terms to the `DEFAULT_FILTER_KEYWORDS` and `FILTER_KEYWORDS` in `config.yml`
+
+  - Changed
+
+    - The Common Crawl HTTPAdaptor for retry strategy will just be applied for code 503. There was an issue with 504 errors happening, and then waymore effectively freezes because of the retry strategy. The Common Crawl documentation (https://commoncrawl.org/blog/oct-nov-2023-performance-issues) just says to retry on 503.
+
 - v2.3
 
   - New

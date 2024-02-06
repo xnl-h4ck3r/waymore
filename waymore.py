@@ -120,7 +120,7 @@ DEFAULT_FILTER_MIME = 'text/css,image/jpeg,image/jpg,image/png,image/svg+xml,ima
 DEFAULT_FILTER_CODE = '404,301,302'
 
 # Keywords 
-DEFAULT_FILTER_KEYWORDS = 'admin,login,logon,signin,register,dashboard,portal,ftp,cpanel,panel,.js,api,robots.txt,graph,gql,jira'
+DEFAULT_FILTER_KEYWORDS = 'admin,login,logon,signin,signup,register,registration,dash,portal,ftp,panel,.js,api,robots.txt,graph,gql,config,backup,debug,db,database,git,cgi-bin,swagger,zip,rar,tar.gz,internal,jira,jenkins,confluence,atlassian,okta,corp,upload,delete,email,sql,create,edit,test,temp,cache,wsdl,log,payment,setting,mail,file,redirect,chat,billing,doc,trace,cp,ftp,gateway,import,proxy,dev,stage,stg,uat'
 
 # Yaml config values
 FILTER_URL = ''
@@ -420,7 +420,7 @@ def getConfig():
             retry= Retry(
                 total=args.retries+20,
                 backoff_factor=1.1,
-                status_forcelist=[429, 500, 502, 503, 504],
+                status_forcelist=[503],
                 raise_on_status=False,
                 respect_retry_after_header=False
             )
