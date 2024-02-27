@@ -2791,6 +2791,14 @@ if __name__ == '__main__':
             
             argsInput = inpt.strip().rstrip('\n').strip('.').lower()
             
+            # Check if a sub domains may have been passed
+            try:
+                testInput = argsInput.replace('co.uk','')[:argsInput.rindex(".")]
+                if testInput.count('.') > 0: 
+                    writerr(colored(getSPACER('IMPORTANT: It looks like you may be passing a subdomain. If you want ALL subs for a domain, then pass the domain only. It will be a LOT quicker, and you won\'t miss anything. NEVER pass a file of subdomains if you want everything, just the domains.\n'),'yellow'))
+            except:
+                pass
+            
             # Reset global variables
             linksFound = set()
             linkMimes = set()

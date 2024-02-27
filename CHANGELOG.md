@@ -1,5 +1,11 @@
 ## Changelog
 
+- v2.5
+
+  - New
+
+    - Show a warning if the user may be passing a sub domain. The chances are that they want all subs if a domain, so should just call for the domain only.
+
 - v2.4
 
   - New

@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
-## About - v2.4
+## About - v2.5
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -22,6 +22,8 @@ Now **waymore** gets URL's from ALL of those sources too (with ability to filter
 👉 **PLEASE READ ALL OF THE INFORMATION ON THIS PAGE TO MAKE THE MOST OF THIS TOOL, AND ESPECIALLY BEFORE RAISING ANY ISSUES** 🤘
 
 👉 **THIS TOOL CAN BE VERY SLOW, BUT IT IS MEANT FOR COVERAGE, NOT SPEED**
+
+⚠️ **A common mistake that is made is passing a file of subdomains to get everything for a domain. DON'T DO IT! Just pass the domain only to get all subs for that domain. It will be SO much quicker, and you won't miss anything.**
 
 ## Installation
 
