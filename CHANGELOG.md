@@ -1,5 +1,18 @@
 ## Changelog
 
+- v2.6
+
+  - New
+
+    - Use `tldextract` library to determine whether the input is a subdomain, or just a domain.
+    - Include `tldextract` in `setup.py`
+
+  - Changed
+
+    - Fix a bug that causes Alien Vault to not return any links if a subdomain is passed as input. This happens because the api is called with `/indicators/domain/`. If a URL is passed, it will use `/indicators/hostname/` instead and return links successfully.
+    - Fix a bug that causes URLScan to fail with error `[ 400 ] Unable to get links from urlscan.io`. This happens when a URL is sent as input because URLScan.io can only retrieve information for hosts. Also, if a host is sent with a trailing `/` then it will be stripped for URLScan.io so it doesn't think there is a path.
+    - Fix a bug that causes Alien Vault to fail with runtime error `ERROR getAlienVaultUrls 1: 'full_size'`. This happens when a URL is sent as input. This will now successfully return links for passed URLs.
+
 - v2.5
 
   - New

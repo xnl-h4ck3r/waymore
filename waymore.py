@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # Python 3
-# waymore - by @Xnl-h4ck3r: Find way more from the Wayback Machine (also get links from Common Crawl, AlienValut OTX and URLScan)
+# waymore - by @Xnl-h4ck3r: Find way more from the Wayback Machine (also get links from Common Crawl, AlienValut OTX, URLScan and VirusTotal)
 # Full help here: https://github.com/xnl-h4ck3r/waymore/blob/main/README.md
 # Good luck and good hunting! If you really love the tool (or any others), or they helped you find an awesome bounty, consider BUYING ME A COFFEE! (https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
 
@@ -25,6 +25,7 @@ import math
 import enum
 import pickle
 import time
+import tldextract
 
 # Try to import psutil to show memory usage
 try:
@@ -58,6 +59,7 @@ totalPages = 0
 indexFile = None
 continueRespFile = None
 inputIsDomainANDPath = False
+inputIsSubDomain = False
 subs = '*.'
 path = ''
 waymorePath = ''
@@ -73,11 +75,12 @@ checkCommonCrawl = 0
 checkAlienVault = 0
 checkURLScan = 0
 checkVirusTotal = 0
+argsInputHostname = ''
 
 # Source Provider URLs
 WAYBACK_URL = 'https://web.archive.org/cdx/search/cdx?url={DOMAIN}&collapse={COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest'
 CCRAWL_INDEX_URL = 'https://index.commoncrawl.org/collinfo.json'
-ALIENVAULT_URL = 'https://otx.alienvault.com/api/v1/indicators/domain/{DOMAIN}/url_list?limit=500'
+ALIENVAULT_URL = 'https://otx.alienvault.com/api/v1/indicators/{TYPE}/{DOMAIN}/url_list?limit=500'
 URLSCAN_URL = 'https://urlscan.io/api/v1/search/?q=domain:{DOMAIN}&size=10000'
 VIRUSTOTAL_URL = 'https://www.virustotal.com/vtapi/v2/domain/report?apikey={APIKEY}&domain={DOMAIN}'
 
@@ -395,9 +398,15 @@ def getConfig():
             path = '/*'
             inputIsDomainANDPath = False
         else:
-            path = '*'
-            inputIsDomainANDPath = True
-            
+            # If there is only one / and is the last character, remove it
+            if str(argsInput).count('/') == 1 and str(argsInput)[-1:] == '/':
+                argsInput = argsInput.replace('/','')
+                path = '/*'
+                inputIsDomainANDPath = False
+            else:
+                path = '*'
+                inputIsDomainANDPath = True
+
         # If the -no-subs argument was passed, don't include subs
         if args.no_subs:
             subs = ''
@@ -628,11 +637,15 @@ def fixArchiveOrgUrl(url):
 
 # Add a link to the linksFound collection
 def linksFoundAdd(link):
-    global linksFound, argsInput
+    global linksFound, argsInput, argsInputHostname
     # If the link specifies port 80 or 443, e.g. http://example.com:80, then remove the port 
     try:
+        if inputIsDomainANDPath:
+            checkInput = argsInput
+        else:
+            checkInput = argsInputHostname
         # Don't write it if the link does not contain the requested domain (this can sometimes happen)
-        if link.find(argsInput) >= 0:
+        if link.find(checkInput) >= 0:
             parsed = urlparse(link.strip())
             if parsed.netloc.find(':80') >= 0 or parsed.netloc.fnd(':443') >= 0:
                 newNetloc = parsed.netloc.split(':')[0]
@@ -1200,14 +1213,20 @@ def getAlienVaultUrls():
     """
     Get URLs from the Alien Vault OTX, otx.alienvault.com
     """
-    global linksFound, waymorePath, subs, path, stopProgram, totalPages, stopSource, argsInput, checkAlienVault
+    global linksFound, waymorePath, subs, path, stopProgram, totalPages, stopSource, argsInput, checkAlienVault, inputIsSubDomain, argsInputHostname
     
     # Write the file of URL's for the passed domain/URL
     try:
         stopSource = False
         originalLinkCount = len(linksFound)
         
-        url = ALIENVAULT_URL.replace('{DOMAIN}',quote(argsInput))+'&page='
+        # Set the Alien Vault API indicator types of domain or hostname (has subdomain)
+        if inputIsSubDomain:
+            indicatorType = 'hostname'
+        else:
+            indicatorType = 'domain'
+        
+        url = ALIENVAULT_URL.replace('{TYPE}',indicatorType).replace('{DOMAIN}',quote(argsInputHostname))+'&page='
         
         # Get the number of pages (i.e. separate requests) that are going to be made to alienvault.com
         totalPages = 0
@@ -1287,7 +1306,7 @@ def processURLScanUrl(url, httpCode, mimeType):
     """
     Process a specific URL from urlscan.io to determine whether to save the link
     """
-    global argsInput
+    global argsInput, argsInputHostname
     
     addLink = True
     
@@ -1297,7 +1316,7 @@ def processURLScanUrl(url, httpCode, mimeType):
             
             # If the user requested -n / --no-subs then we don't want to add it if it has a sub domain (www. will not be classed as a sub domain)
             if args.no_subs:
-                match = re.search(r'^[A-za-z]*\:\/\/(www\.)?'+re.escape(argsInput), url, flags=re.IGNORECASE)
+                match = re.search(r'^[A-za-z]*\:\/\/(www\.)?'+re.escape(argsInputHostname), url, flags=re.IGNORECASE)
                 if match is None:
                     addLink = False
         
@@ -1342,13 +1361,16 @@ def processURLScanUrl(url, httpCode, mimeType):
                     
         # Add link if it passed filters        
         if addLink:
-            # Just get the domain of the url found by removing anything after ? and then from 3rd / 
-            domainOnly = url.split('?',1)[0]
-            domainOnly = '/'.join(domainOnly.split('/',3)[:3])
-
-            # URLScan can return URLs that aren't for the domain passed so we need to check for those and not process them
+            # Just get the hostname of the url 
+            tldExtract = tldextract.extract(url)
+            subDomain = tldExtract.subdomain
+            if subDomain != '':
+                subDomain = subDomain+'.'
+            domainOnly = subDomain+tldExtract.domain+'.'+tldExtract.suffix
+            
+            # URLScan might return URLs that aren't for the domain passed so we need to check for those and not process them
             # Check the URL
-            match = re.search(r'^[A-za-z]*\:\/.*(\/|\.)'+re.escape(argsInput)+'$', domainOnly, flags=re.IGNORECASE)
+            match = re.search(r'(^|\.)'+re.escape(argsInputHostname)+'$', domainOnly, flags=re.IGNORECASE)
             if match is not None:
                 linksFoundAdd(url)  
             
@@ -1359,7 +1381,7 @@ def getURLScanUrls():
     """
     Get URLs from the URLSCan API, urlscan.io
     """
-    global URLSCAN_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSource, argsInput, checkURLScan
+    global URLSCAN_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSource, argsInput, checkURLScan, argsInputHostname
     
     # Write the file of URL's for the passed domain/URL
     try:
@@ -1368,8 +1390,9 @@ def getURLScanUrls():
         linkMimes = set()
         originalLinkCount = len(linksFound)
         
-        url = URLSCAN_URL.replace('{DOMAIN}',quote(argsInput))
-        
+        # Set the URL to just the hostname
+        url = URLSCAN_URL.replace('{DOMAIN}',quote(argsInputHostname))
+
         if verbose():
             write(colored('The URLScan URL requested to get links: ','magenta')+colored(url+'\n','white'))
         
@@ -1434,7 +1457,7 @@ def getURLScanUrls():
         
         # Get the JSON response
         jsonResp = json.loads(resp.text.strip())
-  
+
         # Get the number of results
         totalUrls = jsonResp['total']
         
@@ -2039,7 +2062,7 @@ def processVirusTotalUrl(url):
     """
     Process a specific URL from virustotal.io to determine whether to save the link
     """
-    global argsInput
+    global argsInput, argsInputHostname
     
     addLink = True
     
@@ -2054,7 +2077,7 @@ def processVirusTotalUrl(url):
             
             # If the user requested -n / --no-subs then we don't want to add it if it has a sub domain (www. will not be classed as a sub domain)
             if args.no_subs:
-                match = re.search(r'^[A-za-z]*\:\/\/(www\.)?'+re.escape(argsInput), url, flags=re.IGNORECASE)
+                match = re.search(r'^[A-za-z]*\:\/\/(www\.)?'+re.escape(argsInputHostname), url, flags=re.IGNORECASE)
                 if match is None:
                     addLink = False
         
@@ -2079,13 +2102,16 @@ def processVirusTotalUrl(url):
                     
         # Add link if it passed filters        
         if addLink:
-            # Just get the domain of the url found by removing anything after ? and then from 3rd / 
-            domainOnly = url.split('?',1)[0]
-            domainOnly = '/'.join(domainOnly.split('/',3)[:3])
+            # Just get the hostname of the urkl
+            tldExtract = tldextract.extract(url)
+            subDomain = tldExtract.subdomain
+            if subDomain != '':
+                subDomain = subDomain+'.'
+            domainOnly = subDomain+tldExtract.domain+'.'+tldExtract.suffix
 
             # VirusTotal might return URLs that aren't for the domain passed so we need to check for those and not process them
             # Check the URL
-            match = re.search(r'^[A-za-z]*\:\/.*(\/|\.)'+re.escape(argsInput)+'$', domainOnly, flags=re.IGNORECASE)
+            match = re.search(r'(^|\.)'+re.escape(argsInputHostname)+'$', domainOnly, flags=re.IGNORECASE)
             if match is not None:
                 linksFoundAdd(url)  
                 
@@ -2096,7 +2122,7 @@ def getVirusTotalUrls():
     """
     Get URLs from the VirusTotal API v2
     """
-    global VIRUSTOTAL_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSource, argsInput, checkVirusTotal
+    global VIRUSTOTAL_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSource, argsInput, checkVirusTotal, argsInputHostname
     
     # Write the file of URL's for the passed domain/URL
     try:
@@ -2105,7 +2131,8 @@ def getVirusTotalUrls():
         linkMimes = set()
         originalLinkCount = len(linksFound)
         
-        url = VIRUSTOTAL_URL.replace('{DOMAIN}',quote(argsInput)).replace('{APIKEY}',VIRUSTOTAL_API_KEY)
+        # Just pass the hostname in the URL
+        url = VIRUSTOTAL_URL.replace('{DOMAIN}',quote(argsInputHostname)).replace('{APIKEY}',VIRUSTOTAL_API_KEY)
         
         if verbose():
             write(colored('The VirusTotal URL requested to get links: ','magenta')+colored(url+'\n','white'))
@@ -2135,7 +2162,6 @@ def getVirusTotalUrls():
             writerr(colored(getSPACER('[ 403 ] VirusTotal: Permission denied. Check your API key is correct.'),'red'))
             return
         elif resp.status_code != 200:
-            print(resp.text)
             writerr(colored(getSPACER('[ ' + str(resp.status_code) + ' ] Unable to get links from virustotal.com'),'red'))
             return
         
@@ -2791,14 +2817,19 @@ if __name__ == '__main__':
             
             argsInput = inpt.strip().rstrip('\n').strip('.').lower()
             
-            # Check if a sub domains may have been passed
-            try:
-                testInput = argsInput.replace('co.uk','')[:argsInput.rindex(".")]
-                if testInput.count('.') > 0: 
-                    writerr(colored(getSPACER('IMPORTANT: It looks like you may be passing a subdomain. If you want ALL subs for a domain, then pass the domain only. It will be a LOT quicker, and you won\'t miss anything. NEVER pass a file of subdomains if you want everything, just the domains.\n'),'yellow'))
-            except:
-                pass
-            
+            # Get the input hostname
+            tldExtract = tldextract.extract(argsInput)
+            subDomain = tldExtract.subdomain
+            inputIsSubDomain = False
+            if subDomain != '':
+                inputIsSubDomain = True
+                subDomain = subDomain+'.'
+            argsInputHostname = subDomain+tldExtract.domain+'.'+tldExtract.suffix
+        
+            # Warn user if a sub domains may have been passed
+            if inputIsSubDomain:
+                writerr(colored(getSPACER('IMPORTANT: It looks like you may be passing a subdomain. If you want ALL subs for a domain, then pass the domain only. It will be a LOT quicker, and you won\'t miss anything. NEVER pass a file of subdomains if you want everything, just the domains.\n'),'yellow'))
+                
             # Reset global variables
             linksFound = set()
             linkMimes = set()
