@@ -1,5 +1,21 @@
 ## Changelog
 
+- v3.0
+
+  - New
+
+    - Allow `waymore` to be installed using `pip` or `pipx` so it can be run from any directory.
+    - Show the current version of the tool in the banner, and whether it is the latest, or outdated.
+    - When installing `waymore`, if the `config.yml` already exists then it will keep that one and create `config.yml.NEW` in case you need to replace the old config.
+    - Add reference to VirusTotal v2 API in `README.md`.
+    - Fix a big where the `results/target` folder was being created every time, even if the `-oU` and `-oR` arguments were passed.
+    - Include "Buy Me a Coffee" link at the end of output.
+
+  - Changed
+
+    - Change installation instructions in `README.md`.
+    - If `--check-only` was passed and it looks like it will take a long time. include the `-ko` argument in the message description of arguments to consider.
+
 - v2.6
 
   - New

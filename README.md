@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
-## About - v2.6
+## About - v3.0
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -27,19 +27,22 @@ Now **waymore** gets URL's from ALL of those sources too (with ability to filter
 
 ## Installation
 
-waymore supports **Python 3**.
+**NOTE: If you already have a `config.yml` file, it will not be overwritten. The file `config.yml.NEW` will be created in the same directory. If you need the new config, remove `config.yml` and rename `config.yml.NEW` back to `config.yml`.**
 
-```
-$ git clone https://github.com/xnl-h4ck3r/waymore.git
-$ cd waymore
-$ sudo python setup.py install
+`waymore` supports **Python 3**.
+
+Install `waymore` in default(global) python environment.
+
+```bash
+pip install git+https://github.com/xnl-h4ck3r/waymore.git -v
 ```
 
-if you're having a problem running the **`setup.py`** for whatever reason
-you can run the following to install the dependencies:
+### pipx
 
-```
-$ sudo pip3 install -r requirements.txt
+Quick setup in isolated python environment using [pipx](https://pypa.github.io/pipx/)
+
+```bash
+pipx install git+https://github.com/xnl-h4ck3r/waymore.git
 ```
 
 ## Usage
@@ -48,8 +51,8 @@ $ sudo pip3 install -r requirements.txt
 | ------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | -i            | --input                    | The target domain (or file of domains) to find links for. This can be a domain only, or a domain with a specific path. If it is a domain only to get everything for that domain, don't prefix with `www.`. You can also specify a TLD only by prefixing with a period, e.g. `.mil`, which will get all subs for all domains with that TLD (NOTE: The Alien Vault OTX source is excluded if searching for a TLD because it requires a full domain). **NOTE: Any scheme, port number, query string, or URL fragment will be removed from the input values. However, if you provide a path, this will be specifically searched for, so will limit your results.** |
 | -mode         |                            | The mode to run: `U` (retrieve URLs only), `R` (download Responses only) or `B` (Both). If `-i` is a domain only, then `-mode` will default to `B`. If `-i` is a domain with path then `-mode` will default to `R`.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| -oU           | --output-urls              | The file to save the Links output to, including path if necessary. If the `-oR` argument is not passed, a `/results` directory will be created in the path of the `waymore.py` file. Within that, a directory will be created with target domain (or domain with path) passed with `-i` (or for each line of a file passed with `-i`). For example: `-oU ~/Recon/Redbull/waymoreUrls.txt`                                                                                                                                                                                                                                                                      |
-| -oR           | --output-responses         | The directory to save the response output files to, including path if necessary. If the argument is not passed, a `/results` directory will be created in the path of the `waymore.py` file. Within that, a directory will be created with target domain (or domain with path) passed with `-i` (or for each line of a file passed with `-i`). For example: `-oR ~/Recon/Redbull/waymoreResponses`                                                                                                                                                                                                                                                             |
+| -oU           | --output-urls              | The file to save the Links output to, including path if necessary. If the `-oR` argument is not passed, a `/results` directory will be created in the path of the `config.yml` file (typically in `~/.config/waymore/`). Within that, a directory will be created with target domain (or domain with path) passed with `-i` (or for each line of a file passed with `-i`). For example: `-oU ~/Recon/Redbull/waymoreUrls.txt`                                                                                                                                                                                                                                  |
+| -oR           | --output-responses         | The directory to save the response output files to, including path if necessary. If the argument is not passed, a `/results` directory will be created in the path of the `config.yml` file (typically in `~/.config/waymore/`). Within that, a directory will be created with target domain (or domain with path) passed with `-i` (or for each line of a file passed with `-i`). For example: `-oR ~/Recon/Redbull/waymoreResponses`                                                                                                                                                                                                                         |
 | -n            | --no-subs                  | Don't include subdomains of the target domain (only used if input is not a domain with a specific path).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -f            | --filter-responses-only    | The initial links from Wayback Machine will not be filtered, only the responses that are downloaded, , e.g. it maybe useful to still see all available paths from the links even if you don't want to check the content.                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -fc           |                            | Filter HTTP status codes for retrieved URLs and responses. Comma separated list of codes (default: the FILTER_CODE values from config.yml). Passing this argument will override the value from config.yml                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -71,7 +74,7 @@ $ sudo pip3 install -r requirements.txt
 | -p            | --processes                | Basic multithreading is done when getting requests for a file of URLs. This argument determines the number of processes (threads) used (default: 1)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | -r            | --retries                  | The number of retries for requests that get connection error or rate limited (default: 1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | -m            | --memory-threshold         | The memory threshold percentage. If the machines memory goes above the threshold, the program will be stopped and ended gracefully before running out of memory (default: 95)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| -ko           | --keywords-only            | Only return links and responses that contain keywords that you are interested in. This can reduce the time it takes to get results. If you provide the flag with no value, Keywords are taken from the comma separated list in the `config.yml` file with the `FILTER_KEYWORDS` key, otherwise you can pass a specific Regex value to use, e.g. `-ko "admin"` to only get links containing the word `admin`, or `-ko "\.js(\?\|$)"` to only get JS files. The Regex check is NOT case sensitive.                                                                                                                                                               |
+| -ko           | --keywords-only            | Only return links and responses that contain keywords that you are interested in. This can reduce the time it takes to get results. If you provide the flag with no value, Keywords are taken from the comma separated list in the `config.yml` file (typically in `~/.config/waymore/`) with the `FILTER_KEYWORDS` key, otherwise you can pass a specific Regex value to use, e.g. `-ko "admin"` to only get links containing the word `admin`, or `-ko "\.js(\?\|$)"` to only get JS files. The Regex check is NOT case sensitive.                                                                                                                           |
 | -lr           | --limit-requests           | Limit the number of requests that will be made when getting links from a source (this doesn\'t apply to Common Crawl). Some targets can return a huge amount of requests needed that are just not feasible to get, so this can be used to manage that situation. This defaults to 0 (Zero) which means there is no limit.                                                                                                                                                                                                                                                                                                                                      |
 | -ow           | --output-overwrite         | If the URL output file (`waymore.txt`) already exists, it will be overwritten instead of being appended to.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | -nlf          | --new-links-file           | If this argument is passed, a waymore.new file (or if `-oU` is used it will be the name of that file suffixed with `.new`) will also be written that will contain links for the latest run. This can be used for continuous monitoring of a target.                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -101,7 +104,7 @@ docker build -t waymore .
 Run waymore with this command:
 
 ```bash
-docker run -it --rm -v $PWD/results:/app/results waymore:latest python3 waymore.py -i example.com -mode U
+docker run -it --rm -v $PWD/results:/app/results waymore:latest python3 waymore/waymore.py -i example.com -oU example.com.links -oR results/example.com/
 ```
 
 ## Input and Mode
@@ -120,7 +123,7 @@ If the input is just a domain, e.g. `redbull.com` then the `-mode` defaults to `
 
 ## config.yml
 
-The `config.yml` file have values that can be updated to suit your needs. Filters are all provided as comma separated lists:
+The `config.yml` file (typically in `~/.config/waymore/`) have values that can be updated to suit your needs. Filters are all provided as comma separated lists:
 
 - `FILTER_CODE` - Exclusions used to exclude responses we will try to get from web.archive.org, and also for file names when `-i` is a directory, e.g. `301,302`. This can be overridden with the `-fc` argument. Passing the `-mc` (to match status codes instead of filter) will override any value in `FILTER_CODE` or `-fc`
 - `FILTER_MIME` - MIME Content-Type exclusions used to filter links and responses from web.archive.org through their API, e.g. `'text/css,image/jpeg`
@@ -133,7 +136,7 @@ The `config.yml` file have values that can be updated to suit your needs. Filter
 
 ## Output
 
-In the path of the `waymore.py` file, a `results` directory will be created. Within that, a directory will be created with target domain (or domain with path) passed with `-i` (or for each line of a file passed with `-i`). You can alternatively use argument `-oU` to specify where the URL links file will be output (and the name of the file). You can also use argument `-oR` to specify a directory (or path) where the archived responses will be output.
+In the path of the `config.yml` file (typically in `~/.config/waymore`), a `results` directory will be created. Within that, a directory will be created with target domain (or domain with path) passed with `-i` (or for each line of a file passed with `-i`). You can alternatively use argument `-oU` to specify where the URL links file will be output (and the name of the file). You can also use argument `-oR` to specify a directory (or path) where the archived responses will be output.
 When run, the following files are created in the target directory:
 
 - `waymore.txt` - If `-mode` is `U` or `B`, this file will contain links from selected sources. Links will be retrieved from archive.org Wayback Machine (unless `-xwm` was passed), commoncrawl.org (unless `-xcc` was passed), otx.alienvault.com (unless `-xav` was passed) and urlscan.io (unless `-xus` was passed). If the `-ow` option was also passed, any existing `waymore.txt` file in the target results directory will be overwritten, otherwise new links will be appended and duplicates removed.
@@ -244,7 +247,6 @@ If you come across any problems at all, or have ideas for improvements, please f
 ## TODO
 
 - Add an `-oss` argument that accepts a file of Out Of Scope subdomains/URLs that will not be returned in the output, or have any responses downloaded
-- When URLScan returns a 429 response it gives the number of seconds to wait before it will work again. Add an argument to wait for that delay in order to complete requests.
 
 ## References
 
@@ -252,6 +254,7 @@ If you come across any problems at all, or have ideas for improvements, please f
 - [Common Crawl Index Server](https://index.commoncrawl.org/)
 - [Alien Vault OTX API](https://otx.alienvault.com/assets/static/external_api.html)
 - [URLScan API](https://urlscan.io/docs/api/)
+- [VirusTotal API (v2)](https://docs.virustotal.com/v2.0/reference/getting-started)
 
 Good luck and good hunting!
 If you really love the tool (or any others), or they helped you find an awesome bounty, consider [BUYING ME A COFFEE!](https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
