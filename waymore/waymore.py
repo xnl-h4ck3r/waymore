@@ -26,7 +26,6 @@ import enum
 import pickle
 import time
 import tldextract
-import mimetypes
 try:
     from . import __version__
 except:
@@ -213,11 +212,11 @@ def showVersion():
         try:
             resp = requests.get('https://raw.githubusercontent.com/xnl-h4ck3r/waymore/main/waymore/__init__.py',timeout=3)
         except:
-            print('Current waymore version '+__version__+' (unable to check if latest)\n')
+            write('Current waymore version '+__version__+' (unable to check if latest)\n')
         if __version__ == resp.text.split('=')[1].replace('"',''):
-            print('Current waymore version '+__version__+' ('+colored('latest','green')+')\n')
+            write('Current waymore version '+__version__+' ('+colored('latest','green')+')\n')
         else:
-            print('Current waymore version '+__version__+' ('+colored('outdated','red')+')\n')
+            write('Current waymore version '+__version__+' ('+colored('outdated','red')+')\n')
     except:
         pass
     
@@ -427,7 +426,8 @@ def getConfig():
                 inputIsDomainANDPath = True
 
         # If the -no-subs argument was passed, don't include subs
-        if args.no_subs:
+        # Also, if a path is passed, the subs will not be used
+        if args.no_subs or inputIsDomainANDPath:
             subs = ''
         
         # Set up an HTTPAdaptor for retry strategy when making requests
@@ -706,7 +706,7 @@ def processArchiveUrl(url):
                     resp = session.get(url = archiveUrl, headers={"User-Agent":userAgent}, allow_redirects = True)
                     archiveHtml = str(resp.text)
                     try:
-                        contentType = resp.headers.get("Content-Type").split(';')[0]
+                        contentType = resp.headers.get("Content-Type").split(';')[0].lower()
                     except:
                         contentType = ''
                     
@@ -747,46 +747,40 @@ def processArchiveUrl(url):
                             # Determine extension of file from the content-type using the mimetypes library
                             extension = ''
                             try:
-                                # Guess from content type
-                                extension = mimetypes.guess_extension(contentType)
+                                # Get path extension
+                                targetUrl = 'https://' + url.split("://")[1]
+                                parsed = urlparse(targetUrl.strip())
+                                path = parsed.path
+                                extension = path[path.rindex('.')+1:]
                             except:
                                 pass
-
-                            # If we didn't find an extension, try to get from the file name
-                            try:
-                                if extension == '':
-                                    parsed = urlparse(url.strip())
-                                    path = parsed.path
-                                    extension = path[path.rindex('.')+1:]
-                            except:
-                                pass
-
-                            # If the extension is blank, numeric, longer than 6 characters or not alphanumeric - then it's not a valid file type so check contentType
-                            if extension == '' or extension.isnumeric() or not extension.isalnum():
+                            
+                            # If the extension is blank, numeric, longer than 4 characters or not alphanumeric - then it's not a valid file type so check contentType
+                            if extension == '' or extension.isnumeric() or not extension.isalnum() or len(extension) > 4:
                                 # Determine the extension from the content type
                                 try:
                                     if contentType != '':
-                                        extension = contentType.split('/')[1]
-                                except:
-                                    pass
-                                try:
+                                        extension = contentType.split('/')[1].replace('x-','')
                                     if extension == '':
-                                        if 'html' in contentType.lower():
-                                            extension = 'html'
-                                        elif 'javascript' in contentType.lower():
-                                            extension = 'js'
-                                        elif 'json' in contentType.lower():
-                                            extension = 'json'
-                                        elif 'css' in contentType.lower():
-                                            extension = 'css'
-                                        elif 'pdf' in contentType.lower():
-                                            extension = 'pdf'
+                                        extension = contentType.lower()
                                 except:
                                     pass
-
+                                if 'html' in extension:
+                                    extension = 'html'
+                                elif 'javascript' in extension:
+                                    extension = 'js'
+                                elif 'json' in extension:
+                                    extension = 'json'
+                                elif 'css' in extension:
+                                    extension = 'css'
+                                elif 'pdf' in extension:
+                                    extension = 'pdf'
+                                elif 'plain' == extension:
+                                    extension = 'txt'
+                                
                                 # If extension is still blank, set to html if the content ends with HTML tag, otherwise set to unknown
                                 if extension == '':
-                                    if archiveHtml.lower().strip().endswith('</html>'):
+                                    if archiveHtml.lower().strip().endswith('</html>') or archiveHtml.lower().strip().startswith('<!doctype html') or archiveHtml.lower().strip().startswith('<html'):
                                         extension = 'html'
                                     else:
                                         extension = 'unknown'
@@ -1357,7 +1351,10 @@ def getAlienVaultUrls():
         
         if not args.check_only:
             linkCount = len(linksFound) - originalLinkCount
-            write(getSPACER(colored('Extra links found on alienvault.com: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+            if args.xwm and args.xcc:
+                write(getSPACER(colored('Links found on alienvault.com: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+            else:
+                write(getSPACER(colored('Extra links found on alienvault.com: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
         
     except Exception as e:
         writerr(colored('ERROR getAlienVaultUrls 1: ' + str(e), 'red'))
@@ -1653,7 +1650,10 @@ def getURLScanUrls():
                 write(getSPACER(colored('MIME types found: ','magenta')+colored(str(linkMimes),'white'))+'\n')
                         
             linkCount = len(linksFound) - originalLinkCount
-            write(getSPACER(colored('Extra links found on urlscan.io: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+            if args.xwm and args.xcc and args.xav:
+                write(getSPACER(colored('Links found on urlscan.io: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+            else:
+                write(getSPACER(colored('Extra links found on urlscan.io: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
         
     except Exception as e:
         writerr(colored('ERROR getURLScanUrls 1: ' + str(e), 'red'))
@@ -1987,7 +1987,7 @@ def getCommonCrawlIndexes():
                     writerr(colored(getSPACER('[ ERR ] Couldn\'t delete local version of Common Crawl index file: ' + str(e)), 'red'))
         else:
             createFile = True
-            
+
         # If the local file exists then read that instead of requesting the index file again
         if not createFile:
             # Read the indexes from the local file    
@@ -2018,6 +2018,13 @@ def getCommonCrawlIndexes():
             # If the rate limit was reached end now
             if indexes.status_code == 429:
                 writerr(colored(getSPACER('[ 429 ] Common Crawl rate limit reached so unable to get links.'),'red'))
+                return
+            # If the rate limit was reached end now
+            elif indexes.status_code == 503:
+                writerr(colored(getSPACER('[ 503 ] Common Crawl seems to be unavailable.'),'red'))
+                return
+            elif indexes.status_code != 200:
+                writerr(colored(getSPACER('[ '+str(indexes.status_code)+' ] Common Crawl did not retrun the indexes file.'),'red'))
                 return
             
             # Get the the returned JSON
@@ -2113,7 +2120,10 @@ def getCommonCrawlUrls():
                 write(getSPACER(colored('MIME types found: ','magenta')+colored(str(linkMimes),'white'))+'\n')
             
             linkCount = len(linksFound) - originalLinkCount
-            write(getSPACER(colored('Extra links found on commoncrawl.org: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+            if args.xwm:
+                write(getSPACER(colored('Links found on commoncrawl.org: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+            else:
+                write(getSPACER(colored('Extra links found on commoncrawl.org: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
                     
     except Exception as e:
         writerr(colored('ERROR getCommonCrawlUrls 1: ' + str(e), 'red'))
@@ -2266,7 +2276,10 @@ def getVirusTotalUrls():
                 processVirusTotalUrl(vturl)
                         
             linkCount = len(linksFound) - originalLinkCount
-            write(getSPACER(colored('Extra links found on virustotal.com: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+            if args.xwm and args.xcc and args.xav and args.xus:
+                write(getSPACER(colored('Links found on virustotal.com: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+            else:
+                write(getSPACER(colored('Extra links found on virustotal.com: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
         
     except Exception as e:
         writerr(colored('ERROR getVirusTotalUrls 1: ' + str(e), 'red'))
@@ -2845,7 +2858,7 @@ def main():
 
     # If --version was passed, display version and exit
     if args.version:
-        print(colored('Waymore - v' + __version__,'cyan'))
+        write(colored('Waymore - v' + __version__,'cyan'))
         sys.exit()
     
     # If -lcc wasn't passed then set to the default of 3 if -lcy is 0. This will make them work together
@@ -2987,7 +3000,8 @@ def main():
 
     finally:
         try:
-            writerr(colored('✅ Want to buy me a coffee? ☕ https://ko-fi.com/xnlh4ck3r 🤘', 'green'))
+            if sys.stdout.isatty():
+                writerr(colored('✅ Want to buy me a coffee? ☕ https://ko-fi.com/xnlh4ck3r 🤘', 'green'))
         except:
             pass
         # Clean up

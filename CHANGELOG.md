@@ -1,5 +1,18 @@
 ## Changelog
 
+- v3.2
+
+  - New
+
+    - When getting the Common Crawl index file, if the response is 503, then let the user know it's unavailable. If anything other than 429 or 403, then print an error.
+
+  - Changed
+
+    - Don't show the coffee link if the output is piped out to something else.
+    - Remove the `mimetypes` library as it turned out to be quite inaccurate compared to just getting the path extension and using content type of response. Also improve the extension logic.
+    - If the input has a path, then make sure it is treated as if no subdomains are wanted, i.e. don't prefix with `*.`. This stopped links coming back from archive.org
+    - Change the messaging to make more sense when multiple sources are used, showing `Links found...` for the first, but `Extra links found...` for the rest.
+
 - v3.1
 
   - Changed
