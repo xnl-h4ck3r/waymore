@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
-## About - v3.0
+## About - v3.1
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -78,7 +78,7 @@ pipx install git+https://github.com/xnl-h4ck3r/waymore.git
 | -lr           | --limit-requests           | Limit the number of requests that will be made when getting links from a source (this doesn\'t apply to Common Crawl). Some targets can return a huge amount of requests needed that are just not feasible to get, so this can be used to manage that situation. This defaults to 0 (Zero) which means there is no limit.                                                                                                                                                                                                                                                                                                                                      |
 | -ow           | --output-overwrite         | If the URL output file (`waymore.txt`) already exists, it will be overwritten instead of being appended to.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | -nlf          | --new-links-file           | If this argument is passed, a waymore.new file (or if `-oU` is used it will be the name of that file suffixed with `.new`) will also be written that will contain links for the latest run. This can be used for continuous monitoring of a target.                                                                                                                                                                                                                                                                                                                                                                                                            |
-| -c            | --config                   | Path to the YML config file. If not passed, it looks for file `config.yml` in the same directory as runtime file `waymore.py`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| -c            | --config                   | Path to the YML config file. If not passed, it looks for file `config.yml` in the default directory, typically `~/.config/waymore`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | -wrlr         | --wayback-rate-limit-retry | The number of minutes the user wants to wait for a rate limit pause on Wayback Machine (archive.org) instead of stopping with a `429` error (default: 3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | -urlr         | --urlscan-rate-limit-retry | The number of minutes the user wants to wait for a rate limit pause on URLScan.io instead of stopping with a `429` error (default: 1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | -co           | --check-only               | This will make a few minimal requests to show you how many requests, and roughly how long it could take, to get URLs from the sources and downloaded responses from Wayback Machine.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -104,7 +104,7 @@ docker build -t waymore .
 Run waymore with this command:
 
 ```bash
-docker run -it --rm -v $PWD/results:/app/results waymore:latest python3 waymore/waymore.py -i example.com -oU example.com.links -oR results/example.com/
+docker run -it --rm -v $PWD/results:/app/results waymore:latest waymore -i example.com -oU example.com.links -oR results/example.com/
 ```
 
 ## Input and Mode
@@ -141,7 +141,7 @@ When run, the following files are created in the target directory:
 
 - `waymore.txt` - If `-mode` is `U` or `B`, this file will contain links from selected sources. Links will be retrieved from archive.org Wayback Machine (unless `-xwm` was passed), commoncrawl.org (unless `-xcc` was passed), otx.alienvault.com (unless `-xav` was passed) and urlscan.io (unless `-xus` was passed). If the `-ow` option was also passed, any existing `waymore.txt` file in the target results directory will be overwritten, otherwise new links will be appended and duplicates removed.
 - `index.txt` - If `-mode` is `R` or `B`, and `-url-filname` was not passed then archived responses will be downloaded and hash values will be used for the saved file names. This file contains a comma separated list of `<hash>,<archive URL>,<timestamp>` in case you need to know which URLs produced which response.
-- `ALL OTHER FILES` - These archived response files will be created if `-mode` was `R` or `B`. If `-url-filename` was passed the the file names will be the archive URL that generated the response, e.g. `https--example.com-robots.txt`, otherwise the file name will be a hash value, e.g. `7960113391501.xnl` (the extension of `.xnl` is used if the original file name cannot be derived from the URL). Using hash values mean that less files will be written as there will only be one file per unique response. These archived responses are edited, before being saved, to remove any reference to `web.archive.org`.
+- `ALL OTHER FILES` - These archived response files will be created if `-mode` was `R` or `B`. If `-url-filename` was passed the the file names will be the archive URL that generated the response, e.g. `https--example.com-robots.txt`, otherwise the file name will be a hash value, e.g. `7960113391501.{EXT}` where `{EXT}` will be the extension derived from the path, otherwise it will be derived from the response `content-type`. Sometimes a general extesions will be given, e.g. `.js` for any content type containing the word `javascript`, otherwise it may be set to the last part of the type (e.g. if it's `application/java-archive` the file will be `7960113391501.java-archive`). Using hash values mean that less files will be written as there will only be one file per unique response. These archived responses are edited, before being saved, to remove any reference to `web.archive.org`.
 
 ## Info and Suggestions
 
@@ -183,12 +183,12 @@ Just get the URLs from all sources for `redbull.com` (`-mode U` is just for URLs
 
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/example1.png"></center>
 
-The URLs are saved in the same path as `waymore.py` under `results/redbull.com/waymore.txt`
+The URLs are saved in the same path as `config.yml` (typically `~/.config/waymore`) under `results/redbull.com/waymore.txt`
 
 ### Example 2
 
-Get ALL the URLs from Wayback for `redbull.com` (no filters are applied with `-f`, and no URLs are retrieved from Commone Crawl because `-xcc` is passed, or from Alien Vault because `-xav` is passed).
-Save the FIRST 1000 responses that are found starting from 2015 (`-l 1000 -from 2015`):
+Get ALL the URLs from Wayback for `redbull.com` (no filters are applied in `mode U` with `-f`, and no URLs are retrieved from Commone Crawl, Alien Vault, URLScan and Virus Total, because `-xcc`, `-xav`, `-xus`, `-xvt` are passed respectively).
+Save the FIRST 200 responses that are found starting from 2022 (`-l 200 -from 2022`):
 
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/example2.png"></center>
 
@@ -210,13 +210,13 @@ where `4847147712618` is the hash value of the response in `4847147712618.xnl`, 
 You can pipe waymore to other tools. Any errors are sent to `stderr` and any links found are sent to `stdout`. The output file is still created in addition to the links being piped to the next program. However, archived responses are not piped to the next program, but they are still written to files. For example:
 
 ```
-python3 waymore.py -i redbull.com -mode U | unfurl keys | sort -u
+waymore -i redbull.com -mode U | unfurl keys | sort -u
 ```
 
 You can also pass the input through `stdin` instead of `-i`.
 
 ```
-cat redbull_subs.txt | python3 waymore.py
+cat redbull_subs.txt | waymore
 ```
 
 ## Example 4
@@ -224,7 +224,7 @@ cat redbull_subs.txt | python3 waymore.py
 Sometimes you may just want to check how many request, and how long `waymore` is likely to take if you ran it for a particular domain. You can do a quick check by using the `-co`/`--check-only` argument. For example:
 
 ```
-python3 waymore.py -i redbull.com --check-only
+waymore -i redbull.com --check-only
 ```
 
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/example4.png"></center>
@@ -235,7 +235,7 @@ So now you have lots of archived responses and you want to find extra links? Eas
 For example:
 
 ```
-python3 xnLinkFinder -i ~/Tools/waymore/results/redbull.com -sp https://www.redbull.com -sf redbull.com -o redbull.txt
+xnLinkFinder -i ~/Tools/waymore/results/redbull.com -sp https://www.redbull.com -sf redbull.com -o redbull.txt
 ```
 
 Or run other tools such as [trufflehog](https://github.com/trufflesecurity/trufflehog) or [gf](https://github.com/tomnomnom/gf) over the directory of responses to find even more from the archived responses!

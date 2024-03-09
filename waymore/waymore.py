@@ -26,6 +26,7 @@ import enum
 import pickle
 import time
 import tldextract
+import mimetypes
 try:
     from . import __version__
 except:
@@ -212,7 +213,7 @@ def showVersion():
         try:
             resp = requests.get('https://raw.githubusercontent.com/xnl-h4ck3r/waymore/main/waymore/__init__.py',timeout=3)
         except:
-            print('Current waymore version '+__version__+' (unable to check if latest)')
+            print('Current waymore version '+__version__+' (unable to check if latest)\n')
         if __version__ == resp.text.split('=')[1].replace('"',''):
             print('Current waymore version '+__version__+' ('+colored('latest','green')+')\n')
         else:
@@ -702,8 +703,12 @@ def processArchiveUrl(url):
                     session = requests.Session()
                     session.mount('https://', HTTP_ADAPTER)
                     session.mount('http://', HTTP_ADAPTER)
-                    resp = session.get(url = archiveUrl, headers={"User-Agent":userAgent}, allow_redirects = False)
+                    resp = session.get(url = archiveUrl, headers={"User-Agent":userAgent}, allow_redirects = True)
                     archiveHtml = str(resp.text)
+                    try:
+                        contentType = resp.headers.get("Content-Type").split(';')[0]
+                    except:
+                        contentType = ''
                     
                     # Only create a file if there is a response
                     if len(archiveHtml) != 0:
@@ -739,18 +744,53 @@ def processArchiveUrl(url):
                             hashValue = filehash(archiveHtml)
                             fileName = hashValue
                             
-                            # Determine extension of file from the file name
+                            # Determine extension of file from the content-type using the mimetypes library
                             extension = ''
                             try:
-                                path = url[url.rindex(argsInput)+len(argsInput):]
-                                if path.find('?') > 0:
-                                    path = path[:path.index('?')]
-                                extension = path[path.rindex('.')+1:]
+                                # Guess from content type
+                                extension = mimetypes.guess_extension(contentType)
                             except:
                                 pass
-                            # If the extension is blank, numeric, longer than 6 characters or not alphanumeric - then it's not a valid file type so set to default of xnl
-                            if extension == '' or extension.isnumeric() or len(extension) > 6 or not extension.isalnum():
-                                extension = 'xnl'
+
+                            # If we didn't find an extension, try to get from the file name
+                            try:
+                                if extension == '':
+                                    parsed = urlparse(url.strip())
+                                    path = parsed.path
+                                    extension = path[path.rindex('.')+1:]
+                            except:
+                                pass
+
+                            # If the extension is blank, numeric, longer than 6 characters or not alphanumeric - then it's not a valid file type so check contentType
+                            if extension == '' or extension.isnumeric() or not extension.isalnum():
+                                # Determine the extension from the content type
+                                try:
+                                    if contentType != '':
+                                        extension = contentType.split('/')[1]
+                                except:
+                                    pass
+                                try:
+                                    if extension == '':
+                                        if 'html' in contentType.lower():
+                                            extension = 'html'
+                                        elif 'javascript' in contentType.lower():
+                                            extension = 'js'
+                                        elif 'json' in contentType.lower():
+                                            extension = 'json'
+                                        elif 'css' in contentType.lower():
+                                            extension = 'css'
+                                        elif 'pdf' in contentType.lower():
+                                            extension = 'pdf'
+                                except:
+                                    pass
+
+                                # If extension is still blank, set to html if the content ends with HTML tag, otherwise set to unknown
+                                if extension == '':
+                                    if archiveHtml.lower().strip().endswith('</html>'):
+                                        extension = 'html'
+                                    else:
+                                        extension = 'unknown'
+  
                             fileName = fileName + '.' + extension
                         
                         # If -oR / --output-responses was passed then add the file to that directory, 

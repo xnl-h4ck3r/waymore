@@ -1,5 +1,12 @@
 ## Changelog
 
+- v3.1
+
+  - Changed
+
+    - Make the identification of extension type better when creating the archived hash files. First try the `mimetypes` library that guesses the extension based on the mimetype. If that doesn't work, try to get the extension from the path. If the extension cannot be retrieved from the path, it will be derived from the `content-type` header. If a generic type still can't be obtained, it will be set to the 2nd part of the `content-type` after the `/`. If still unknown, it will be set to `.unknown`. There will be no more `.xnl` extensions by default.
+    - Updated `README` and images to reflect the most recent version.
+
 - v3.0
 
   - New
