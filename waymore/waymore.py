@@ -137,6 +137,7 @@ MATCH_CODE  = ''
 FILTER_KEYWORDS = ''
 URLSCAN_API_KEY = ''
 CONTINUE_RESPONSES_IF_PIPED = True
+WEBHOOK_DISCORD = ''
 
 # Get memory usage for 
 def getMemory():
@@ -379,6 +380,12 @@ def showOptions():
                 write(colored('Keywords only: ', 'magenta')+colored('It looks like no keywords have been set in config.yml file.','red'))
             else: 
                 write(colored('Keywords only: ', 'magenta')+colored(FILTER_KEYWORDS))
+
+        if args.notify_discord:
+            if WEBHOOK_DISCORD == '' or WEBHOOK_DISCORD == 'YOUR_WEBHOOK':
+                write(colored('Discord Webhook: ', 'magenta')+colored('It looks like no Discord webhook has been set in config.yml file.','red'))
+            else: 
+                write(colored('Discord Webhook: ', 'magenta')+colored(WEBHOOK_DISCORD))
                 
         if args.regex_after is not None:
             write(colored('-ra: ' + args.regex_after, 'magenta')+colored(' RegEx for filtering purposes against found links from Wayback Machine (archive.org) AND responses downloaded. Only positive matches will be output.','white'))
@@ -402,7 +409,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD
     try:
         
         # Set terminal width
@@ -545,8 +552,18 @@ def getConfig():
                     writerr(colored('No value for "CONTINUE_RESPONSES_IF_PIPED" in config.yml - default set', 'yellow'))
                     CONTINUE_RESPONSES_IF_PIPED = True
             except Exception as e:
-                writerr(colored('Unable to read "FILTER_KEYWORDS" from config.yml - default set', 'red'))
+                writerr(colored('Unable to read "CONTINUE_RESPONSES_IF_PIPED" from config.yml - default set', 'red'))
                 CONTINUE_RESPONSES_IF_PIPED = True
+            
+            if args.notify_discord:
+                try:
+                    WEBHOOK_DISCORD = config.get('WEBHOOK_DISCORD')
+                    if str(WEBHOOK_DISCORD) == 'None' or str(WEBHOOK_DISCORD) == 'YOUR_WEBHOOK':
+                        writerr(colored('No value for "WEBHOOK_DISCORD" in config.yml - default set', 'yellow'))
+                        WEBHOOK_DISCORD = ''
+                except Exception as e:
+                    writerr(colored('Unable to read "WEBHOOK_DISCORD" from config.yml - default set', 'red'))
+                    WEBHOOK_DISCORD = ''
                 
         except yaml.YAMLError as e: # A scan error occurred reading the file
             useDefaults = True
@@ -578,6 +595,7 @@ def getConfig():
             VIRUSTOTAL_API_KEY = ''
             FILTER_KEYWORDS = ''
             CONTINUE_RESPONSES_IF_PIPED = True
+            WEBHOOK_DISCORD = ''
             
     except Exception as e:
         writerr(colored('ERROR getConfig 1: ' + str(e), 'red'))
@@ -2611,10 +2629,26 @@ def argcheckPercent(value):
             "A valid integer percentage less than 100 must be entered."
         )
     return ivalue
-    
+
+def notifyDiscord():
+    global WEBHOOK_DISCORD, args
+    try:
+        data = {
+            'content': 'waymore has finished for `-i ' + args.input + ' -mode ' + args.mode + '` ! 🤘',
+            'username': 'waymore',
+        }
+        try:
+            result = requests.post(WEBHOOK_DISCORD, json=data)
+            if 300 <= result.status_code < 200:
+                writerr(colored('WARNING: Failed to send notification to Discord - ' + result.json(), 'yellow'))
+        except Exception as e:
+            writerr(colored('WARNING: Failed to send notification to Discord - ' + str(e), 'yellow'))
+    except Exception as e:
+        writerr(colored('ERROR notifyDiscord 1: ' + str(e), 'red'))
+        
 # Run waymore
 def main():
-    global args, DEFAULT_TIMEOUT, inputValues, argsInput, linksFound, linkMimes, successCount, failureCount, fileCount, totalResponses, totalPages, indexFile, path, stopSource, stopProgram, VIRUSTOTAL_API_KEY, inputIsSubDomain, argsInput, argsInputHostname
+    global args, DEFAULT_TIMEOUT, inputValues, argsInput, linksFound, linkMimes, successCount, failureCount, fileCount, totalResponses, totalPages, indexFile, path, stopSource, stopProgram, VIRUSTOTAL_API_KEY, inputIsSubDomain, argsInput, argsInputHostname, WEBHOOK_DISCORD
 
     # Tell Python to run the handler() function when SIGINT is received
     signal(SIGINT, handler)
@@ -2852,6 +2886,12 @@ def main():
         action="store_true",
         help="This will make a few minimal requests to show you how many requests, and roughly how long it could take, to get URLs from the sources and downloaded responses from Wayback Machine.",
     )
+    parser.add_argument(
+        "-nd",
+        "--notify-discord",
+        action="store_true",
+        help="Whether to send a notification to Discord when waymore completes. It requires WEBHOOK_DISCORD to be provided in the config.yml file.",
+    )
     parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
     parser.add_argument('--version', action='store_true', help="Show version number")
     args = parser.parse_args()
@@ -2999,6 +3039,12 @@ def main():
         writerr(colored('ERROR main 1: ' + str(e), 'red'))
 
     finally:
+        # Send a notification to discord if requested
+        try:
+            if args.notify_discord and WEBHOOK_DISCORD != '':
+                notifyDiscord()
+        except:
+            pass
         try:
             if sys.stdout.isatty():
                 writerr(colored('✅ Want to buy me a coffee? ☕ https://ko-fi.com/xnlh4ck3r 🤘', 'green'))

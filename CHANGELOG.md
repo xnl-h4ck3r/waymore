@@ -1,5 +1,12 @@
 ## Changelog
 
+- v3.3
+
+  - New
+
+    - Add `WEBHOOK_DISCORD` to `config.yml` to provide a webhook to be notified when `waymore` has finished, because in some cases it can take a looooooong time!
+    - Add arg `-nd`/`--notify-discord` to send a notification to the specified Discord webhook in `config.yml` when `waymore` completes. This is useful when because `waymore` can take a looooong time to complete for some targets.
+
 - v3.2
 
   - New

@@ -5,3 +5,4 @@ FILTER_KEYWORDS: admin,login,logon,signin,signup,register,registration,dash,port
 URLSCAN_API_KEY:
 VIRUSTOTAL_API_KEY:
 CONTINUE_RESPONSES_IF_PIPED: True
+WEBHOOK_DISCORD: YOUR_WEBHOOK
