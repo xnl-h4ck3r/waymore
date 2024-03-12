@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
-## About - v3.3
+## About - v3.4
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -132,12 +132,14 @@ The `config.yml` file (typically in `~/.config/waymore/`) have values that can b
 - `FILTER_KEYWORDS` - Only links and responses will be returned that contain the specified keywords if the `-ko`/`--keywords-only` argument is passed (without providing an explicit value on the command line), e.g. `admin,portal`
 - `URLSCAN_API_KEY` - You can sign up to [urlscan.io](https://urlscan.io/user/signup) to get a **FREE** API key (there are also paid subscriptions available). It is recommended you get a key and put it into the config file so that you can get more back (and quicker) from their API. NOTE: You will get rate limited unless you have a full paid subscription.
 - `CONTINUE_RESPONSES_IF_PIPED` - If retrieving archive responses doesn't complete, you will be prompted next time whether you want to continue with the previous run. However, if `stdout` is piped to another process it is assumed you don't want to have an interactive prompt. A value of `True` (default) will determine assure the previous run will be continued. if you want a fresh run every time then set to `False`.
+- `WEBHOOK_DISCORD` - If the `--notify-discord` argument is passed, `knoxnl` will send a notification to this Discord wehook when a successful XSS is found.
+- `DEFAULT_OUTPUT_DIR` - This is the default location of any output files written if the `-oU` and `-oR` arguments are not used. If the value of this key is blank, then it will default to the location of the `config.yml` file.
 
-**NOTE: The MIME types cannot be filtered for Alien Vault results because they do not return that in the API response.**
+  **NOTE: The MIME types cannot be filtered for Alien Vault results because they do not return that in the API response.**
 
 ## Output
 
-In the path of the `config.yml` file (typically in `~/.config/waymore`), a `results` directory will be created. Within that, a directory will be created with target domain (or domain with path) passed with `-i` (or for each line of a file passed with `-i`). You can alternatively use argument `-oU` to specify where the URL links file will be output (and the name of the file). You can also use argument `-oR` to specify a directory (or path) where the archived responses will be output.
+In the default output directory specificed in the `config.yml` file with `DEFAULT_OUTPUT_DIR` (if that is blank, it will default to the location of the `config.yml` file itself, typically `~/.config/waymore/`), a `results` directory will be created. Within that, a directory will be created with target domain (or domain with path) passed with `-i` (or for each line of a file passed with `-i`). You can alternatively use argument `-oU` to specify where the URL links file will be output (and the name of the file). You can also use argument `-oR` to specify a directory (or path) where the archived responses will be output.
 When run, the following files are created in the target directory:
 
 - `waymore.txt` - If `-mode` is `U` or `B`, this file will contain links from selected sources. Links will be retrieved from archive.org Wayback Machine (unless `-xwm` was passed), commoncrawl.org (unless `-xcc` was passed), otx.alienvault.com (unless `-xav` was passed) and urlscan.io (unless `-xus` was passed). If the `-ow` option was also passed, any existing `waymore.txt` file in the target results directory will be overwritten, otherwise new links will be appended and duplicates removed.

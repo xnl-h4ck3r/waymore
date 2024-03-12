@@ -1,5 +1,11 @@
 ## Changelog
 
+- v3.4
+
+  - New
+
+    - Add `DEFAULT_OUTPUT_DIR` to the `config.yml` file. This will be used to specify the default directory where output will be written if the `-oU` and `-oR` options aren't used. If blank, this defaults to the directory where `config.yml` is stored (typically `~/.config/waymore/`).
+
 - v3.3
 
   - New

@@ -138,6 +138,7 @@ FILTER_KEYWORDS = ''
 URLSCAN_API_KEY = ''
 CONTINUE_RESPONSES_IF_PIPED = True
 WEBHOOK_DISCORD = ''
+DEFAULT_OUTPUT_DIR = ''
 
 # Get memory usage for 
 def getMemory():
@@ -386,6 +387,8 @@ def showOptions():
                 write(colored('Discord Webhook: ', 'magenta')+colored('It looks like no Discord webhook has been set in config.yml file.','red'))
             else: 
                 write(colored('Discord Webhook: ', 'magenta')+colored(WEBHOOK_DISCORD))
+        
+        write(colored('Default Output Directory: ', 'magenta')+colored(str(DEFAULT_OUTPUT_DIR)))
                 
         if args.regex_after is not None:
             write(colored('-ra: ' + args.regex_after, 'magenta')+colored(' RegEx for filtering purposes against found links from Wayback Machine (archive.org) AND responses downloaded. Only positive matches will be output.','white'))
@@ -409,7 +412,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD, DEFAULT_OUTPUT_DIR
     try:
         
         # Set terminal width
@@ -564,7 +567,21 @@ def getConfig():
                 except Exception as e:
                     writerr(colored('Unable to read "WEBHOOK_DISCORD" from config.yml - default set', 'red'))
                     WEBHOOK_DISCORD = ''
-                
+            
+            try:
+                DEFAULT_OUTPUT_DIR = config.get('DEFAULT_OUTPUT_DIR')
+                if str(DEFAULT_OUTPUT_DIR) == 'None' or str(DEFAULT_OUTPUT_DIR) == '':
+                    DEFAULT_OUTPUT_DIR = str(waymorePath)
+                else:
+                    # Test if DEFAULT_OUTPUT_DIR is a valid directory
+                    if not os.path.isdir(DEFAULT_OUTPUT_DIR):
+                        writerr(colored('The "DEFAULT_OUTPUT_DIR" of "'+str(DEFAULT_OUTPUT_DIR)+'" is not a valid directory. Using "'+str(waymorePath)+'" instead.', 'yellow'))
+                        DEFAULT_OUTPUT_DIR = str(waymorePath)
+            except Exception as e:
+                print(str(e))
+                writerr(colored('Unable to read "DEFAULT_OUTPUT_DIR" from config.yml - default set', 'red'))
+                DEFAULT_OUTPUT_DIR = waymorePath
+                    
         except yaml.YAMLError as e: # A scan error occurred reading the file
             useDefaults = True
             if args.config is None:
@@ -596,6 +613,7 @@ def getConfig():
             FILTER_KEYWORDS = ''
             CONTINUE_RESPONSES_IF_PIPED = True
             WEBHOOK_DISCORD = ''
+            DEFAULT_OUTPUT_DIR = '~/.config/waymore'
             
     except Exception as e:
         writerr(colored('ERROR getConfig 1: ' + str(e), 'red'))
@@ -698,7 +716,7 @@ def processArchiveUrl(url):
     """
     Get the passed web archive response
     """
-    global stopProgram, successCount, failureCount, fileCount, waymorePath, totalResponses, indexFile, argsInput, continueRespFile
+    global stopProgram, successCount, failureCount, fileCount, DEFAULT_OUTPUT_DIR, totalResponses, indexFile, argsInput, continueRespFile
     try:
         if stopProgram is None:
             
@@ -810,12 +828,7 @@ def processArchiveUrl(url):
                         if args.output_responses != '':
                             filePath = args.output_responses + '/' + f'{fileName}'
                         else: 
-                            filePath = (
-                                    waymorePath
-                                    / 'results'
-                                    / str(argsInput).replace('/','-')
-                                    / f'{fileName}'
-                            )
+                            filePath = (DEFAULT_OUTPUT_DIR + '/results/' + str(argsInput).replace('/','-') + '/' + f'{fileName}')
                             
                         # Write the file
                         try:
@@ -917,7 +930,7 @@ def processURLOutput():
     """
     Show results of the URL output, i.e. getting URLs from archive.org and commoncrawl.org and write results to file
     """
-    global linksFound, subs, path, argsInput, checkWayback, checkCommonCrawl, checkAlienVault, checkURLScan, checkVirusTotal
+    global linksFound, subs, path, argsInput, checkWayback, checkCommonCrawl, checkAlienVault, checkURLScan, checkVirusTotal, DEFAULT_OUTPUT_DIR
 
     try:
         
@@ -952,7 +965,7 @@ def processURLOutput():
                 if args.output_responses != '':
                     fullPath = args.output_responses + '/'
                 else:
-                    fullPath = str(waymorePath) + '/results/' + str(argsInput).replace('/','-') + '/'
+                    fullPath = str(DEFAULT_OUTPUT_DIR) + '/results/' + str(argsInput).replace('/','-') + '/'
                 filename = fullPath + 'waymore.txt'
                 filenameNew = fullPath + 'waymore.new'
                 filenameOld = fullPath + 'waymore.old'
@@ -1073,13 +1086,13 @@ def processResponsesOutput():
     """
     Show results of the archive responses saved
     """
-    global successCount, failureCount, subs, fileCount, argsInput, waymorePath
+    global successCount, failureCount, subs, fileCount, argsInput, DEFAULT_OUTPUT_DIR
     try:
         # Get the output directory for responses
         if args.output_responses != '':
             outputDir = args.output_responses + '/'
         else:
-            outputDir = str(waymorePath) + '/results/' + str(argsInput).replace('/','-') + '/'
+            outputDir = str(DEFAULT_OUTPUT_DIR) + '/results/' + str(argsInput).replace('/','-') + '/'
             
         if failureCount > 0:
             if verbose():
@@ -1840,6 +1853,7 @@ def getWaybackUrls():
                     writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): ' + str(resp.text.strip())), 'red'))
             except:
                 if str(e).lower().find('alert access denied'):
+                    print(str(e))
                     writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): Access Denied. Are you able to manually visit https://web.archive.org/? Your ISP may be blocking you, e.g. your adult content filter is on (why it triggers that filter I don\'t know, but it has happened!)'), 'red'))
                 elif str(e).lower().find('connection refused'):
                     writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): Connection Refused. Are you able to manually visit https://web.archive.org/? Your ISP may be blocking your IP)'), 'red'))
@@ -2306,7 +2320,7 @@ def processResponses():
     """
     Get archived responses from Wayback Machine (archive.org)
     """
-    global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput, continueRespFile, successCount, fileCount
+    global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput, continueRespFile, successCount, fileCount, DEFAULT_OUTPUT_DIR
     try:
         if not args.check_only:
             # Create 'results' and domain directory if needed
@@ -2319,18 +2333,9 @@ def processResponses():
                     responsesPath = args.output_responses + '/responses.tmp'
                     indexPath = args.output_responses + '/index.txt'
                 else:
-                    continuePath = (waymorePath
-                        / 'results'
-                        / str(argsInput).replace('/','-')
-                        / 'continueResp.tmp')
-                    responsesPath = (waymorePath
-                        / 'results'
-                        / str(argsInput).replace('/','-')
-                        / 'responses.tmp')
-                    indexPath = (waymorePath
-                        / 'results'
-                        / str(argsInput).replace('/','-')
-                        / 'index.txt')
+                    continuePath = (DEFAULT_OUTPUT_DIR + '/results/' + str(argsInput).replace('/','-') + '/continueResp.tmp')
+                    responsesPath = (DEFAULT_OUTPUT_DIR + '/results/' + str(argsInput).replace('/','-') + '/responses.tmp')
+                    indexPath = (DEFAULT_OUTPUT_DIR + '/results/' + str(argsInput).replace('/','-') + '/index.txt')
             except Exception as e:
                 if verbose():
                     writerr(colored('ERROR processResponses 4: ' + str(e), 'red'))
@@ -2578,29 +2583,35 @@ def createDirs():
     Create a directory for the 'results' and the sub directory for the passed domain/URL, unless if
     -oR / --output-responses was passed, just create those directories
     """
-    global waymorePath, argsInput
-    if args.output_responses == '':
-        # Create a directory for "results" if it doesn't already exist
-        try:
-            results_dir = Path(waymorePath / 'results')
-            results_dir.mkdir(exist_ok=True)
-        except:
-            pass
-        # Create a directory for the target domain
-        try:
-            domain_dir = Path(
-                waymorePath / 'results' / str(argsInput).replace('/','-')
-            )
-            domain_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            pass     
-    else:
-        try:
-            responseDir = Path(args.output_responses)
-            responseDir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            pass
-            
+    global DEFAULT_OUTPUT_DIR, argsInput
+    try:
+        if (args.mode in 'R,B' and args.output_responses == '') or (args.mode in 'U,B' and args.output_urls == ''):
+            # Create a directory for "results" if it doesn't already exist
+            try:
+                results_dir = Path(DEFAULT_OUTPUT_DIR+'/results')
+                results_dir.mkdir(exist_ok=True)
+            except:
+                pass
+            # Create a directory for the target domain
+            try:
+                domain_dir = Path(DEFAULT_OUTPUT_DIR + '/results/' + str(argsInput).replace('/','-'))
+                domain_dir.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                pass     
+        else:
+            print("HERE2")
+            try:
+                if args.output_responses == '':
+                    responseDir = Path(args.output_responses)
+                    responseDir.mkdir(parents=True, exist_ok=True)
+                if args.output_urls == '':
+                    responseDir = Path(args.output_urls)
+                    responseDir.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                pass
+    except Exception as e:
+        writerr(colored(getSPACER('ERROR createDirs 1: ' + str(e)), 'red'))
+                
 # Get width of the progress bar based on the width of the terminal
 def getProgressBarLength():
     global terminalWidth
