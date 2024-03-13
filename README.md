@@ -249,7 +249,7 @@ If you come across any problems at all, or have ideas for improvements, please f
 
 ## TODO
 
-- For `mode R`, if `404` responses are request to be filtered, also check the the response of `200`'s to see if the page was a custom 404 page.
+- For `mode R`, if `404` responses are requested to be filtered, also check the the response of `200`'s to see if the page was a custom 404 page.
 - Add an `-oss` argument that accepts a file of Out Of Scope subdomains/URLs that will not be returned in the output, or have any responses downloaded
 
 ## References
