@@ -391,7 +391,7 @@ def showOptions():
         write(colored('Default Output Directory: ', 'magenta')+colored(str(DEFAULT_OUTPUT_DIR)))
                 
         if args.regex_after is not None:
-            write(colored('-ra: ' + args.regex_after, 'magenta')+colored(' RegEx for filtering purposes against found links from Wayback Machine (archive.org) AND responses downloaded. Only positive matches will be output.','white'))
+            write(colored('-ra: ' + args.regex_after, 'magenta')+colored(' RegEx for filtering purposes against found links from all sources of URLs AND responses downloaded. Only positive matches will be output.','white'))
         if args.mode in ['R','B']:
             write(colored('-t: ' + str(args.timeout), 'magenta')+colored(' The number of seconds to wait for a an archived response.','white'))
         if args.mode in ['R','B'] or (args.mode == 'U' and not args.xcc):
@@ -2692,14 +2692,14 @@ def main():
         '-oU',
         '--output-urls',
         action='store',
-        help='The file to save the Links output to, including path if necessary. If the "-oR" argument is not passed, a "results" directory will be created in the path of the "waymore.py" file. Within that, a directory will be created with target domain (or domain with path) passed with "-i" (or for each line of a file passed with "-i").' ,
+        help='The file to save the Links output to, including path if necessary. If the "-oR" argument is not passed, a "results" directory will be created in the path specified by the DEFAULT_OUTPUT_DIR key in config.yml file (typically defaults to "~/.config/waymore/"). Within that, a directory will be created with target domain (or domain with path) passed with "-i" (or for each line of a file passed with "-i").' ,
         default='',
     )
     parser.add_argument(
         '-oR',
         '--output-responses',
         action='store',
-        help='The directory to save the response output files to, including path if necessary. If the argument is not passed, a "results" directory will be created in the path of the "waymore.py" file. Within that, a directory will be created with target domain (or domain with path) passed with "-i" (or for each line of a file passed with "-i").' ,
+        help='The directory to save the response output files to, including path if necessary. If the argument is not passed, a "results" directory will be created in the path specified by the DEFAULT_OUTPUT_DIR key in config.yml file (typically defaults to "~/.config/waymore/"). Within that, a directory will be created with target domain (or domain with path) passed with "-i" (or for each line of a file passed with "-i").' ,
         default='',
     )
     parser.add_argument(
@@ -2756,7 +2756,7 @@ def main():
     parser.add_argument(
         '-ra',
         '--regex-after',
-        help='RegEx for filtering purposes against links found from archive.org/commoncrawl.org AND responses downloaded. Only positive matches will be output.',
+        help='RegEx for filtering purposes against links found all sources of URLs AND responses downloaded. Only positive matches will be output.',
         action='store',
     )
     parser.add_argument(

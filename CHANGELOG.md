@@ -1,5 +1,13 @@
 ## Changelog
 
+- v3.5
+
+  - Changed
+
+    - Change `README` descriptions of `-oU` and `-oR` to reference recent `DEFAULT_OUTPUT_DIR`.
+    - Change description of `-ra` arg in code and on `README` to say all sources.
+    - Other small improvements to `README`.
+
 - v3.4
 
   - New
