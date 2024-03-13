@@ -613,7 +613,7 @@ def getConfig():
             FILTER_KEYWORDS = ''
             CONTINUE_RESPONSES_IF_PIPED = True
             WEBHOOK_DISCORD = ''
-            DEFAULT_OUTPUT_DIR = '~/.config/waymore'
+            DEFAULT_OUTPUT_DIR = os.path.expanduser('~/.config/waymore')
             
     except Exception as e:
         writerr(colored('ERROR getConfig 1: ' + str(e), 'red'))
