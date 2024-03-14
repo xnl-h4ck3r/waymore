@@ -43,3 +43,5 @@ setup(
 
 if configNew:
     print('\n\033[33mIMPORTANT: The file '+target_directory+'/config.yml already exists.\nCreating config.yml.NEW but leaving existing config.\nIf you need the new file, then remove the current one and rename config.yml.NEW to config.yml\n\033[0m')
+else:
+    print('\n\033[92mThe file '+target_directory+'/config.yml has been created.\n\033[0m')

@@ -1,5 +1,13 @@
 ## Changelog
 
+- v3.6
+
+  - Changed
+
+    - Added `-ko` to the suggestions displayed for Responses when the `-co`/`--check-only` option is used, and there a huge amount of requests to be made.
+    - Remove `-ko` from the suggestion displayed for Urls when the `-co`/`--check-only` option is used, because this doesn't affect this. The `-ko` is applied after the links are retrieved.
+    - Add a statement to `setup.py` to show where `config.yml` is created if it doesn't already exist. This is to help in figuring out Issue #41.
+
 - v3.5
 
   - Changed

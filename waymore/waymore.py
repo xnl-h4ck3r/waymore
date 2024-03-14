@@ -948,9 +948,9 @@ def processURLOutput():
             elif hours < 24:
                 write(colored('\n-> Getting URLs (e.g. at 1 req/sec) take more than '+str(hours)+' hours.','yellow'))
             elif days < 7:
-                write(colored('\n-> Getting URLs (e.g. at 1 req/sec) could take more than '+str(days)+' days. Consider using arguments -ko, -lr, -ci, -from and -to wisely!','red'))
+                write(colored('\n-> Getting URLs (e.g. at 1 req/sec) could take more than '+str(days)+' days. Consider using arguments -lr, -ci, -from and -to wisely!','red'))
             else:
-                write(colored('\n-> Getting URLs (e.g. at 1 req/sec) could take more than '+str(days)+' days!!! Consider using arguments -ko, -lr, -ci, -from and -to wisely!','red'))
+                write(colored('\n-> Getting URLs (e.g. at 1 req/sec) could take more than '+str(days)+' days!!! Consider using arguments -lr, -ci, -from and -to wisely!','red'))
             write('')
         else:
             linkCount = len(linksFound)
@@ -2532,17 +2532,17 @@ def processResponses():
             elif hours < 24:
                 write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(hours)+' hours.','yellow'))
             elif days < 7:
-                write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(days)+' days. Consider using arguments -l, -ci, -from and -to wisely! ','red'))
+                write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(days)+' days. Consider using arguments -ko, -l, -ci, -from and -to wisely! ','red'))
             else:
-                write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(days)+' days!!! Consider using arguments -l, -ci, -from and -to wisely!','red'))
+                write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(days)+' days!!! Consider using arguments -ko, -l, -ci, -from and -to wisely!','red'))
             write('')
         else:
             # If the limit has been set over the default, give a warning that this could take a long time!
             if totalResponses - successCount > DEFAULT_LIMIT:
                 if successCount > 0:
-                    writerr(colored(getSPACER('WARNING: Downloading remaining ' + str(totalResponses - successCount) + ' responses may take a loooooooong time! Consider using arguments -l, -ci, -from and -to wisely!'),'yellow'))
+                    writerr(colored(getSPACER('WARNING: Downloading remaining ' + str(totalResponses - successCount) + ' responses may take a loooooooong time! Consider using arguments -ko, -l, -ci, -from and -to wisely!'),'yellow'))
                 else:
-                    writerr(colored(getSPACER('WARNING: Downloading ' + str(totalResponses) + ' responses may take a loooooooong time! Consider using arguments -l, -ci, -from and -to wisely!'),'yellow'))
+                    writerr(colored(getSPACER('WARNING: Downloading ' + str(totalResponses) + ' responses may take a loooooooong time! Consider using arguments -ko, -l, -ci, -from and -to wisely!'),'yellow'))
             
             # Open the index file if hash value is going to be used (not URL)
             if not args.url_filename:
