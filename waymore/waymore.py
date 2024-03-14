@@ -756,6 +756,7 @@ def processArchiveUrl(url):
                         # Remove all web archive references in the response
                         archiveHtml = re.sub(r'\<script type=\"text\/javascript" src=\"\/_static\/js\/bundle-playback\.js\?v=[A-Za-z0-9]*" charset="utf-8"><\/script>\n<script type="text\/javascript" src="\/_static\/js\/wombat\.js.*\<\!-- End Wayback Rewrite JS Include --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
                         archiveHtml = re.sub(r'\<script src=\"\/\/archive\.org.*\<\!-- End Wayback Rewrite JS Include --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
+                        archiveHtml = re.sub(r'\<script\>window\.RufflePlayer[^\<]*\<\/script\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
                         archiveHtml = re.sub(r'\<\!-- BEGIN WAYBACK TOOLBAR INSERT --\>.*\<\!-- END WAYBACK TOOLBAR INSERT --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
                         archiveHtml = re.sub(r'(}\n)?(\/\*|<!--\n)\s*FILE ARCHIVED ON.*108\(a\)\(3\)\)\.\n(\*\/|-->)','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
                         archiveHtml = re.sub(r'var\s_____WB\$wombat\$assign\$function.*WB\$wombat\$assign\$function_____\(\"opener\"\);','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
@@ -767,6 +768,7 @@ def processArchiveUrl(url):
                         archiveHtml = re.sub(r'\<script type=\"text\/javascript\">\s*__wm\.init\(\"https:\/\/web\.archive\.org\/web\"\);[^\<]*\<\/script\>','',archiveHtml,flags=re.IGNORECASE)
                         archiveHtml = re.sub(r'\<script type=\"text\/javascript\" src="https:\/\/web-static\.archive\.org[^\<]*\<\/script\>','',archiveHtml,flags=re.IGNORECASE)
                         archiveHtml = re.sub(r'\<link rel=\"stylesheet\" type=\"text\/css\" href=\"https:\/\/web-static\.archive\.org[^\<]*\/\>','',archiveHtml,flags=re.IGNORECASE)
+                        archiveHtml = re.sub(r'\<\!-- End Wayback Rewrite JS Include --\>','',archiveHtml,re.IGNORECASE)
                         
                         # If there is a specific Wayback error in the response, raise an exception 
                         if archiveHtml.lower().find('wayback machine has not archived that url') > 0 or archiveHtml.lower().find('snapshot cannot be displayed due to an internal error') > 0:
@@ -2598,17 +2600,18 @@ def createDirs():
                 domain_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
                 pass     
-        else:
-            print("HERE2")
-            try:
-                if args.output_responses == '':
-                    responseDir = Path(args.output_responses)
-                    responseDir.mkdir(parents=True, exist_ok=True)
-                if args.output_urls == '':
-                    responseDir = Path(args.output_urls)
-                    responseDir.mkdir(parents=True, exist_ok=True)
-            except Exception as e:
-                pass
+        try:
+            # Create specified directory for -oR if required
+            if args.output_responses != '':
+                responseDir = Path(args.output_responses)
+                responseDir.mkdir(parents=True, exist_ok=True)
+            # If -oU was passed and is prefixed with a directory, create it
+            if args.output_urls != '' and '/' in args.output_urls:
+                directoriesOnly = os.path.dirname(args.output_urls)
+                responseDir = Path(directoriesOnly)
+                responseDir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            pass
     except Exception as e:
         writerr(colored(getSPACER('ERROR createDirs 1: ' + str(e)), 'red'))
                 
@@ -2867,7 +2870,7 @@ def main():
         "-nlf",
         "--new-links-file",
         action="store_true",
-        help="If this argument is passed, a .new file will also be written that will contain links for the latest run.",
+        help="If this argument is passed, a .new file will also be written that will contain links for the latest run. This is only relevant for mode U.",
     )
     parser.add_argument(
         "-c",

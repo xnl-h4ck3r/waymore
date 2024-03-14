@@ -1,5 +1,16 @@
 ## Changelog
 
+- v3.7
+
+  - Changed
+
+    - Fix a big that can occur in some situations where error `ERROR processResponses 1: [Errno 2] No such file or directory: 'testing/responses.tmp'` shown. The required directories weren't being created correctly.
+    - Remove a debug print line I left in!
+    - Remove this script from downloaded responses that's now being included by archive.org:
+      `<script>window.RufflePlayer=window.RufflePlayer||{};window.RufflePlayer.config={"autoplay":"on","unmuteOverlay":"hidden"};</script>`
+    - Remove the comment `<!-- End Wayback Rewrite JS Include -->` from the downloaded responses.
+    - Clarify that `-nlf` argument is only relevant to `mode U`.
+
 - v3.6
 
   - Changed
