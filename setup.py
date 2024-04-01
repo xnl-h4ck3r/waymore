@@ -11,6 +11,7 @@ target_directory = (
             )
 
 # Copy the config.yml file to the target directory if it exists
+configNew = False
 if target_directory and os.path.isfile("config.yml"):
     os.makedirs(target_directory, exist_ok=True)
     # If file already exists, create a new one
@@ -21,7 +22,6 @@ if target_directory and os.path.isfile("config.yml"):
         os.rename(target_directory+'/config.yml',target_directory+'/config.yml.NEW')
         os.rename(target_directory+'/config.yml.OLD',target_directory+'/config.yml')
     else:
-        configNew = False
         shutil.copy("config.yml", target_directory)
 
 setup(
@@ -30,6 +30,7 @@ setup(
     version=__import__('waymore').__version__,
     description="Find way more from the Wayback Machine, Common Crawl, Alien Vault OTX, URLScan & VirusTotal!",
     long_description=open("README.md").read(),
+    long_description_content_type='text/markdown',
     author="@xnl-h4ck3r",
     url="https://github.com/xnl-h4ck3r/waymore",
     py_modules=["waymore"],

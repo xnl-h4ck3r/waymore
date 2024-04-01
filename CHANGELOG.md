@@ -1,5 +1,18 @@
 ## Changelog
 
+- v4.0
+
+  - New
+
+    - Add argument `-oijs`/`--output-inline-js`. If passed, and archived responses are requested, all unique scripts from the responses (excluding `.js`, `.csv`, `.xls`, `.xslx`, `.doc`, `.docx`, `.pdf`, `.msi`, `.zip`, `.gzip`, `.gz`, `.tar`, `.rar`, `.json`) will be extracted and written to files `combinedInline{}.js` (in the same response directory) where `{}` will be the number of the file for every 1000 unique scripts. There will also be a file `combinedInlineSrc.txt` written that will contain the `src` value for all inline external scripts.
+    - Exclude SOME downloaded custom 404 responses for `-mode R` if 404 status is to be excluded. The custom 404 pages will be identified by the regex `<title>[^\<]*(404|not found)[^\<]*</title>`.
+    - Add `long_description_content_type` to `setup.py` to upload to PyPi
+    - Add `waymore` to `PyPi` so can be installed with `pip install waymore`
+
+  - Changed
+
+    - When getting the `DEFAULT_OUTPUT_DIR`, use the `os.path.expanduser` to ensure that the full path is used.
+
 - v3.7
 
   - Changed

@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
-## About - v3.7
+## About - v4.0
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -31,7 +31,13 @@ Now **waymore** gets URL's from ALL of those sources too (with ability to filter
 
 `waymore` supports **Python 3**.
 
-Install `waymore` in default(global) python environment.
+Install `waymore` in default (global) python environment.
+
+```bash
+pip install waymore
+```
+
+OR
 
 ```bash
 pip install git+https://github.com/xnl-h4ck3r/waymore.git -v
@@ -83,6 +89,7 @@ pipx install git+https://github.com/xnl-h4ck3r/waymore.git
 | -urlr         | --urlscan-rate-limit-retry | The number of minutes the user wants to wait for a rate limit pause on URLScan.io instead of stopping with a `429` error (default: 1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | -co           | --check-only               | This will make a few minimal requests to show you how many requests, and roughly how long it could take, to get URLs from the sources and downloaded responses from Wayback Machine.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | -nd           | --notify-discord           | Whether to send a notification to Discord when waymore completes. It requires `WEBHOOK_DISCORD` to be provided in the `config.yml` file.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -oijs         | --output-inline-js         | Whether to save combined inline javascript of all relevant files in the response directory when `-mode R` (or `-mode B`) has been used. The files are saved with the name `combinedInline{}.js` where `{}` is the number of the file, saving 1000 unique scripts per file. The file `combinedInlineSrc.txt` will also be created, containing the `src` value of all external scripts referenced in the files.                                                                                                                                                                                                                                                  |
 | -v            | --verbose                  | Verbose output                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 |               | --version                  | Show current version number.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | -h            | --help                     | Show the help message and exit.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -249,7 +256,6 @@ If you come across any problems at all, or have ideas for improvements, please f
 
 ## TODO
 
-- For `mode R`, if `404` responses are requested to be filtered, also check the the response of `200`'s to see if the page was a custom 404 page.
 - Add an `-oss` argument that accepts a file of Out Of Scope subdomains/URLs that will not be returned in the output, or have any responses downloaded
 
 ## References

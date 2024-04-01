@@ -30,6 +30,7 @@ try:
     from . import __version__
 except:
     pass
+from tqdm import tqdm
 
 # Try to import psutil to show memory usage
 try:
@@ -80,6 +81,7 @@ checkAlienVault = 0
 checkURLScan = 0
 checkVirusTotal = 0
 argsInputHostname = ''
+responseOutputDirectory = ''
 
 # Source Provider URLs
 WAYBACK_URL = 'https://web.archive.org/cdx/search/cdx?url={DOMAIN}&collapse={COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest'
@@ -126,6 +128,9 @@ DEFAULT_FILTER_MIME = 'text/css,image/jpeg,image/jpg,image/png,image/svg+xml,ima
 # Response code exclusions we will use to filter links and responses from web.archive.org through their API
 DEFAULT_FILTER_CODE = '404,301,302'
 
+# Used to filter out downloaded responses that could be custom 404 pages
+REGEX_404 = r'<title>[^\<]*(404|not found)[^\<]*</title>'
+
 # Keywords 
 DEFAULT_FILTER_KEYWORDS = 'admin,login,logon,signin,signup,register,registration,dash,portal,ftp,panel,.js,api,robots.txt,graph,gql,config,backup,debug,db,database,git,cgi-bin,swagger,zip,rar,tar.gz,internal,jira,jenkins,confluence,atlassian,okta,corp,upload,delete,email,sql,create,edit,test,temp,cache,wsdl,log,payment,setting,mail,file,redirect,chat,billing,doc,trace,cp,ftp,gateway,import,proxy,dev,stage,stg,uat'
 
@@ -139,6 +144,11 @@ URLSCAN_API_KEY = ''
 CONTINUE_RESPONSES_IF_PIPED = True
 WEBHOOK_DISCORD = ''
 DEFAULT_OUTPUT_DIR = ''
+
+API_KEY_SECRET = "aHR0cHM6Ly95b3V0dS5iZS9kUXc0dzlXZ1hjUQ=="
+
+# When -oijs is passed, and the downloaded responses are checked for scripts, files with these extensions will be ignored
+INLINE_JS_EXCLUDE = ['.js', '.csv', '.xls', '.xlsx', '.doc', '.docx', '.pdf', '.msi', '.zip', '.gzip', '.gz', '.tar', '.rar', '.json']
 
 # Get memory usage for 
 def getMemory():
@@ -362,6 +372,8 @@ def showOptions():
             if args.url_filename:
                 write(colored('-url-filename: ' +str(args.url_filename), 'magenta')+colored(' The filenames of downloaded responses wil be set to the URL rather than the hash value of the response.','white'))
 
+            write(colored('-oijs: '+str(args.output_inline_js), 'magenta')+colored(' Whether the combined JS of all responses will be written to one or more files.','white'))
+                    
         write(colored('-f: ' +str(args.filter_responses_only), 'magenta')+colored(' If True, the initial links from wayback machine will not be filtered, only the responses that are downloaded will be filtered. It maybe useful to still see all available paths even if you don\'t want to check the file for content.','white'))
         if args.keywords_only is not None and args.keywords_only != '#CONFIG':
             write(colored('-ko: ' +str(args.keywords_only), 'magenta')+colored(' Only get results that match the given Regex.','white'))
@@ -571,14 +583,15 @@ def getConfig():
             try:
                 DEFAULT_OUTPUT_DIR = config.get('DEFAULT_OUTPUT_DIR')
                 if str(DEFAULT_OUTPUT_DIR) == 'None' or str(DEFAULT_OUTPUT_DIR) == '':
-                    DEFAULT_OUTPUT_DIR = str(waymorePath)
+                    DEFAULT_OUTPUT_DIR = os.path.expanduser(str(waymorePath))
                 else:
                     # Test if DEFAULT_OUTPUT_DIR is a valid directory
                     if not os.path.isdir(DEFAULT_OUTPUT_DIR):
                         writerr(colored('The "DEFAULT_OUTPUT_DIR" of "'+str(DEFAULT_OUTPUT_DIR)+'" is not a valid directory. Using "'+str(waymorePath)+'" instead.', 'yellow'))
-                        DEFAULT_OUTPUT_DIR = str(waymorePath)
+                        DEFAULT_OUTPUT_DIR = os.path.expanduser(str(waymorePath))
+                    else:
+                        DEFAULT_OUTPUT_DIR = os.path.expanduser(DEFAULT_OUTPUT_DIR)
             except Exception as e:
-                print(str(e))
                 writerr(colored('Unable to read "DEFAULT_OUTPUT_DIR" from config.yml - default set', 'red'))
                 DEFAULT_OUTPUT_DIR = waymorePath
                     
@@ -614,6 +627,7 @@ def getConfig():
             CONTINUE_RESPONSES_IF_PIPED = True
             WEBHOOK_DISCORD = ''
             DEFAULT_OUTPUT_DIR = os.path.expanduser('~/.config/waymore')
+            outputInlineJSDir = DEFAULT_OUTPUT_DIR
             
     except Exception as e:
         writerr(colored('ERROR getConfig 1: ' + str(e), 'red'))
@@ -716,7 +730,7 @@ def processArchiveUrl(url):
     """
     Get the passed web archive response
     """
-    global stopProgram, successCount, failureCount, fileCount, DEFAULT_OUTPUT_DIR, totalResponses, indexFile, argsInput, continueRespFile
+    global stopProgram, successCount, failureCount, fileCount, DEFAULT_OUTPUT_DIR, totalResponses, indexFile, argsInput, continueRespFile, REGEX_404
     try:
         if stopProgram is None:
             
@@ -749,122 +763,125 @@ def processArchiveUrl(url):
                     # Only create a file if there is a response
                     if len(archiveHtml) != 0:
                         
-                        # Add the URL as a comment at the start of the response
-                        if args.url_filename:
-                            archiveHtml = '/* Original URL: ' + archiveUrl + ' */\n' + archiveHtml
+                        # If the FILTER_CODE includes 404, and it only process if it doesn't seem to be a custom 404 page
+                        if '404' in FILTER_CODE and not re.findall(REGEX_404, archiveHtml, re.DOTALL|re.IGNORECASE):
                         
-                        # Remove all web archive references in the response
-                        archiveHtml = re.sub(r'\<script type=\"text\/javascript" src=\"\/_static\/js\/bundle-playback\.js\?v=[A-Za-z0-9]*" charset="utf-8"><\/script>\n<script type="text\/javascript" src="\/_static\/js\/wombat\.js.*\<\!-- End Wayback Rewrite JS Include --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
-                        archiveHtml = re.sub(r'\<script src=\"\/\/archive\.org.*\<\!-- End Wayback Rewrite JS Include --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
-                        archiveHtml = re.sub(r'\<script\>window\.RufflePlayer[^\<]*\<\/script\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
-                        archiveHtml = re.sub(r'\<\!-- BEGIN WAYBACK TOOLBAR INSERT --\>.*\<\!-- END WAYBACK TOOLBAR INSERT --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
-                        archiveHtml = re.sub(r'(}\n)?(\/\*|<!--\n)\s*FILE ARCHIVED ON.*108\(a\)\(3\)\)\.\n(\*\/|-->)','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
-                        archiveHtml = re.sub(r'var\s_____WB\$wombat\$assign\$function.*WB\$wombat\$assign\$function_____\(\"opener\"\);','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
-                        archiveHtml = re.sub(r'(\<\!--|\/\*)\nplayback timings.*(--\>|\*\/)','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
-                        archiveHtml = re.sub(r'((https:)?\/\/web\.archive\.org)?\/web\/[0-9]{14}([A-Za-z]{2}\_)?\/','',archiveHtml,flags=re.IGNORECASE)
-                        archiveHtml = re.sub(r'((https:)?\\\/\\\/web\.archive\.org)?\\\/web\\\/[0-9]{14}([A-Za-z]{2}\_)?\\\/','',archiveHtml,flags=re.IGNORECASE)
-                        archiveHtml = re.sub(r'((https:)?%2F%2Fweb\.archive\.org)?%2Fweb%2F[0-9]{14}([A-Za-z]{2}\_)?%2F','',archiveHtml,flags=re.IGNORECASE)
-                        archiveHtml = re.sub(r'((https:)?\\u002F\\u002Fweb\.archive\.org)?\\u002Fweb\\u002F[0-9]{14}([A-Za-z]{2}\_)?\\u002F','',archiveHtml,flags=re.IGNORECASE)
-                        archiveHtml = re.sub(r'\<script type=\"text\/javascript\">\s*__wm\.init\(\"https:\/\/web\.archive\.org\/web\"\);[^\<]*\<\/script\>','',archiveHtml,flags=re.IGNORECASE)
-                        archiveHtml = re.sub(r'\<script type=\"text\/javascript\" src="https:\/\/web-static\.archive\.org[^\<]*\<\/script\>','',archiveHtml,flags=re.IGNORECASE)
-                        archiveHtml = re.sub(r'\<link rel=\"stylesheet\" type=\"text\/css\" href=\"https:\/\/web-static\.archive\.org[^\<]*\/\>','',archiveHtml,flags=re.IGNORECASE)
-                        archiveHtml = re.sub(r'\<\!-- End Wayback Rewrite JS Include --\>','',archiveHtml,re.IGNORECASE)
-                        
-                        # If there is a specific Wayback error in the response, raise an exception 
-                        if archiveHtml.lower().find('wayback machine has not archived that url') > 0 or archiveHtml.lower().find('snapshot cannot be displayed due to an internal error') > 0:
-                            raise WayBackException
-                        
-                        # Create file name based on url or hash value of the response, depending on selection. Ensure the file name isn't over 255 characters 
-                        if args.url_filename:
-                            fileName = url.replace('/','-').replace(':','')
-                            fileName = fileName[0:254]
-                        else:
-                            hashValue = filehash(archiveHtml)
-                            fileName = hashValue
+                            # Add the URL as a comment at the start of the response
+                            if args.url_filename:
+                                archiveHtml = '/* Original URL: ' + archiveUrl + ' */\n' + archiveHtml
                             
-                            # Determine extension of file from the content-type using the mimetypes library
-                            extension = ''
-                            try:
-                                # Get path extension
-                                targetUrl = 'https://' + url.split("://")[1]
-                                parsed = urlparse(targetUrl.strip())
-                                path = parsed.path
-                                extension = path[path.rindex('.')+1:]
-                            except:
-                                pass
+                            # Remove all web archive references in the response
+                            archiveHtml = re.sub(r'\<script type=\"text\/javascript" src=\"\/_static\/js\/bundle-playback\.js\?v=[A-Za-z0-9]*" charset="utf-8"><\/script>\n<script type="text\/javascript" src="\/_static\/js\/wombat\.js.*\<\!-- End Wayback Rewrite JS Include --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
+                            archiveHtml = re.sub(r'\<script src=\"\/\/archive\.org.*\<\!-- End Wayback Rewrite JS Include --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
+                            archiveHtml = re.sub(r'\<script\>window\.RufflePlayer[^\<]*\<\/script\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
+                            archiveHtml = re.sub(r'\<\!-- BEGIN WAYBACK TOOLBAR INSERT --\>.*\<\!-- END WAYBACK TOOLBAR INSERT --\>','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
+                            archiveHtml = re.sub(r'(}\n)?(\/\*|<!--\n)\s*FILE ARCHIVED ON.*108\(a\)\(3\)\)\.\n(\*\/|-->)','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
+                            archiveHtml = re.sub(r'var\s_____WB\$wombat\$assign\$function.*WB\$wombat\$assign\$function_____\(\"opener\"\);','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
+                            archiveHtml = re.sub(r'(\<\!--|\/\*)\nplayback timings.*(--\>|\*\/)','',archiveHtml,1,flags=re.DOTALL|re.IGNORECASE)
+                            archiveHtml = re.sub(r'((https:)?\/\/web\.archive\.org)?\/web\/[0-9]{14}([A-Za-z]{2}\_)?\/','',archiveHtml,flags=re.IGNORECASE)
+                            archiveHtml = re.sub(r'((https:)?\\\/\\\/web\.archive\.org)?\\\/web\\\/[0-9]{14}([A-Za-z]{2}\_)?\\\/','',archiveHtml,flags=re.IGNORECASE)
+                            archiveHtml = re.sub(r'((https:)?%2F%2Fweb\.archive\.org)?%2Fweb%2F[0-9]{14}([A-Za-z]{2}\_)?%2F','',archiveHtml,flags=re.IGNORECASE)
+                            archiveHtml = re.sub(r'((https:)?\\u002F\\u002Fweb\.archive\.org)?\\u002Fweb\\u002F[0-9]{14}([A-Za-z]{2}\_)?\\u002F','',archiveHtml,flags=re.IGNORECASE)
+                            archiveHtml = re.sub(r'\<script type=\"text\/javascript\">\s*__wm\.init\(\"https:\/\/web\.archive\.org\/web\"\);[^\<]*\<\/script\>','',archiveHtml,flags=re.IGNORECASE)
+                            archiveHtml = re.sub(r'\<script type=\"text\/javascript\" src="https:\/\/web-static\.archive\.org[^\<]*\<\/script\>','',archiveHtml,flags=re.IGNORECASE)
+                            archiveHtml = re.sub(r'\<link rel=\"stylesheet\" type=\"text\/css\" href=\"https:\/\/web-static\.archive\.org[^\<]*\/\>','',archiveHtml,flags=re.IGNORECASE)
+                            archiveHtml = re.sub(r'\<\!-- End Wayback Rewrite JS Include --\>','',archiveHtml,re.IGNORECASE)
                             
-                            # If the extension is blank, numeric, longer than 4 characters or not alphanumeric - then it's not a valid file type so check contentType
-                            if extension == '' or extension.isnumeric() or not extension.isalnum() or len(extension) > 4:
-                                # Determine the extension from the content type
+                            # If there is a specific Wayback error in the response, raise an exception 
+                            if archiveHtml.lower().find('wayback machine has not archived that url') > 0 or archiveHtml.lower().find('snapshot cannot be displayed due to an internal error') > 0:
+                                raise WayBackException
+                            
+                            # Create file name based on url or hash value of the response, depending on selection. Ensure the file name isn't over 255 characters 
+                            if args.url_filename:
+                                fileName = url.replace('/','-').replace(':','')
+                                fileName = fileName[0:254]
+                            else:
+                                hashValue = filehash(archiveHtml)
+                                fileName = hashValue
+                                
+                                # Determine extension of file from the content-type using the mimetypes library
+                                extension = ''
                                 try:
-                                    if contentType != '':
-                                        extension = contentType.split('/')[1].replace('x-','')
-                                    if extension == '':
-                                        extension = contentType.lower()
+                                    # Get path extension
+                                    targetUrl = 'https://' + url.split("://")[1]
+                                    parsed = urlparse(targetUrl.strip())
+                                    path = parsed.path
+                                    extension = path[path.rindex('.')+1:]
                                 except:
                                     pass
-                                if 'html' in extension:
-                                    extension = 'html'
-                                elif 'javascript' in extension:
-                                    extension = 'js'
-                                elif 'json' in extension:
-                                    extension = 'json'
-                                elif 'css' in extension:
-                                    extension = 'css'
-                                elif 'pdf' in extension:
-                                    extension = 'pdf'
-                                elif 'plain' == extension:
-                                    extension = 'txt'
                                 
-                                # If extension is still blank, set to html if the content ends with HTML tag, otherwise set to unknown
-                                if extension == '':
-                                    if archiveHtml.lower().strip().endswith('</html>') or archiveHtml.lower().strip().startswith('<!doctype html') or archiveHtml.lower().strip().startswith('<html'):
+                                # If the extension is blank, numeric, longer than 4 characters or not alphanumeric - then it's not a valid file type so check contentType
+                                if extension == '' or extension.isnumeric() or not extension.isalnum() or len(extension) > 4:
+                                    # Determine the extension from the content type
+                                    try:
+                                        if contentType != '':
+                                            extension = contentType.split('/')[1].replace('x-','')
+                                        if extension == '':
+                                            extension = contentType.lower()
+                                    except:
+                                        pass
+                                    if 'html' in extension:
                                         extension = 'html'
-                                    else:
-                                        extension = 'unknown'
-  
-                            fileName = fileName + '.' + extension
-                        
-                        # If -oR / --output-responses was passed then add the file to that directory, 
-                        # else add to the default "results/{target.domain}" directory in the same path as the .py file
-                        if args.output_responses != '':
-                            filePath = args.output_responses + '/' + f'{fileName}'
-                        else: 
-                            filePath = (DEFAULT_OUTPUT_DIR + '/results/' + str(argsInput).replace('/','-') + '/' + f'{fileName}')
+                                    elif 'javascript' in extension:
+                                        extension = 'js'
+                                    elif 'json' in extension:
+                                        extension = 'json'
+                                    elif 'css' in extension:
+                                        extension = 'css'
+                                    elif 'pdf' in extension:
+                                        extension = 'pdf'
+                                    elif 'plain' == extension:
+                                        extension = 'txt'
+                                    
+                                    # If extension is still blank, set to html if the content ends with HTML tag, otherwise set to unknown
+                                    if extension == '':
+                                        if archiveHtml.lower().strip().endswith('</html>') or archiveHtml.lower().strip().startswith('<!doctype html') or archiveHtml.lower().strip().startswith('<html'):
+                                            extension = 'html'
+                                        else:
+                                            extension = 'unknown'
+    
+                                fileName = fileName + '.' + extension
                             
-                        # Write the file
-                        try:
-                            responseFile = open(filePath, 'w', encoding='utf8')
-                            responseFile.write(archiveHtml)
-                            responseFile.close()
-                            fileCount = fileCount + 1
-                        except Exception as e:
-                            writerr(colored(getSPACER('[ ERR ] Failed to write file ' + filePath + ': '+ str(e)), 'red'))
-                            
-                        # Write the hash value and URL to the index file
-                        if not args.url_filename:
+                            # If -oR / --output-responses was passed then add the file to that directory, 
+                            # else add to the default "results/{target.domain}" directory in the same path as the .py file
+                            if args.output_responses != '':
+                                filePath = args.output_responses + '/' + f'{fileName}'
+                            else: 
+                                filePath = (DEFAULT_OUTPUT_DIR + '/results/' + str(argsInput).replace('/','-') + '/' + f'{fileName}')
+                                
+                            # Write the file
                             try:
-                                timestamp = str(datetime.now())
-                                indexFile.write(hashValue+','+archiveUrl+' ,'+timestamp+'\n')
-                                indexFile.flush()
+                                responseFile = open(filePath, 'w', encoding='utf8')
+                                responseFile.write(archiveHtml)
+                                responseFile.close()
+                                fileCount = fileCount + 1
                             except Exception as e:
-                                writerr(colored(getSPACER('[ ERR ] Failed to write to index.txt for "' + archiveUrl + '": '+ str(e)), 'red'))
+                                writerr(colored(getSPACER('[ ERR ] Failed to write file ' + filePath + ': '+ str(e)), 'red'))
+                                
+                            # Write the hash value and URL to the index file
+                            if not args.url_filename:
+                                try:
+                                    timestamp = str(datetime.now())
+                                    indexFile.write(hashValue+','+archiveUrl+' ,'+timestamp+'\n')
+                                    indexFile.flush()
+                                except Exception as e:
+                                    writerr(colored(getSPACER('[ ERR ] Failed to write to index.txt for "' + archiveUrl + '": '+ str(e)), 'red'))
 
-                        # FOR DEBUGGING PURPOSES
-                        try:
-                            if os.environ.get('USER') == 'xnl':
-                                debugText = ''
-                                if archiveHtml.lower().find('archive.org') > 0:
-                                    debugText = 'ARCHIVE.ORG'
-                                elif archiveHtml.lower().find('internet archive') > 0:
-                                    debugText = 'INTERNET ARCHIVE'
-                                elif archiveHtml.lower().find('wombat') > 0:
-                                    debugText = 'WOMBAT (JS)'
-                                if debugText != '':
-                                    writerr(colored(getSPACER('"' + fileName + '" CONTAINS ' + debugText + ' - CHECK ITS A VALID REFERENCE'), 'yellow'))
-                        except:
-                            pass
-                            
+                            # FOR DEBUGGING PURPOSES
+                            try:
+                                if os.environ.get('USER') == 'xnl':
+                                    debugText = ''
+                                    if archiveHtml.lower().find('archive.org') > 0:
+                                        debugText = 'ARCHIVE.ORG'
+                                    elif archiveHtml.lower().find('internet archive') > 0:
+                                        debugText = 'INTERNET ARCHIVE'
+                                    elif archiveHtml.lower().find('wombat') > 0:
+                                        debugText = 'WOMBAT (JS)'
+                                    if debugText != '':
+                                        writerr(colored(getSPACER('"' + fileName + '" CONTAINS ' + debugText + ' - CHECK ITS A VALID REFERENCE'), 'yellow'))
+                            except:
+                                pass
+                                
                     successCount = successCount + 1
                 
                 except WayBackException as wbe:
@@ -1088,22 +1105,17 @@ def processResponsesOutput():
     """
     Show results of the archive responses saved
     """
-    global successCount, failureCount, subs, fileCount, argsInput, DEFAULT_OUTPUT_DIR
+    global successCount, failureCount, subs, fileCount, argsInput, DEFAULT_OUTPUT_DIR, responseOutputDirectory
     try:
-        # Get the output directory for responses
-        if args.output_responses != '':
-            outputDir = args.output_responses + '/'
-        else:
-            outputDir = str(DEFAULT_OUTPUT_DIR) + '/results/' + str(argsInput).replace('/','-') + '/'
             
         if failureCount > 0:
             if verbose():
-                write(colored('\nResponses saved to ','cyan')+colored(outputDir,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' failed)\n','red'))
+                write(colored('\nResponses saved to ','cyan')+colored(responseOutputDirectory,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' failed)\n','red'))
             else:
                 write(colored('\nResponses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' failed)\n','red'))
         else:
             if verbose():
-                write(colored('\nResponses saved to ','cyan')+colored(outputDir,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
+                write(colored('\nResponses saved to ','cyan')+colored(responseOutputDirectory,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
             else:
                 write(colored('\nResponses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
     except Exception as e:
@@ -1855,7 +1867,6 @@ def getWaybackUrls():
                     writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): ' + str(resp.text.strip())), 'red'))
             except:
                 if str(e).lower().find('alert access denied'):
-                    print(str(e))
                     writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): Access Denied. Are you able to manually visit https://web.archive.org/? Your ISP may be blocking you, e.g. your adult content filter is on (why it triggers that filter I don\'t know, but it has happened!)'), 'red'))
                 elif str(e).lower().find('connection refused'):
                     writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): Connection Refused. Are you able to manually visit https://web.archive.org/? Your ISP may be blocking your IP)'), 'red'))
@@ -2322,7 +2333,7 @@ def processResponses():
     """
     Get archived responses from Wayback Machine (archive.org)
     """
-    global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput, continueRespFile, successCount, fileCount, DEFAULT_OUTPUT_DIR
+    global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput, continueRespFile, successCount, fileCount, DEFAULT_OUTPUT_DIR, responseOutputDirectory
     try:
         if not args.check_only:
             # Create 'results' and domain directory if needed
@@ -2330,14 +2341,9 @@ def processResponses():
             
             # Get the path of the files, depending on whether -oR / --output_responses was passed
             try:
-                if args.output_responses != '':
-                    continuePath = args.output_responses + '/continueResp.tmp'
-                    responsesPath = args.output_responses + '/responses.tmp'
-                    indexPath = args.output_responses + '/index.txt'
-                else:
-                    continuePath = (DEFAULT_OUTPUT_DIR + '/results/' + str(argsInput).replace('/','-') + '/continueResp.tmp')
-                    responsesPath = (DEFAULT_OUTPUT_DIR + '/results/' + str(argsInput).replace('/','-') + '/responses.tmp')
-                    indexPath = (DEFAULT_OUTPUT_DIR + '/results/' + str(argsInput).replace('/','-') + '/index.txt')
+                continuePath = responseOutputDirectory + 'continueResp.tmp'
+                responsesPath = responseOutputDirectory + 'responses.tmp'
+                indexPath = responseOutputDirectory + 'index.txt'
             except Exception as e:
                 if verbose():
                     writerr(colored('ERROR processResponses 4: ' + str(e), 'red'))
@@ -2654,15 +2660,158 @@ def notifyDiscord():
         try:
             result = requests.post(WEBHOOK_DISCORD, json=data)
             if 300 <= result.status_code < 200:
-                writerr(colored('WARNING: Failed to send notification to Discord - ' + result.json(), 'yellow'))
+                writerr(colored(getSPACER('WARNING: Failed to send notification to Discord - ' + result.json()), 'yellow'))
         except Exception as e:
-            writerr(colored('WARNING: Failed to send notification to Discord - ' + str(e), 'yellow'))
+            writerr(colored(getSPACER('WARNING: Failed to send notification to Discord - ' + str(e)), 'yellow'))
     except Exception as e:
         writerr(colored('ERROR notifyDiscord 1: ' + str(e), 'red'))
+
+def checkScript(script):
+    try:
+        if script.replace('\n','').strip() != '':
+            return True 
+    except Exception as e:
+        writerr(colored('ERROR extractScripts 1: ' + str(e), 'red'))
+        
+def extractScripts(filePath):
+    try:
+        with open(filePath, 'rb') as file:
+            content = file.read().decode('utf-8', errors='ignore')
+            scripts = re.findall(r'<script[^>]*>(.*?)</script>', content, re.DOTALL)
+            scripts = list(filter(checkScript, scripts))
+            return scripts
+    except Exception as e:
+        writerr(colored('ERROR extractScripts 1: ' + str(e), 'red'))
+
+def extractExternalScripts(filePath):
+    try:
+        with open(filePath, 'rb') as file:
+            content = file.read().decode('utf-8', errors='ignore')
+            scripts = re.findall(r'<script[^>]* src="(.*?)".*?>', content, re.DOTALL)
+            scripts = list(filter(checkScript, scripts))
+            return scripts
+    except Exception as e:
+        writerr(colored('ERROR extractExternalScripts 1: ' + str(e), 'red'))
+        
+def combineInlineJS():
+    global responseOutputDirectory, INLINE_JS_EXCLUDE
+    try:
+        write(colored('Creating combined inline JS files...', 'cyan'))
+        outputFileTemplate = "combinedInline{}.js"
+        excludedNames = ['index.txt', 'continueResp.tmp', 'responses.tmp']
+        fileList = [name for name in os.listdir(responseOutputDirectory) 
+            if os.path.isfile(os.path.join(responseOutputDirectory, name)) 
+            and not any(name.lower().endswith(ext) for ext in INLINE_JS_EXCLUDE) 
+            and name not in excludedNames 
+            and 'combinedInline' not in name]
+
+        allScripts = {}  # To store all scripts from all files
+        allExternalScripts = [] # To store all external script sources from all files
+        
+        fileCount = len(fileList)
+        currentFile = 1
+        for filename in fileList:
+            filePath = os.path.join(responseOutputDirectory, filename)
+            scripts = extractScripts(filePath)
+            if scripts:
+                allScripts[filename] = scripts
+            allExternalScripts.extend(extractExternalScripts(filePath))
+            
+            # Show progress bar
+            fillTest = currentFile % 2
+            fillChar = "o"
+            if fillTest == 0:
+                fillChar = "O"
+            suffix="Complete "
+            printProgressBar(
+                currentFile,
+                fileCount,
+                prefix="Checking "+str(fileCount)+" files:",
+                suffix=suffix,
+                length=getProgressBarLength(),
+                fill=fillChar
+            )
+            currentFile += 1   
+
+        # Write a file of external javascript files referenced in the inline scripts
+        totalExternal = len(allExternalScripts)
+        if totalExternal > 0:
+            uniqueExternalScripts = set(allExternalScripts)
+            outputFile = os.path.join(responseOutputDirectory, 'combinedInlineSrc.txt')
+            inlineExternalFile = open(outputFile, 'w', encoding='utf-8')
+            for script in uniqueExternalScripts:
+                inlineExternalFile.write(script.strip() + '\n')
+            write(colored('Created file ','cyan')+colored(responseOutputDirectory+'combinedInlineSrc.txt','white')+colored(' (src of external JS)','cyan'))
+            
+        # Write files for all combined inline JS
+        uniqueScripts = set()
+        for scriptsList in allScripts.values():
+            uniqueScripts.update(scriptsList)
+                
+        totalSections = len(uniqueScripts)
+        sectionCounter = 0  # Counter for inline JS sections
+        currentOutputFile = os.path.join(responseOutputDirectory, outputFileTemplate.format(1))
+        currentSectionsWritten = 0  # Counter for sections written in current file
+
+        if totalSections > 0:
+            fileNumber = 1
+            with open(currentOutputFile, 'w', encoding='utf-8') as inlineJSFile:
+                currentScript = 1
+                for script in uniqueScripts:
+                    # Show progress bar
+                    fillTest = currentScript % 2
+                    fillChar = "o"
+                    if fillTest == 0:
+                        fillChar = "O"
+                    suffix="Complete "
+                    printProgressBar(
+                        currentScript,
+                        totalSections,
+                        prefix="Writing "+str(totalSections)+" unique scripts:",
+                        suffix=suffix,
+                        length=getProgressBarLength(),
+                        fill=fillChar
+                    )
+                    sectionCounter += 1
+                    currentSectionsWritten += 1
+                    if currentSectionsWritten > 1000:
+                        # If 1000 sections have been written, switch to the next output file
+                        inlineJSFile.close()
+                        fileNumber = sectionCounter // 1000 + 1
+                        currentOutputFile = os.path.join(responseOutputDirectory, outputFileTemplate.format(fileNumber))
+                        inlineJSFile = open(currentOutputFile, 'w', encoding='utf-8')
+                        currentSectionsWritten = 1 
+                        
+                    # Insert comment line for the beginning of the section
+                    inlineJSFile.write(f"//****** INLINE JS SECTION {sectionCounter} ******//\n\n")
+                    
+                    # Write comments indicating the files the script was found in
+                    files = ''
+                    for filename, scripts_list in allScripts.items():
+                        if script in scripts_list:
+                            files = files + filename + ', '
+
+                    # Write the files the script appears in
+                    inlineJSFile.write('// ' + files.rstrip(', ') + '\n')
+                    
+                    # Write the script content
+                    inlineJSFile.write('\n' + script.strip() + '\n\n')
+                    
+                    currentScript += 1
+                    
+        if totalExternal == 0 and totalSections == 0:
+            write(colored('No scripts found, so no combined JS files written.\n','cyan'))
+        elif fileNumber == 1:
+            write(colored('Created file ','cyan')+colored(responseOutputDirectory+'combinedInline1.js','white')+colored(' (contents of inline JS)\n','cyan'))
+        else:
+            write(colored('Created files ','cyan')+colored(responseOutputDirectory+'combinedInline{1-'+str(fileNumber)+'}.js','white')+colored(' (contents of inline JS)\n','cyan'))
+                    
+    except Exception as e:
+        writerr(colored('ERROR combineInlineJS 1: ' + str(e), 'red'))
         
 # Run waymore
 def main():
-    global args, DEFAULT_TIMEOUT, inputValues, argsInput, linksFound, linkMimes, successCount, failureCount, fileCount, totalResponses, totalPages, indexFile, path, stopSource, stopProgram, VIRUSTOTAL_API_KEY, inputIsSubDomain, argsInput, argsInputHostname, WEBHOOK_DISCORD
+    global args, DEFAULT_TIMEOUT, inputValues, argsInput, linksFound, linkMimes, successCount, failureCount, fileCount, totalResponses, totalPages, indexFile, path, stopSource, stopProgram, VIRUSTOTAL_API_KEY, inputIsSubDomain, argsInputHostname, WEBHOOK_DISCORD, responseOutputDirectory, fileCount
 
     # Tell Python to run the handler() function when SIGINT is received
     signal(SIGINT, handler)
@@ -2906,6 +3055,12 @@ def main():
         action="store_true",
         help="Whether to send a notification to Discord when waymore completes. It requires WEBHOOK_DISCORD to be provided in the config.yml file.",
     )
+    parser.add_argument(
+        '-oijs',
+        '--output-inline-js',
+        action="store_true",
+        help='Whether to save combined inline javascript of all relevant files in the response directory when "-mode R" (or "-mode B") has been used. The files are saved with the name "combined_inline{}.js" where "{}" is the number of the file, saving 1000 unique scripts per file. '
+    )
     parser.add_argument('-v', '--verbose', action='store_true', help="Verbose output")
     parser.add_argument('--version', action='store_true', help="Show version number")
     args = parser.parse_args()
@@ -3010,12 +3165,23 @@ def main():
                 
             # If we want to get actual archived responses from archive.org...
             if (args.mode in ['R','B']) and stopProgram is None:
+                
+                # Get the output directory for responses
+                if args.output_responses != '':
+                    responseOutputDirectory = args.output_responses + '/'
+                else:
+                    responseOutputDirectory = str(DEFAULT_OUTPUT_DIR) + '/results/' + str(argsInput).replace('/','-') + '/'
+            
                 processResponses()
                 
                 # Output details of the responses downloaded
                 if not args.check_only:
                     processResponsesOutput()
             
+                    # If requested, generate the combined inline JS files
+                    if stopProgram is None and fileCount > 0 and args.output_inline_js:
+                        combineInlineJS()
+                    
             if args.check_only:
                 write(colored('NOTE: The time frames are a very rough guide and doesn\'t take into account additonal time for rate limiting.','magenta'))
                 
