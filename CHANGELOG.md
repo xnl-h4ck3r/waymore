@@ -1,5 +1,11 @@
 ## Changelog
 
+- v4.1
+
+  - Changed
+
+    - Removed line `from tqdm import tqdm` as it is not needed and will cause errors if not installed.
+
 - v4.0
 
   - New

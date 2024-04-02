@@ -30,7 +30,6 @@ try:
     from . import __version__
 except:
     pass
-from tqdm import tqdm
 
 # Try to import psutil to show memory usage
 try:
