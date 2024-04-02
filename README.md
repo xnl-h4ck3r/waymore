@@ -43,6 +43,12 @@ OR
 pip install git+https://github.com/xnl-h4ck3r/waymore.git -v
 ```
 
+You can upgrade with
+
+```bash
+pip install --upgrade waymore
+```
+
 ### pipx
 
 Quick setup in isolated python environment using [pipx](https://pypa.github.io/pipx/)
