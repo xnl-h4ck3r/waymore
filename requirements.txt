@@ -6,3 +6,4 @@ termcolor
 psutil
 urlparse3
 tldextract
+tqdm
