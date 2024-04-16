@@ -1780,23 +1780,31 @@ def processWayBackPage(url):
                     return
             
             # Get the URLs and MIME types. Each line is a separate JSON string
-            for line in resp.iter_lines():
-                results = line.decode("utf-8")
-                # Only get MIME Types if --verbose option was selected
-                if verbose():
-                    try:
-                        linkMimes.add(str(results).split(' ')[2])
-                    except Exception as e:
-                        if verbose():
-                            writerr(colored(getSPACER('ERROR processWayBackPage 2: Cannot get MIME type from line: ' + str(line)),'red'))
-                            write(resp.text)
-                try:
+            try:
+                for line in resp.iter_lines():
+                    results = line.decode("utf-8")
                     foundUrl = fixArchiveOrgUrl(str(results).split(' ')[1])
-                    linksFoundAdd(foundUrl)
-                except Exception as e:
-                    if verbose():
-                        writerr(colored(getSPACER('ERROR processWayBackPage 3: Cannot get link from line: ' + str(line)),'red'))         
-                        write(resp.text)       
+                    
+                    # Check the URL exclusions
+                    match = re.search(r'('+re.escape(FILTER_URL).replace(',','|')+')', foundUrl, flags=re.IGNORECASE)
+                    if match is None:
+                        # Only get MIME Types if --verbose option was selected
+                        if verbose():
+                            try:
+                                linkMimes.add(str(results).split(' ')[2])
+                            except Exception as e:
+                                if verbose():
+                                    writerr(colored(getSPACER('ERROR processWayBackPage 2: Cannot get MIME type from line: ' + str(line)),'red'))
+                                    write(resp.text)
+                        try:
+                            linksFoundAdd(foundUrl)
+                        except Exception as e:
+                            if verbose():
+                                writerr(colored(getSPACER('ERROR processWayBackPage 3: Cannot get link from line: ' + str(line)),'red'))         
+                                write(resp.text)       
+            except Exception as e:
+                if verbose():
+                    writerr(colored(getSPACER('ERROR processWayBackPage 4: ' + str(line)),'red'))   
         else:
             pass
     except Exception as e:
@@ -2422,12 +2430,12 @@ def processResponses():
             # This is useful for filtering out captures that are 'too dense' or when looking for unique captures."
             if args.capture_interval == 'none': # get all
                 collapse = ''
-            elif args.capture_interval == 'h': # get at most 1 capture per hour
-                collapse = 'timestamp:10'
-            elif args.capture_interval == 'd': # get at most 1 capture per day
-                collapse = 'timestamp:8'
-            elif args.capture_interval == 'm': # get at most 1 capture per month
-                collapse = 'timestamp:6'
+            elif args.capture_interval == 'h': # get at most 1 capture per URL per hour
+                collapse = 'timestamp:10,original'
+            elif args.capture_interval == 'd': # get at most 1 capture per URL per day
+                collapse = 'timestamp:8,original'
+            elif args.capture_interval == 'm': # get at most 1 capture per URL per month
+                collapse = 'timestamp:6,original'
 
             url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}',collapse) + filterMIME + filterCode + filterLimit + filterFrom + filterTo + filterKeywords
                 

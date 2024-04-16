@@ -1,5 +1,12 @@
 ## Changelog
 
+- v4.2
+
+  - Changed
+
+    - BUG FIX: [Github Issue #45](https://github.com/xnl-h4ck3r/waymore/issues/45) - When getting archived responses from wayback machine, by default it is supposed to get one capture per day per URL (thi interval can be changed with `-ci`). But, it was only getting one response per day, not for all the different URLs per day. Thanks to @zakaria_ounissi for raising this.
+    - BUG FIX: [Github Issue #46](https://github.com/xnl-h4ck3r/waymore/issues/46) - The config `FILTER_URL` list was being applied to links found from all sources, except wayback machine. So if the MIME type wasn't correct, it was possible that links that matched `FILTER_URL` were still included in the output. Thanks to @brutexploiter for raising this.
+
 - v4.1
 
   - Changed
