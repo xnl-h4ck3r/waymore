@@ -83,7 +83,7 @@ argsInputHostname = ''
 responseOutputDirectory = ''
 
 # Source Provider URLs
-WAYBACK_URL = 'https://web.archive.org/cdx/search/cdx?url={DOMAIN}&collapse={COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest'
+WAYBACK_URL = 'https://web.archive.org/cdx/search/cdx?url={DOMAIN}{COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest'
 CCRAWL_INDEX_URL = 'https://index.commoncrawl.org/collinfo.json'
 ALIENVAULT_URL = 'https://otx.alienvault.com/api/v1/indicators/{TYPE}/{DOMAIN}/url_list?limit=500'
 URLSCAN_URL = 'https://urlscan.io/api/v1/search/?q=domain:{DOMAIN}&size=10000'
@@ -1851,11 +1851,15 @@ def getWaybackUrls():
             session.mount('https://', HTTP_ADAPTER)
             session.mount('http://', HTTP_ADAPTER)
             resp = session.get(url+'&showNumPages=True', headers={"User-Agent":userAgent}) 
-            totalPages = int(resp.text.strip())
-            
-            # If the argument to limit the requests was passed and the total pages is larger than that, set to the limit
-            if args.limit_requests != 0 and totalPages > args.limit_requests:
-                totalPages = args.limit_requests
+            # Try to get the total number of pages. If there is a problem, we'll return totalPages = 0 which means we'll get everything back in one request 
+            try:
+                totalPages = int(resp.text.strip())
+                
+                # If the argument to limit the requests was passed and the total pages is larger than that, set to the limit
+                if args.limit_requests != 0 and totalPages > args.limit_requests:
+                    totalPages = args.limit_requests
+            except:
+                totalPages = -1
         except Exception as e:
             try:
                 # If the rate limit was reached end now
@@ -1880,31 +1884,39 @@ def getWaybackUrls():
                 else:
                     writerr(colored(getSPACER('[ ERR ] Unable to get links from Wayback Machine (archive.org): ' + str(e)), 'red'))
             return
-
+        
         if args.check_only:
-            checkWayback = totalPages
-            write(colored('Get URLs from Wayback Machine: ','cyan')+colored(str(checkWayback)+' requests','white'))
+            if totalPages < 0:
+                write(colored('Due to a change in Wayback Machine API, all URLs will be retrieved in one request and it is not possible to determine how long it will take, so please ignore this.','cyan'))
+            else:
+                checkWayback = totalPages
+                write(colored('Get URLs from Wayback Machine: ','cyan')+colored(str(checkWayback)+' requests','white'))
         else:
             if verbose():
                 write(colored('The archive URL requested to get links: ','magenta')+colored(url+'\n','white'))
             
-            # if the page number was found then display it, but otherwise we will just try to increment until we have everything       
-            write(colored('\rGetting links from ' + str(totalPages) + ' Wayback Machine (archive.org) API requests (this can take a while for some domains)...\r','cyan'))
+            if totalPages < 0:
+                write(colored('\rGetting links from Wayback Machine (archive.org) with one request (this can take a while for some domains)...\r','cyan'))
 
-            # Get a list of all the page URLs we need to visit
-            pages = []
-            if totalPages == 1:
-                pages.append(url)
+                processWayBackPage(url)
             else:
-                for page in range(0, totalPages):
-                    pages.append(url+str(page))
-            
-            # Process the URLs from web archive
-            if stopProgram is None:
-                p = mp.Pool(args.processes)
-                p.map(processWayBackPage, pages)
-                p.close()
-                p.join()
+                # if the page number was found then display it, but otherwise we will just try to increment until we have everything  
+                write(colored('\rGetting links from ' + str(totalPages) + ' Wayback Machine (archive.org) API requests (this can take a while for some domains)...\r','cyan'))
+
+                # Get a list of all the page URLs we need to visit
+                pages = []
+                if totalPages == 1:
+                    pages.append(url)
+                else:
+                    for page in range(0, totalPages):
+                        pages.append(url+str(page))
+                
+                # Process the URLs from web archive
+                if stopProgram is None:
+                    p = mp.Pool(args.processes)
+                    p.map(processWayBackPage, pages)
+                    p.close()
+                    p.join()
                 
             # Show the MIME types found (in case user wants to exclude more)
             if verbose() and len(linkMimes) > 0 :
@@ -2431,11 +2443,11 @@ def processResponses():
             if args.capture_interval == 'none': # get all
                 collapse = ''
             elif args.capture_interval == 'h': # get at most 1 capture per URL per hour
-                collapse = 'timestamp:10,original'
+                collapse = '&collapse=timestamp:10'
             elif args.capture_interval == 'd': # get at most 1 capture per URL per day
-                collapse = 'timestamp:8,original'
+                collapse = '&collapse=timestamp:8'
             elif args.capture_interval == 'm': # get at most 1 capture per URL per month
-                collapse = 'timestamp:6,original'
+                collapse = '&collapse=timestamp:6'
 
             url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}',collapse) + filterMIME + filterCode + filterLimit + filterFrom + filterTo + filterKeywords
                 

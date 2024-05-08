@@ -1,10 +1,18 @@
 ## Changelog
 
+- v4.3
+
+  - Changed
+
+    - Wayback Machine seemed to have made some changes to their CDX API without any notice or documentation. This caused problems getting URLs for `-mode U` because the API pagination no longer worked. If a number of pages cannot be returned, then all links will be retrieved in one request. However, if they "fix" the problem and pagination starts working again, it will revert to previous code that will get results a page at a time.
+    - Although the bug fix for [Github Issue #45](https://github.com/xnl-h4ck3r/waymore/issues/45) appeared to be working fine since the last version, the "changes" made by Wayback machine seemed to have broken that too. The code had to be refactored to work (i.e. don't include the `collapse` parameter at all if `none`), but also no longer works with multiple fields.
+    - When `-co` is used, there is no way to tell how long the results will take from Wayback machine now because all the data is retrieved in one request. While pagination is broken, this will just return `Unknown` but will revert back to previous functionality if pagination is fixed.
+
 - v4.2
 
   - Changed
 
-    - BUG FIX: [Github Issue #45](https://github.com/xnl-h4ck3r/waymore/issues/45) - When getting archived responses from wayback machine, by default it is supposed to get one capture per day per URL (thi interval can be changed with `-ci`). But, it was only getting one response per day, not for all the different URLs per day. Thanks to @zakaria_ounissi for raising this.
+    - BUG FIX: [Github Issue #45](https://github.com/xnl-h4ck3r/waymore/issues/45) - When getting archived responses from wayback machine, by default it is supposed to get one capture per day per URL (this interval can be changed with `-ci`). But, it was only getting one response per day, not for all the different URLs per day. Thanks to @zakaria_ounissi for raising this.
     - BUG FIX: [Github Issue #46](https://github.com/xnl-h4ck3r/waymore/issues/46) - The config `FILTER_URL` list was being applied to links found from all sources, except wayback machine. So if the MIME type wasn't correct, it was possible that links that matched `FILTER_URL` were still included in the output. Thanks to @brutexploiter for raising this.
 
 - v4.1
