@@ -706,23 +706,55 @@ def fixArchiveOrgUrl(url):
             url = url[0:newline]
     return url
 
-# Add a link to the linksFound collection
-def linksFoundAdd(link):
+# Add a link to the linksFound collection for archived responses (included timestamp preifx)
+def linksFoundResponseAdd(link):
     global linksFound, argsInput, argsInputHostname
-    # If the link specifies port 80 or 443, e.g. http://example.com:80, then remove the port 
+     
     try:
         if inputIsDomainANDPath:
             checkInput = argsInput
         else:
             checkInput = argsInputHostname
+        
+        # Remove the timestamp
+        linkWithoutTimestamp = link.split('/', 1)[-1]
+        
+        # If the link specifies port 80 or 443, e.g. http://example.com:80, then remove the port
+        parsed = urlparse(linkWithoutTimestamp.strip())
+        if parsed.port in (80, 443):
+            new_netloc = parsed.hostname
+            parsed_url = parsed._replace(netloc=new_netloc).geturl()
+        else:
+            parsed_url = linkWithoutTimestamp
+
         # Don't write it if the link does not contain the requested domain (this can sometimes happen)
-        if link.find(checkInput) >= 0:
-            parsed = urlparse(link.strip())
-            if parsed.netloc.find(':80') >= 0 or parsed.netloc.fnd(':443') >= 0:
-                newNetloc = parsed.netloc.split(':')[0]
-                parsed = parsed._replace(netloc=newNetloc).geturl()
-            linksFound.add(parsed)
-    except:
+        if parsed_url.find(checkInput) >= 0:
+            linksFound.add(link)
+    except Exception as e:
+        linksFound.add(link)
+        
+# Add a link to the linksFound collection
+def linksFoundAdd(link):
+    global linksFound, argsInput, argsInputHostname
+    
+    try:
+        if inputIsDomainANDPath:
+            checkInput = argsInput
+        else:
+            checkInput = argsInputHostname
+        
+        # If the link specifies port 80 or 443, e.g. http://example.com:80, then remove the port
+        parsed = urlparse(link.strip())
+        if parsed.port in (80, 443):
+            new_netloc = parsed.hostname
+            parsed_url = parsed._replace(netloc=new_netloc).geturl()
+        else:
+            parsed_url = link
+        
+        # Don't write it if the link does not contain the requested domain (this can sometimes happen)
+        if parsed_url.find(checkInput) >= 0:
+            linksFound.add(link)
+    except Exception as e:
         linksFound.add(link)
     
 def processArchiveUrl(url):
@@ -2347,7 +2379,7 @@ def getVirusTotalUrls():
         
     except Exception as e:
         writerr(colored('ERROR getVirusTotalUrls 1: ' + str(e), 'red'))
-        
+
 def processResponses():
     """
     Get archived responses from Wayback Machine (archive.org)
@@ -2513,13 +2545,14 @@ def processResponses():
                 except:
                     pass
             
-            # Go through the response to save the links found        
+            # Go through the response to save the links found    
             for line in resp.iter_lines():
                 try:
                     results = line.decode("utf-8") 
-                    timestamp = results.split(' ')[0]
-                    originalUrl = results.split(' ')[1]
-                    linksFoundAdd(timestamp+'/'+originalUrl)
+                    parts = results.split(' ', 2)
+                    timestamp = parts[0]
+                    originalUrl = parts[1]
+                    linksFoundResponseAdd(timestamp+'/'+originalUrl)
                 except Exception as e:
                     writerr(colored(getSPACER('ERROR processResponses 3: Cannot to get link from line: '+str(line)), 'red'))
             
@@ -2540,6 +2573,16 @@ def processResponses():
                 
         # Get the total number of responses we will try to get and set the current file count to the success count
         totalResponses = len(linkRequests)
+        
+        # If there are no reponses to download, diaplay an error and exit
+        if totalResponses == 0:
+            try:
+                if originalUrl:
+                    writerr(colored(getSPACER('Failed to get links from Wayback Machine (archive.org) - there were results (e.g. "'+originalUrl+'") but they didn\'t match the input you gave. Check input and try again.'), 'red'))
+            except:
+                writerr(colored(getSPACER('Failed to get links from Wayback Machine (archive.org) - check input and try again.'), 'red'))
+            return
+        
         fileCount = successCount
         
         if args.check_only:

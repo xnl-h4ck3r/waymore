@@ -1,5 +1,17 @@
 ## Changelog
 
+- v4.4
+
+  - New
+
+    - When using `-mode R`, if input was used that does find results, but then those reults don't match the input given, then display a message. For example, if input is `www.hackerone.com/xnl` then wayback machine returns links for `http://hackerone.com/xnl` (without the `www.`). These don't match so aren't returned, but a message will give the user and clue as to what to change the input to if they did want those.
+    
+  - Changed
+
+    - BUG FIX:Rewrite the logic in `linksFoundAdd` and correct a typo that always made a runtime error occur and always add a link, without doing the check to see if the domain matches what was searched for (it's rare other URLs are included anyway). Also use new `linksFoundResponseAdd` with similar logic, but remove the prefixed timestamp which occurs with response links.
+    - BUG FIX: If a URL is passed (instead of just a domain) as input for `-mode R` to download archived responses, it would not download anything because it would check the result contains the input, but the default port number is included in wayback results, but not included in the input. This has been corrected.
+    - Remove `argparse` from `setup.py` and `requirements.txt` because it is a standard Python module.
+
 - v4.3
 
   - Changed

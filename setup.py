@@ -34,7 +34,7 @@ setup(
     author="@xnl-h4ck3r",
     url="https://github.com/xnl-h4ck3r/waymore",
     py_modules=["waymore"],
-    install_requires=["argparse","requests","pyyaml","termcolor","psutil","urlparse3","tldextract"],
+    install_requires=["requests","pyyaml","termcolor","psutil","urlparse3","tldextract"],
     entry_points={
         'console_scripts': [
             'waymore = waymore.waymore:main',
