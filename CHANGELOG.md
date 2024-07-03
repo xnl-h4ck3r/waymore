@@ -1,11 +1,21 @@
 ## Changelog
 
+- v4.5
+
+  - Change
+
+    - BUG FIX: When `-f`/`--filter-responses-only` is used, and retrieving Wayback Archive links, the links were still being filtered for URL exclusions, e.g. the extensions. This has been fixed and should return more links in that situation.
+    - BUG FIX: If there is an invalid response from Alien Vault, then the error `ERROR: getAlienVaultUrls 1: Expecting value: line 1 column 1 (char 0)` is raised. This will be handled properly.
+    - BUG FIX: If there is an invalid response from URLScan, then the error `ERROR getURLScanUrls 1: local variable 'jsonResp' referenced before assignment` is raised. This will be handled properly.
+    - BUG FIX: If there is an invalid response from Virus Total, then the error `ERROR getVirusTotalUrls 1: Expecting value: line 1 column 1 (char 0)` is raised. This will be handled properly.
+    - BUG FIX: When retrieving links from the Wayback Archive, and the user presses Ctrl-C to cancel the program, the error `[ ERR ] Error getting response for page  - local variable 'resp' referenced before assignment` was displayed. This will no longer be shown.
+
 - v4.4
 
   - New
 
     - When using `-mode R`, if input was used that does find results, but then those reults don't match the input given, then display a message. For example, if input is `www.hackerone.com/xnl` then wayback machine returns links for `http://hackerone.com/xnl` (without the `www.`). These don't match so aren't returned, but a message will give the user and clue as to what to change the input to if they did want those.
-    
+
   - Changed
 
     - BUG FIX:Rewrite the logic in `linksFoundAdd` and correct a typo that always made a runtime error occur and always add a link, without doing the check to see if the domain matches what was searched for (it's rare other URLs are included anyway). Also use new `linksFoundResponseAdd` with similar logic, but remove the prefixed timestamp which occurs with response links.

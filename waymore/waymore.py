@@ -1384,11 +1384,15 @@ def getAlienVaultUrls():
         # Carry on if something was found
         if resp.text.lower().find('"error": "') < 0:
 
-            # Get the JSON response
-            jsonResp = json.loads(resp.text.strip())
-            
-            # Try to get the number of results
-            totalUrls = jsonResp['full_size']
+            try:
+                # Get the JSON response
+                jsonResp = json.loads(resp.text.strip())
+                
+                # Try to get the number of results
+                totalUrls = int(jsonResp['full_size'])
+            except:
+                writerr(colored(getSPACER('[ ERR ] There was an unexpected response from the Alien Vault API'),'red'))
+                totalUrls = 0
             
             # If there are results, carry on
             if totalUrls > 0 or args.check_only:
@@ -1588,19 +1592,28 @@ def getURLScanUrls():
             writerr(colored(getSPACER('[ ' + str(resp.status_code) + ' ] Unable to get links from urlscan.io'),'red'))
             return
         
-        # Get the JSON response
-        jsonResp = json.loads(resp.text.strip())
+        try:
+            # Get the JSON response
+            jsonResp = json.loads(resp.text.strip())
 
-        # Get the number of results
-        totalUrls = jsonResp['total']
+            # Get the number of results
+            totalUrls = int(jsonResp['total'])
+        except:
+            writerr(colored(getSPACER('[ ERR ] There was an unexpected response from the URLScan API'),'red'))
+            totalUrls = 0
         
+        # Carry on if something was found
         if args.check_only:
-            hasMore = jsonResp['has_more']
-            if hasMore:
-                write(colored('Get URLs from URLScan: ','cyan')+colored('UNKNOWN requests','white'))
-            else:
-                write(colored('Get URLs from URLScan: ','cyan')+colored('1 request','white'))
+            try:
+                hasMore = jsonResp['has_more']
+                if hasMore:
+                    write(colored('Get URLs from URLScan: ','cyan')+colored('UNKNOWN requests','white'))
+                else:
+                    write(colored('Get URLs from URLScan: ','cyan')+colored('1 request','white'))
+            except:
+                pass
             checkURLScan = 1
+            
         else:
             # Carry on if something was found
             if int(totalUrls) > 0:
@@ -1746,6 +1759,7 @@ def processWayBackPage(url):
         if not stopSource:
             try:             
                 # Choose a random user agent string to use for any requests
+                resp = None
                 userAgent = random.choice(USER_AGENT)
                 page = url.split('page=')[1]
                 session = requests.Session()
@@ -1817,8 +1831,11 @@ def processWayBackPage(url):
                     results = line.decode("utf-8")
                     foundUrl = fixArchiveOrgUrl(str(results).split(' ')[1])
                     
-                    # Check the URL exclusions
-                    match = re.search(r'('+re.escape(FILTER_URL).replace(',','|')+')', foundUrl, flags=re.IGNORECASE)
+                    # If --filter-responses-only wasn't used, then check the URL exclusions
+                    if args.filter_responses_only:
+                        match = None
+                    else:
+                        match = re.search(r'('+re.escape(FILTER_URL).replace(',','|')+')', foundUrl, flags=re.IGNORECASE)
                     if match is None:
                         # Only get MIME Types if --verbose option was selected
                         if verbose():
@@ -2332,29 +2349,33 @@ def getVirusTotalUrls():
             return
         
         # Get the JSON response
-        jsonResp = json.loads(resp.text.strip())
+        try:
+            jsonResp = json.loads(resp.text.strip())
   
-        # Get the different URLs
-        if args.no_subs:
-            subDomains = []
-        else:
-            try:
-                subDomains = jsonResp['subdomains']
-            except Exception as e:
+            # Get the different URLs
+            if args.no_subs:
                 subDomains = []
-        try:  
-            detectedUrls = [entry['url'] for entry in jsonResp.get('detected_urls', [])]
-        except Exception as e:
-            detectedUrls = []
-        try:
-            undetectedUrls = [entry[0] for entry in jsonResp.get('undetected_urls', [])]
-        except Exception as e:
-            undetectedUrls = []
-        try:
-            totalUrls = set(subDomains + detectedUrls + undetectedUrls)
-        except Exception as e:
+            else:
+                try:
+                    subDomains = jsonResp['subdomains']
+                except Exception as e:
+                    subDomains = []
+            try:  
+                detectedUrls = [entry['url'] for entry in jsonResp.get('detected_urls', [])]
+            except Exception as e:
+                detectedUrls = []
+            try:
+                undetectedUrls = [entry[0] for entry in jsonResp.get('undetected_urls', [])]
+            except Exception as e:
+                undetectedUrls = []
+            try:
+                totalUrls = set(subDomains + detectedUrls + undetectedUrls)
+            except Exception as e:
+                totalUrls = []
+        except:
+            writerr(colored(getSPACER('[ ERR ] There was an unexpected response from the VirusTotal API'),'red'))
             totalUrls = []
-        
+            
         if args.check_only:
             write(colored('Get URLs from VirusTotal: ','cyan')+colored('1 request','white'))
             checkVirusTotal = 1
