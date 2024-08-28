@@ -54,7 +54,7 @@ pip install --upgrade waymore
 Quick setup in isolated python environment using [pipx](https://pypa.github.io/pipx/)
 
 ```bash
-pipx install git+https://github.com/xnl-h4ck3r/waymore.git
+pipx install git+https://github.com/xnl-h4ck3r/waymore
 ```
 
 ## Usage
