@@ -136,6 +136,7 @@ DEFAULT_FILTER_KEYWORDS = 'admin,login,logon,signin,signup,register,registration
 # Yaml config values
 FILTER_URL = ''
 FILTER_MIME = ''
+MATCH_MIME = ''
 FILTER_CODE = ''
 MATCH_CODE  = ''
 FILTER_KEYWORDS = ''
@@ -313,8 +314,21 @@ def showOptions():
         else:
             write(colored('-n: ' +str(args.no_subs), 'magenta')+colored(' Sub domains are included in the search.','white'))
         
-        write(colored('-xwm: ' +str(args.xwm), 'magenta')+colored(' Whether to exclude checks for links from Wayback Machine (archive.org)','white'))    
-        write(colored('-xcc: ' +str(args.xcc), 'magenta')+colored(' Whether to exclude checks for links from commoncrawl.org','white'))
+        providers = ''
+        if not args.xwm:
+            providers = providers + 'Wayback, '
+        if not args.xcc:
+            providers = providers + 'CommonCrawl, '
+        if not args.xav:
+            providers = providers + 'Alien Vault OTX, '
+        if not args.xus:
+            providers = providers + 'URLScan, '
+        if not args.xvt:
+            providers = providers + 'VirusTotal, '
+        if providers == '':
+            providers = 'None'
+        write(colored('Providers: ' +str(providers.strip(', ')), 'magenta')+colored(' Which providers to check for URLs.','white'))
+        
         if not args.xcc:
             if args.lcc ==0 and args.lcy == 0:
                 write(colored('-lcc: ' +str(args.lcc), 'magenta')+colored(' Search ALL Common Crawl index collections.','white'))
@@ -325,13 +339,12 @@ def showOptions():
                     if args.lcc != 0:
                         write(colored('-lcc: ' +str(args.lcc), 'magenta')+colored(' The number of latest Common Crawl index collections to be searched.','white'))
                     write(colored('-lcy: ' +str(args.lcy), 'magenta')+colored(' Search all Common Crawl index collections with data from year '+str(args.lcy)+' and after.','white'))
-        write(colored('-xav: ' +str(args.xav), 'magenta')+colored(' Whether to exclude checks for links from alienvault.com','white'))
-        write(colored('-xus: ' +str(args.xus), 'magenta')+colored(' Whether to exclude checks for links from urlscan.io','white'))
+        
         if URLSCAN_API_KEY == '':
             write(colored('URLScan API Key:', 'magenta')+colored(' {none} - You can get a FREE or paid API Key at https://urlscan.io/user/signup which will let you get more back, and quicker.','white'))
         else:
             write(colored('URLScan API Key: ', 'magenta')+colored(URLSCAN_API_KEY))
-        write(colored('-xvt: ' +str(args.xvt), 'magenta')+colored(' Whether to exclude checks for links from virustotal.com','white'))
+        
         if VIRUSTOTAL_API_KEY == '':
             write(colored('VirusTotal API Key:', 'magenta')+colored(' {none} - You can get a FREE or paid API Key at https://www.virustotal.com/gui/join-us which will let you get some extra URLs.','white'))
         else:
@@ -382,11 +395,19 @@ def showOptions():
             write(colored('-mc: ' +str(args.mc), 'magenta')+colored(' Only retrieve URLs and Responses that match these HTTP Status codes.','white'))
         else:
             if args.fc:
-                write(colored('-fc: ' +str(args.mc), 'magenta')+colored(' Don\'t retrieve URLs and Responses that match these HTTP Status codes.','white'))
-        write(colored('MIME Type exclusions: ', 'magenta')+colored(FILTER_MIME))
+                write(colored('-fc: ' +str(args.fc), 'magenta')+colored(' Don\'t retrieve URLs and Responses that match these HTTP Status codes.','white'))
         if not args.mc and args.fc:
             write(colored('Response Code exclusions: ', 'magenta')+colored(FILTER_CODE))      
         write(colored('Response URL exclusions: ', 'magenta')+colored(FILTER_URL))  
+        
+        if args.mt:
+            write(colored('-mt: ' +str(args.mt.lower()), 'magenta')+colored(' Only retrieve URLs and Responses that match these MIME Types.','white')+colored(' NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you','yellow'))
+        else:
+            if args.ft:
+                write(colored('-ft: ' +str(args.ft.lower()), 'magenta')+colored(' Don\'t retrieve URLs and Responses that match these MIME Types.','white')+colored(' NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you','yellow'))
+            else:
+                write(colored('MIME Type exclusions: ', 'magenta')+colored(FILTER_MIME)+colored(' Don\'t retrieve URLs and Responses that match these MIME Types.','white')+colored(' NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you','yellow'))
+                
         if args.keywords_only and args.keywords_only == '#CONFIG':
             if FILTER_KEYWORDS == '':
                 write(colored('Keywords only: ', 'magenta')+colored('It looks like no keywords have been set in config.yml file.','red'))
@@ -423,7 +444,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD, DEFAULT_OUTPUT_DIR
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD, DEFAULT_OUTPUT_DIR, MATCH_MIME
     try:
         
         # Set terminal width
@@ -467,7 +488,7 @@ def getConfig():
         # Set up an HTTPAdaptor for retry strategy for Common Crawl when making requests
         try:
             retry= Retry(
-                total=args.retries+20,
+                total=args.retries+3,
                 backoff_factor=1.1,
                 status_forcelist=[503],
                 raise_on_status=False,
@@ -505,14 +526,22 @@ def getConfig():
                 writerr(colored('Unable to read "FILTER_URL" from config.yml - default set', 'red'))
                 FILTER_URL = DEFAULT_FILTER_URL
 
-            try:
-                FILTER_MIME = config.get('FILTER_MIME')
-                if str(FILTER_MIME) == 'None':
-                    writerr(colored('No value for "FILTER_MIME" in config.yml - default set', 'yellow'))
-                    FILTER_MIME = ''
-            except Exception as e:
-                writerr(colored('Unable to read "FILTER_MIME" from config.yml - default set', 'red'))
-                FILTER_MIME = DEFAULT_FILTER_MIME
+            # If the argument -ft was passed, don't try to get from the config
+            if args.ft:
+                FILTER_MIME = args.ft.lower()
+            else:
+                try:
+                    FILTER_MIME = config.get('FILTER_MIME')
+                    if str(FILTER_MIME) == 'None':
+                        writerr(colored('No value for "FILTER_MIME" in config.yml - default set', 'yellow'))
+                        FILTER_MIME = ''
+                except Exception as e:
+                    writerr(colored('Unable to read "FILTER_MIME" from config.yml - default set', 'red'))
+                    FILTER_MIME = DEFAULT_FILTER_MIME
+            
+            # Set the match codes if they were passed
+            if args.mt:
+                MATCH_MIME = args.mt.lower()
             
             # If the argument -fc was passed, don't try to get from the config
             if args.fc:
@@ -530,7 +559,7 @@ def getConfig():
             # Set the match codes if they were passed
             if args.mc:
                 MATCH_CODE = args.mc
-            
+
             try:
                 URLSCAN_API_KEY = config.get('URLSCAN_API_KEY')
                 if str(URLSCAN_API_KEY) == 'None':
@@ -618,7 +647,9 @@ def getConfig():
         # Use defaults if required
         if useDefaults:
             FILTER_URL = DEFAULT_FILTER_URL
+            MATCH_MIME = ''
             FILTER_MIME = DEFAULT_FILTER_MIME
+            MATCH_CODE = ''
             FILTER_CODE = DEFAULT_FILTER_CODE
             URLSCAN_API_KEY = ''
             VIRUSTOTAL_API_KEY = ''
@@ -1224,6 +1255,44 @@ def validateArgStatusCodes(x):
         raise argparse.ArgumentTypeError('Pass HTTP status codes separated by a comma')     
     return x
 
+def validateArgMimeTypes(x):
+    """
+    Validate the -ft and -mt arguments
+    The passed values will be changed to lower case.
+    Only values matching the regex '[a-z]+\/[a-z0-9\-\+]+' separated by a comma
+    """
+    invalid = False
+    x = x.lower()
+    mimeTypes = x.split(',')
+    for mimeType in mimeTypes:
+        if not re.fullmatch(r'[a-z]+/[a-z0-9\-\+]+', mimeType):
+            invalid = True
+            break
+    if invalid:
+        raise argparse.ArgumentTypeError('Pass MIME Types separated by a comma, e.g. text/html,text/xml')     
+    return x
+
+def validateArgProviders(x):
+    """
+    Validate the --providers argument
+    Only the following values in a comma separated list are accepted:
+    - wayback
+    - commoncrawl
+    - otx
+    - urlscan
+    - virustotal
+    """
+    invalid = False
+    x = x.lower()
+    providers = x.split(',')
+    for provider in providers:
+        if not re.fullmatch(r'(wayback|commoncrawl|otx|urlscan|virustotal)', provider):
+            invalid = True
+            break
+    if invalid:
+        raise argparse.ArgumentTypeError('Pass providers separated by a comma, e.g. wayback,commoncrawl,otx,urlscan,virustotal')     
+    return x
+
 def processAlienVaultPage(url):
     """
     Get URLs from a specific page of otx.alienvault.org API for the input domain
@@ -1458,7 +1527,6 @@ def processURLScanUrl(url, httpCode, mimeType):
                     addLink = False
         
             # If the user didn't requested -f / --filter-responses-only then check http code
-            # Note we can't check MIME filter because it is not returned by URLScan API
             if addLink and not args.filter_responses_only: 
                 
                 # Compare the HTTP code against the Code exclusions and matches
@@ -1488,13 +1556,18 @@ def processURLScanUrl(url, httpCode, mimeType):
                                     
                 # Check the MIME exclusions
                 if mimeType != '':
-                    match = re.search(r'('+re.escape(FILTER_MIME).replace(',','|')+')', mimeType, flags=re.IGNORECASE)
-                    if match is not None:
-                        addLink = False
+                    if MATCH_MIME != '':
+                        match = re.search(r'('+re.escape(MATCH_MIME).replace(',','|')+')', mimeType, flags=re.IGNORECASE)
+                        if match is None:
+                            addLink = False
                     else:
-                        # Add MIME Types if --verbose option was selected
-                        if verbose():
-                            linkMimes.add(mimeType)            
+                        match = re.search(r'('+re.escape(FILTER_MIME).replace(',','|')+')', mimeType, flags=re.IGNORECASE)
+                        if match is not None:
+                            addLink = False
+                                
+                # Add MIME Types if --verbose option was selected
+                if verbose():
+                    linkMimes.add(mimeType)            
                     
         # Add link if it passed filters        
         if addLink:
@@ -1869,8 +1942,14 @@ def getWaybackUrls():
     # Write the file of URL's for the passed domain/URL
     try:
         stopSource = False
-        # If there any + in the MIME types, e.g. image/svg+xml, then replace the + with a . otherwise the wayback API does not recognise it
-        filterMIME = '&filter=!mimetype:warc/revisit|' + re.escape(FILTER_MIME).replace(',','|').replace('+','.') 
+        
+        if MATCH_MIME != '':
+            filterMIME = '&filter=mimetype:' + re.escape(MATCH_MIME).replace(',','|')
+        else:
+            filterMIME = '&filter=!mimetype:warc/revisit|' + re.escape(FILTER_MIME).replace(',','|')
+        # If there any \+ in the MIME types, e.g. image/svg\+xml (the backslash is because it was previosuly escaped), then replace the \+ with a . otherwise the wayback API does not recognise it
+        filterMIME = filterMIME.replace('\+','.')
+
         if MATCH_CODE != '':
             filterCode = '&filter=statuscode:' + re.escape(MATCH_CODE).replace(',','|')
         else:
@@ -1992,9 +2071,13 @@ def processCommonCrawlCollection(cdxApiUrl):
         
         if not stopSource:
             # Set mime content type filter
-            filterMIME = '&filter=!~mime:(warc/revisit|' 
-            if FILTER_MIME.strip() != '':
-                filterMIME = filterMIME + re.escape(FILTER_MIME).replace(',','|')
+            if MATCH_MIME.strip() != '':
+                filterMIME = '&filter=~mime:('
+                filterMIME = filterMIME + re.escape(MATCH_MIME).replace(',','|')
+            else:
+                filterMIME = '&filter=!~mime:(warc/revisit|' 
+                if FILTER_MIME.strip() != '':
+                    filterMIME = filterMIME + re.escape(FILTER_MIME).replace(',','|')
             filterMIME = filterMIME + ')'
             
             # Set status code filter
@@ -2186,9 +2269,13 @@ def getCommonCrawlUrls():
         originalLinkCount = len(linksFound)
         
         # Set mime content type filter
-        filterMIME = '&filter=!~mime:(warc/revisit|' 
-        if FILTER_MIME.strip() != '':
-            filterMIME = filterMIME + re.escape(FILTER_MIME).replace(',','|')
+        if MATCH_MIME.strip() != '':
+            filterMIME = '&filter=~mime:('
+            filterMIME = filterMIME + re.escape(MATCH_MIME).replace(',','|')
+        else:
+            filterMIME = '&filter=!~mime:(warc/revisit|' 
+            if FILTER_MIME.strip() != '':
+                filterMIME = filterMIME + re.escape(FILTER_MIME).replace(',','|')
         filterMIME = filterMIME + ')'
         
         # Set status code filter
@@ -2211,32 +2298,34 @@ def getCommonCrawlUrls():
         # Get the Common Crawl index collections
         cdxApiUrls = getCommonCrawlIndexes()
         
-        if args.check_only:
-            if args.lcc < len(cdxApiUrls):
-                checkCommonCrawl = args.lcc+1
+        # If there were URLs returned then continue
+        if cdxApiUrls:
+            if args.check_only:
+                if args.lcc < len(cdxApiUrls):
+                    checkCommonCrawl = args.lcc+1
+                else:
+                    checkCommonCrawl = len(cdxApiUrls)+1
+                write(colored('Get URLs from Common Crawl: ','cyan')+colored(str(checkCommonCrawl)+' requests','white'))
             else:
-                checkCommonCrawl = len(cdxApiUrls)+1
-            write(colored('Get URLs from Common Crawl: ','cyan')+colored(str(checkCommonCrawl)+' requests','white'))
-        else:
-            write(colored('\rGetting links from the latest ' + str(len(cdxApiUrls)) + ' commoncrawl.org index collections (this can take a while for some domains)...\r','cyan'))
+                write(colored('\rGetting links from the latest ' + str(len(cdxApiUrls)) + ' commoncrawl.org index collections (this can take a while for some domains)...\r','cyan'))
+                    
+                # Process the URLs from common crawl        
+                if stopProgram is None:
+                    p = mp.Pool(args.processes)
+                    p.map(processCommonCrawlCollection, cdxApiUrls)
+                    p.close()
+                    p.join()
+                                
+                # Show the MIME types found (in case user wants to exclude more)
+                if verbose() and len(linkMimes) > 0:
+                    linkMimes.discard('warc/revisit')
+                    write(getSPACER(colored('MIME types found: ','magenta')+colored(str(linkMimes),'white'))+'\n')
                 
-            # Process the URLs from common crawl        
-            if stopProgram is None:
-                p = mp.Pool(args.processes)
-                p.map(processCommonCrawlCollection, cdxApiUrls)
-                p.close()
-                p.join()
-                            
-            # Show the MIME types found (in case user wants to exclude more)
-            if verbose() and len(linkMimes) > 0:
-                linkMimes.discard('warc/revisit')
-                write(getSPACER(colored('MIME types found: ','magenta')+colored(str(linkMimes),'white'))+'\n')
-            
-            linkCount = len(linksFound) - originalLinkCount
-            if args.xwm:
-                write(getSPACER(colored('Links found on commoncrawl.org: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
-            else:
-                write(getSPACER(colored('Extra links found on commoncrawl.org: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+                linkCount = len(linksFound) - originalLinkCount
+                if args.xwm:
+                    write(getSPACER(colored('Links found on commoncrawl.org: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+                else:
+                    write(getSPACER(colored('Extra links found on commoncrawl.org: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
                     
     except Exception as e:
         writerr(colored('ERROR getCommonCrawlUrls 1: ' + str(e), 'red'))
@@ -2478,8 +2567,11 @@ def processResponses():
             linksFound = set()
             
             # Set mime content type filter
-            filterMIME = '&filter=!mimetype:warc/revisit' 
-            if FILTER_MIME.strip() != '':
+            filterMIME = ''
+            if MATCH_MIME.strip() != '':
+                filterMIME = '&filter=mimetype:' + re.escape(MATCH_MIME).replace(',','|')
+            else:
+                filterMIME = '&filter=!mimetype:warc/revisit' 
                 filterMIME = filterMIME + '|' + re.escape(FILTER_MIME).replace(',','|')
                 
             # Set status code filter
@@ -2950,10 +3042,22 @@ def main():
         type=validateArgStatusCodes,
     )
     parser.add_argument(
+        '-ft',
+        action='store',
+        help='Filter MIME Types for retrieved URLs and responses. Comma separated list of MIME Types (default: the FILTER_MIME values from config.yml). Passing this argument will override the value from config.yml. NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you.',
+        type=validateArgMimeTypes,
+    )
+    parser.add_argument(
         '-mc',
         action='store',
         help='Only Match HTTP status codes for retrieved URLs and responses. Comma separated list of codes. Passing this argument overrides the config FILTER_CODE and -fc.',
         type=validateArgStatusCodes,
+    )
+    parser.add_argument(
+        '-mt',
+        action='store',
+        help='Only MIME Types for retrieved URLs and responses. Comma separated list of MIME types. Passing this argument overrides the config FILTER_MIME and -ft. NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you.',
+        type=validateArgMimeTypes,
     )
     parser.add_argument(
         '-l',
@@ -3031,10 +3135,18 @@ def main():
         default=False
     )
     parser.add_argument(
+        '--providers',
+        action='store',
+        help='A comma separated list of source providers that you want to get URLs from. The values can be wayback,commoncrawl,otx,urlscan and virustotal. Passing this will override any exclude arguments (e.g. -xwm,-xcc, etc.) passed to exclude sources, and reset those based on what was passed with this argument.',
+        default=[],
+        type=validateArgProviders,
+        metavar='{wayback,commoncrawl,otx,urlscan,virustotal}'
+    )
+    parser.add_argument(
         '-lcc',
         action='store',
         type=int,
-        help='Limit the number of Common Crawl index collections searched, e.g. \'-lcc 10\' will just search the latest 10 collections (default: 3). As of July 2023 there are currently 95 collections. Setting to 0 (default) will search ALL collections. If you don\'t want to search Common Crawl at all, use the -xcc option.'
+        help='Limit the number of Common Crawl index collections searched, e.g. \'-lcc 10\' will just search the latest 10 collections (default: 1). As of November 2024 there are currently 106 collections. Setting to 0 (default) will search ALL collections. If you don\'t want to search Common Crawl at all, use the -xcc option.'
     )
     parser.add_argument(
         '-lcy',
@@ -3153,13 +3265,36 @@ def main():
         write(colored('Waymore - v' + __version__,'cyan'))
         sys.exit()
     
-    # If -lcc wasn't passed then set to the default of 3 if -lcy is 0. This will make them work together
+    # If -lcc wasn't passed then set to the default of 1 if -lcy is 0. This will make them work together
     if args.lcc is None:
         if args.lcy == 0:
-            args.lcc = 3
+            args.lcc = 1
         else:
             args.lcc = 0
     
+    # If --providers was passed, then manually set the exclude arguments;
+    if args.providers:
+        if 'wayback' not in args.providers:
+            args.xwm = True
+        else:
+            args.xwm = False
+        if 'commoncrawl' not in args.providers:
+            args.xcc = True
+        else:
+            args.xcc = False
+        if 'otx' not in args.providers:
+            args.xav = True
+        else:
+            args.xav = False
+        if 'urlscan' not in args.providers:
+            args.xus = True
+        else:
+            args.xus = False
+        if 'virustotal' not in args.providers:
+            args.xvt = True
+        else:
+            args.xvt = False
+               
     # If no input was given, raise an error
     if sys.stdin.isatty():
         if args.input is None:

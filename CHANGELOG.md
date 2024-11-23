@@ -1,5 +1,22 @@
 ## Changelog
 
+- v4.6
+
+  - New
+
+    - Add argument `-ft` to specify a list of MIME Types to filter. This will override the `FILTER_MIME` list in `config.yml`. **NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don't have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you.**.
+    - Add argument `-mt` to specify a list of MIME Types to match. This will be used instead of the default filtering using `FILTER_MIME` list in `config.yml`, or filtering using `-ft`. **NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don't have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you.**.
+    - Add argument `--providers` in the same way as `gau`. A comma separated list of source providers that you want to get URLs from. The values can be `wayback`,`commoncrawl`,`otx`,`urlscan` and `virustotal`. Passing this will override any exclude arguments (e.g. `-xwm`,`-xcc`, etc.) passed to exclude sources, and reset those based on what was passed with this argument.
+
+  - Changed
+
+    - When argument `--verbose` has been used and the options are shown, show the name of providers that will be searched instead of the exclude arguments, e.g.`-xwm`, `-xcc`, etc.
+    - Change `HTTP_ADAPTER_CC` used for Common Crawl requests to use `retries+3` instead of `reties+20`. This was originally suggested by Common Crawl, but there are so many issues it can just take forever to get anything from their API, and often fail anyway.
+    - Change the default of `-lcc` to 1 instead of 3 because of so many problems with Common Crawl.
+    - BUG FIX: If a connection error occurs when getting the Common Crawl index file, then error `ERROR getCommonCrawlUrls 1: object of type 'NoneType' has no len()` is displayed. This will now be suppressed.
+    - BUG FIX: If arg `-mc` was not passed and `-ft` was, when options were shown to the user (in `showOptions` function), the value of `-mc` was shown for `-ft`.
+    - BUG FIX: When a MIME type is used in a filter for Wayback Machine that has a `+` in it (e.g. `image/svg+xml`), then the `+` was replaced because that'#s the only way Wayback recognises it. However, it was being escaped first and was being converted to `image/svg\.xml` instead of `image/svg.xml` so was not recognised in the filter.
+
 - v4.5
 
   - Change
