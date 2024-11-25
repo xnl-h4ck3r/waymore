@@ -1037,6 +1037,13 @@ def processURLOutput():
             linkCount = len(linksFound)
             write(getSPACER(colored('Links found for ' + subs + argsInput + ': ', 'cyan')+colored(str(linkCount) + ' 🤘','white'))+'\n')
             
+            if args.print_only:
+                for link in linksFound:
+                    write(link)
+                return  # Skip saving to file if print-only mode is enabled
+
+
+
             # If -oU / --output-urls was passed then use that file name, else use "waymore.txt" in the path of the .py file
             if args.output_urls == '':
                 # Create 'results' and domain directory if needed
@@ -2995,6 +3002,13 @@ def main():
     parser = argparse.ArgumentParser(
         description='waymore - by @Xnl-h4ck3r: Find way more from the Wayback Machine'    
     )
+
+    parser.add_argument(
+        '--print-only',
+        action='store_true',
+        help='Print output to the shell'
+    )
+
     parser.add_argument(
         '-i',
         '--input',
