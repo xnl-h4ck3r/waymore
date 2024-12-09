@@ -3325,7 +3325,16 @@ def main():
             if subDomain != '':
                 inputIsSubDomain = True
                 subDomain = subDomain+'.'
-            argsInputHostname = subDomain+tldExtract.domain+'.'+tldExtract.suffix
+            
+            # Convert domain to punycode
+            punyCode = tldExtract.domain.encode("idna").decode("ascii")
+            if tldExtract.domain != punyCode:
+                writerr(colored(getSPACER(f'IMPORTANT:  You passed a domain that contains unicode characters, so this will be converted to Punycode when retrieving from archived sources, i.e. {punyCode}.{tldExtract.suffix}\n'),'yellow'))
+                argsInput = argsInput.replace(tldExtract.domain,punyCode)
+                rootDomain = punyCode
+            else:
+                rootDomain = tldExtract.domain
+            argsInputHostname = subDomain+rootDomain+'.'+tldExtract.suffix
             
             # Warn user if a sub domains may have been passed
             if inputIsSubDomain:

@@ -1,5 +1,11 @@
 ## Changelog
 
+- v4.7
+
+  - New
+
+    - BUG FIX: If an input domain has unicode in, e.g `xñl.uk`, then it will be converted to the punycode version, e.g. `xn--xl-zja.uk` to use that as the input instead. This will ensure the URLs and responses are correctly retrieved from the archive sources.
+
 - v4.6
 
   - New
