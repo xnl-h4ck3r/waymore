@@ -1,5 +1,11 @@
 ## Changelog
 
+- v4.8
+
+  - Changed
+
+    - BUG FIX: When downloading responses and creating the file name, sometimes the file extension is incorrectly derived and has `/` in it, e.g. `5146045725697.well-known/openid-configuration`, and this causes the writing of the file to fail. If the derived extension does contain `/` then it will be reset to blank, and determined a different way.
+
 - v4.7
 
   - New

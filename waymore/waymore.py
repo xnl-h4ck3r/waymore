@@ -869,6 +869,9 @@ def processArchiveUrl(url):
                                     parsed = urlparse(targetUrl.strip())
                                     path = parsed.path
                                     extension = path[path.rindex('.')+1:]
+                                    # If there is a / in the extension then it's not the extension at all, so reset to blank
+                                    if '/' in extension:
+                                        extension = ''
                                 except:
                                     pass
                                 
