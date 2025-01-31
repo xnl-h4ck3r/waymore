@@ -759,7 +759,7 @@ def linksFoundResponseAdd(link):
             parsed_url = linkWithoutTimestamp
 
         # Don't write it if the link does not contain the requested domain (this can sometimes happen)
-        if parsed_url.find(checkInput) >= 0:
+        if parsed_url.lower().find(checkInput.lower()) >= 0:
             linksFound.add(link)
     except Exception as e:
         linksFound.add(link)
@@ -825,8 +825,9 @@ def processArchiveUrl(url):
                     # Only create a file if there is a response
                     if len(archiveHtml) != 0:
                         
-                        # If the FILTER_CODE includes 404, and it only process if it doesn't seem to be a custom 404 page
-                        if '404' in FILTER_CODE and not re.findall(REGEX_404, archiveHtml, re.DOTALL|re.IGNORECASE):
+                        # If the FILTER_CODE doesn't include 404, OR
+                        # If the FILTER_CODE includes 404, and it doesn't seem to be a custom 404 page
+                        if '404' not in FILTER_CODE or ('404' in FILTER_CODE and not re.findall(REGEX_404, archiveHtml, re.DOTALL|re.IGNORECASE)):
                         
                             # Add the URL as a comment at the start of the response
                             if args.url_filename:
@@ -2920,6 +2921,8 @@ def combineInlineJS():
             for script in uniqueExternalScripts:
                 inlineExternalFile.write(script.strip() + '\n')
             write(colored('Created file ','cyan')+colored(responseOutputDirectory+'combinedInlineSrc.txt','white')+colored(' (src of external JS)','cyan'))
+        else:
+            write(colored('No external JS scripts found, so no combined Inline Src file written.\n','cyan'))
             
         # Write files for all combined inline JS
         uniqueScripts = set()
@@ -2977,12 +2980,13 @@ def combineInlineJS():
                     
                     currentScript += 1
                     
-        if totalExternal == 0 and totalSections == 0:
-            write(colored('No scripts found, so no combined JS files written.\n','cyan'))
-        elif fileNumber == 1:
-            write(colored('Created file ','cyan')+colored(responseOutputDirectory+'combinedInline1.js','white')+colored(' (contents of inline JS)\n','cyan'))
+        if totalSections == 0:
+            write(colored('No scripts found, so no combined Inline JS files written.\n','cyan'))
         else:
-            write(colored('Created files ','cyan')+colored(responseOutputDirectory+'combinedInline{1-'+str(fileNumber)+'}.js','white')+colored(' (contents of inline JS)\n','cyan'))
+            if fileNumber == 1:
+                write(colored('Created file ','cyan')+colored(responseOutputDirectory+'combinedInline1.js','white')+colored(' (contents of inline JS)\n','cyan'))
+            else:
+                write(colored('Created files ','cyan')+colored(responseOutputDirectory+'combinedInline{1-'+str(fileNumber)+'}.js','white')+colored(' (contents of inline JS)\n','cyan'))
                     
     except Exception as e:
         writerr(colored('ERROR combineInlineJS 1: ' + str(e), 'red'))

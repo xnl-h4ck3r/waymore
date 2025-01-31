@@ -1,5 +1,13 @@
 ## Changelog
 
+- v4.9
+
+  - Changed
+
+    - BUG FIX: The error `ERROR combineInlineJS 1: local variable 'fileNumber' referenced before assignment` is raised when there are external javascript files provided via `src` but no inline javascript sections. The correct message will be displayed now without an error being raised.
+    - BUG FIX: If a status code filter does not include `404` (whether specified in `config.yml` or changed via `-fc` or `-mc`) then the logic was causing a response to not be downloaded.
+    - BUG FIX: When downloading responses, the URL needs to all be in lower case, regardless of the URL that the API returns that may have uppercase characters. This resulted in some responses not being found and failing to download.
+
 - v4.8
 
   - Changed
