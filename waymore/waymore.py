@@ -79,6 +79,7 @@ checkCommonCrawl = 0
 checkAlienVault = 0
 checkURLScan = 0
 checkVirusTotal = 0
+checkIntelx = 0
 argsInputHostname = ''
 responseOutputDirectory = ''
 
@@ -88,6 +89,9 @@ CCRAWL_INDEX_URL = 'https://index.commoncrawl.org/collinfo.json'
 ALIENVAULT_URL = 'https://otx.alienvault.com/api/v1/indicators/{TYPE}/{DOMAIN}/url_list?limit=500'
 URLSCAN_URL = 'https://urlscan.io/api/v1/search/?q=domain:{DOMAIN}&size=10000'
 VIRUSTOTAL_URL = 'https://www.virustotal.com/vtapi/v2/domain/report?apikey={APIKEY}&domain={DOMAIN}'
+INTELX_SEARCH_URL = 'https://2.intelx.io/phonebook/search'
+INTELX_RESULTS_URL = 'https://2.intelx.io/phonebook/search/result?id='
+INTELX_ACCOUNT_URL = 'https://2.intelx.io/authenticate/info'
 
 # User Agents to use when making requests, chosen at random
 USER_AGENT  = [
@@ -144,6 +148,7 @@ URLSCAN_API_KEY = ''
 CONTINUE_RESPONSES_IF_PIPED = True
 WEBHOOK_DISCORD = ''
 DEFAULT_OUTPUT_DIR = ''
+INTELX_API_KEY = ''
 
 API_KEY_SECRET = "aHR0cHM6Ly95b3V0dS5iZS9kUXc0dzlXZ1hjUQ=="
 
@@ -285,7 +290,7 @@ def showOptions():
     """
     Show the chosen options and config settings
     """
-    global inputIsDomainANDPath, argsInput, isInputFile
+    global inputIsDomainANDPath, argsInput, isInputFile, INTELX_API_KEY
                 
     try:
         write(colored('Selected config and settings:', 'cyan'))
@@ -325,6 +330,9 @@ def showOptions():
             providers = providers + 'URLScan, '
         if not args.xvt:
             providers = providers + 'VirusTotal, '
+        # Only show Intelligence X if the API key wa provided
+        if not args.xix and INTELX_API_KEY != '':
+            providers = providers + 'Intelligence X, '
         if providers == '':
             providers = 'None'
         write(colored('Providers: ' +str(providers.strip(', ')), 'magenta')+colored(' Which providers to check for URLs.','white'))
@@ -349,6 +357,11 @@ def showOptions():
             write(colored('VirusTotal API Key:', 'magenta')+colored(' {none} - You can get a FREE or paid API Key at https://www.virustotal.com/gui/join-us which will let you get some extra URLs.','white'))
         else:
             write(colored('VirusTotal API Key: ', 'magenta')+colored(VIRUSTOTAL_API_KEY))
+            
+        if INTELX_API_KEY == '':
+            write(colored('Intelligence X API Key:', 'magenta')+colored(' {none} - You require a paid API Key from https://intelx.io/product','white'))
+        else:
+            write(colored('Intelligence X API Key: ', 'magenta')+colored(INTELX_API_KEY))
         
         if args.mode in ['U','B']:
             if args.output_urls != '':
@@ -401,12 +414,12 @@ def showOptions():
         write(colored('Response URL exclusions: ', 'magenta')+colored(FILTER_URL))  
         
         if args.mt:
-            write(colored('-mt: ' +str(args.mt.lower()), 'magenta')+colored(' Only retrieve URLs and Responses that match these MIME Types.','white')+colored(' NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you','yellow'))
+            write(colored('-mt: ' +str(args.mt.lower()), 'magenta')+colored(' Only retrieve URLs and Responses that match these MIME Types.','white')+colored(' NOTE: This will NOT be applied to Alien Vault OTX, Virus Total and Intelligence X because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you','yellow'))
         else:
             if args.ft:
-                write(colored('-ft: ' +str(args.ft.lower()), 'magenta')+colored(' Don\'t retrieve URLs and Responses that match these MIME Types.','white')+colored(' NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you','yellow'))
+                write(colored('-ft: ' +str(args.ft.lower()), 'magenta')+colored(' Don\'t retrieve URLs and Responses that match these MIME Types.','white')+colored(' NOTE: This will NOT be applied to Alien Vault OTX, Virus Total and Intelligence X because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you','yellow'))
             else:
-                write(colored('MIME Type exclusions: ', 'magenta')+colored(FILTER_MIME)+colored(' Don\'t retrieve URLs and Responses that match these MIME Types.','white')+colored(' NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you','yellow'))
+                write(colored('MIME Type exclusions: ', 'magenta')+colored(FILTER_MIME)+colored(' Don\'t retrieve URLs and Responses that match these MIME Types.','white')+colored(' NOTE: This will NOT be applied to Alien Vault OTX, Virus Total and Intelligence X because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you','yellow'))
                 
         if args.keywords_only and args.keywords_only == '#CONFIG':
             if FILTER_KEYWORDS == '':
@@ -444,7 +457,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD, DEFAULT_OUTPUT_DIR, MATCH_MIME
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD, DEFAULT_OUTPUT_DIR, MATCH_MIME, INTELX_API_KEY
     try:
         
         # Set terminal width
@@ -581,6 +594,13 @@ def getConfig():
                 VIRUSTOTAL_API_KEY = ''
             
             try:
+                INTELX_API_KEY = config.get('INTELX_API_KEY')
+                if str(INTELX_API_KEY) == 'None':
+                    INTELX_API_KEY = ''
+            except Exception as e:
+                INTELX_API_KEY = ''
+                
+            try:
                 FILTER_KEYWORDS = config.get('FILTER_KEYWORDS')
                 if str(FILTER_KEYWORDS) == 'None':
                     writerr(colored('No value for "FILTER_KEYWORDS" in config.yml - default set', 'yellow'))
@@ -653,6 +673,7 @@ def getConfig():
             FILTER_CODE = DEFAULT_FILTER_CODE
             URLSCAN_API_KEY = ''
             VIRUSTOTAL_API_KEY = ''
+            INTELX_API_KEY = ''
             FILTER_KEYWORDS = ''
             CONTINUE_RESPONSES_IF_PIPED = True
             WEBHOOK_DISCORD = ''
@@ -1015,12 +1036,12 @@ def processURLOutput():
     """
     Show results of the URL output, i.e. getting URLs from archive.org and commoncrawl.org and write results to file
     """
-    global linksFound, subs, path, argsInput, checkWayback, checkCommonCrawl, checkAlienVault, checkURLScan, checkVirusTotal, DEFAULT_OUTPUT_DIR
+    global linksFound, subs, path, argsInput, checkWayback, checkCommonCrawl, checkAlienVault, checkURLScan, checkVirusTotal, DEFAULT_OUTPUT_DIR, checkIntelx
 
     try:
         
         if args.check_only:
-            totalRequests = checkWayback + checkCommonCrawl + checkAlienVault + checkURLScan + checkVirusTotal
+            totalRequests = checkWayback + checkCommonCrawl + checkAlienVault + checkURLScan + checkVirusTotal + checkIntelx
             minutes = totalRequests*1 // 60
             hours = minutes // 60
             days = hours // 24
@@ -1285,12 +1306,13 @@ def validateArgProviders(x):
     - otx
     - urlscan
     - virustotal
+    - intelx
     """
     invalid = False
     x = x.lower()
     providers = x.split(',')
     for provider in providers:
-        if not re.fullmatch(r'(wayback|commoncrawl|otx|urlscan|virustotal)', provider):
+        if not re.fullmatch(r'(wayback|commoncrawl|otx|urlscan|virustotal|intelx)', provider):
             invalid = True
             break
     if invalid:
@@ -2336,7 +2358,7 @@ def getCommonCrawlUrls():
 
 def processVirusTotalUrl(url):
     """
-    Process a specific URL from virustotal.io to determine whether to save the link
+    Process a specific URL from virustotal.com to determine whether to save the link
     """
     global argsInput, argsInputHostname
     
@@ -2378,7 +2400,7 @@ def processVirusTotalUrl(url):
                     
         # Add link if it passed filters        
         if addLink:
-            # Just get the hostname of the urkl
+            # Just get the hostname of the url
             tldExtract = tldextract.extract(url)
             subDomain = tldExtract.subdomain
             if subDomain != '':
@@ -2423,11 +2445,10 @@ def getVirusTotalUrls():
             session = requests.Session()
             session.mount('https://', HTTP_ADAPTER)
             session.mount('http://', HTTP_ADAPTER)
-            # Pass the API-Key header too. This can change the max endpoints per page, depending on URLScan subscription
             resp = session.get(url, headers={'User-Agent':userAgent})
             requestsMade = requestsMade + 1
         except Exception as e:
-            write(colored(getSPACER('[ ERR ] Unable to get links from virustotal.io: ' + str(e)), 'red'))
+            write(colored(getSPACER('[ ERR ] Unable to get links from virustotal.com: ' + str(e)), 'red'))
             return
                         
         # Deal with any errors
@@ -2493,6 +2514,204 @@ def getVirusTotalUrls():
         
     except Exception as e:
         writerr(colored('ERROR getVirusTotalUrls 1: ' + str(e), 'red'))
+
+def processIntelxUrl(url):
+    """
+    Process a specific URL from intelx.io to determine whether to save the link
+    """
+    global argsInput, argsInputHostname
+    
+    addLink = True
+
+    # If the url passed doesn't have a scheme, prefix with http://
+    match = re.search(r'^[A-za-z]*\:\/\/', url, flags=re.IGNORECASE)
+    if match is None: 
+        url = 'http://'+url
+        
+    try:      
+        # If filters are required then test them
+        if not args.filter_responses_only:
+            
+            # If the user requested -n / --no-subs then we don't want to add it if it has a sub domain (www. will not be classed as a sub domain)
+            if args.no_subs:
+                match = re.search(r'^[A-za-z]*\:\/\/(www\.)?'+re.escape(argsInputHostname), url, flags=re.IGNORECASE)
+                if match is None:
+                    addLink = False
+        
+            # If the user didn't requested -f / --filter-responses-only then check http code
+            # Note we can't check MIME filter because it is not returned by VirusTotal API
+            if addLink and not args.filter_responses_only: 
+                
+                # Check the URL exclusions
+                if addLink:
+                    match = re.search(r'('+re.escape(FILTER_URL).replace(',','|')+')', url, flags=re.IGNORECASE)
+                    if match is not None:
+                        addLink = False            
+                
+                # Set keywords filter if -ko argument passed
+                if addLink and args.keywords_only:
+                    if args.keywords_only == '#CONFIG':
+                        match = re.search(r'('+re.escape(FILTER_KEYWORDS).replace(',','|')+')', url, flags=re.IGNORECASE)
+                    else:
+                        match = re.search(r'('+args.keywords_only+')', url, flags=re.IGNORECASE)
+                    if match is None:
+                        addLink = False     
+                    
+        # Add link if it passed filters        
+        if addLink:
+            linksFoundAdd(url) 
+                
+    except Exception as e:
+        writerr(colored('ERROR processIntelxUrl 1: ' + str(e), 'red'))
+
+def processIntelxType(target, credits):
+    '''
+    target: 1 - Domains
+    target: 3 - URLs
+    '''
+    try:
+        try:
+            requestsMade = 0
+            
+            # Choose a random user agent string to use for any requests
+            userAgent = random.choice(USER_AGENT)
+            session = requests.Session()
+            session.mount('https://', HTTP_ADAPTER)
+            session.mount('http://', HTTP_ADAPTER)
+            # Pass the API key in the X-Key header too.
+            resp = session.post(INTELX_SEARCH_URL, data='{"term":"'+quote(argsInputHostname)+'","target":'+str(target)+'}', headers={'User-Agent':userAgent,'X-Key':INTELX_API_KEY})
+            requestsMade = requestsMade + 1
+        except Exception as e:
+            write(colored(getSPACER('[ ERR ] Unable to get links from intelx.io: ' + str(e)), 'red'))
+            return
+                        
+        # Deal with any errors
+        if resp.status_code == 429:
+            writerr(colored(getSPACER('[ 429 ] IntelX rate limit reached so unable to get links.'),'red'))
+            return
+        elif resp.status_code == 401:
+            writerr(colored(getSPACER('[ 401 ] IntelX: Not authorized. The source requires a paid API key. Check your API key is correct.'),'red'))
+            return
+        elif resp.status_code == 402:
+            if credits.startswith("0/"):
+                writerr(colored(getSPACER('[ 402 ] IntelX: You have run out of daily credits on Intelx ('+credits+').'),'red'))
+            else:
+                writerr(colored(getSPACER('[ 402 ] IntelX: It appears you have run out of daily credits on Intelx.'),'red'))
+            return
+        elif resp.status_code == 403:
+            writerr(colored(getSPACER('[ 403 ] IntelX: Permission denied. Check your API key is correct.'),'red'))
+            return
+        elif resp.status_code != 200:
+            writerr(colored(getSPACER('[ ' + str(resp.status_code) + ' ] Unable to get links from intelx.io'),'red'))
+            return
+        
+        # Get the JSON response
+        try:
+            jsonResp = json.loads(resp.text.strip())
+            id = jsonResp['id']
+        except:
+            writerr(colored(getSPACER('[ ERR ] There was an unexpected response from the Intelligence API'),'red'))
+            return
+        
+        # Get each page of the results
+        moreResults = True
+        status = 0
+        while moreResults:
+            if stopSource:
+                break
+            try:
+                resp = session.get(INTELX_RESULTS_URL+id, headers={'User-Agent':userAgent,'X-Key':INTELX_API_KEY})
+                requestsMade = requestsMade + 1
+            except Exception as e:
+                write(colored(getSPACER('[ ERR ] Unable to get links from intelx.io: ' + str(e)), 'red'))
+                return
+            
+            # Get the JSON response
+            try:
+                jsonResp = json.loads(resp.text.strip())
+                status = jsonResp['status']
+            except:
+                writerr(colored(getSPACER('[ ERR ] There was an unexpected response from the Intelligence API'),'red'))
+                moreResults = False
+                
+            try:
+                selector_values = [entry['selectorvalue'] for entry in jsonResp.get('selectors', [])]
+            except Exception as e:
+                selector_values = []
+            try:
+                selector_valuesh = [entry['selectorvalueh'] for entry in jsonResp.get('selectors', [])]
+            except Exception as e:
+                selector_valuesh = []
+            
+            # Work out whether to include each url
+            unique_values = list(set(selector_values + selector_valuesh))
+            for ixurl in unique_values:
+                if stopSource:
+                    break
+                processIntelxUrl(ixurl)
+            
+            if status == 1 or selector_values == []:
+                moreResults = False
+
+    except Exception as e:
+        writerr(colored('ERROR processIntelxType 1: ' + str(e), 'red'))
+        
+def getIntelxAccountInfo() -> str:
+    '''
+    Get the account info and return the number of Credits remainiing from the /phonebook/search
+    '''
+    try:
+        # Choose a random user agent string to use for any requests
+        userAgent = random.choice(USER_AGENT)
+        session = requests.Session()
+        session.mount('https://', HTTP_ADAPTER)
+        session.mount('http://', HTTP_ADAPTER)
+        # Pass the API key in the X-Key header too.
+        resp = session.get(INTELX_ACCOUNT_URL, headers={'User-Agent':userAgent,'X-Key':INTELX_API_KEY})
+        jsonResp = json.loads(resp.text.strip())
+        credits = str(jsonResp.get("paths", {}).get("/phonebook/search", {}).get("Credit", "Unknown"))
+        credits_max = str(jsonResp.get("paths", {}).get("/phonebook/search", {}).get("CreditMax", "Unknown"))
+        return credits+"/"+credits_max
+    except:
+        return "Unknown"
+        
+def getIntelxUrls():
+    """
+    Get URLs from the Intelligence X Phonebook search
+    """
+    global INTELX_API_KEY, linksFound, waymorePath, subs, stopProgram, stopSource, argsInput, checkIntelx, argsInputHostname
+    
+    # Write the file of URL's for the passed domain/URL
+    try:
+        if args.check_only:
+            write(colored('Get URLs from Intelligence X: ','cyan')+colored('minimum 4 requests','white'))
+            checkIntelx = 4
+            return
+        
+        stopSource = False
+        originalLinkCount = len(linksFound)
+        credits = getIntelxAccountInfo()
+        if verbose():
+            write(colored('The Intelligence X URL requested to get links (Credits: '+credits+'): ','magenta')+colored(INTELX_SEARCH_URL+'\n','white'))
+        
+        if not args.check_only:           
+            write(colored('\rGetting links from intelx.io API...\r','cyan'))
+       
+        # Get the domains from Intelligence X if the --no-subs wasn't passed
+        if not args.no_subs:
+            processIntelxType(1, credits)
+        
+        # Get the URLs from Intelligence X
+        processIntelxType(3, credits)
+        
+        linkCount = len(linksFound) - originalLinkCount
+        if args.xwm and args.xcc and args.xav and args.xus and args.xvt:
+            write(getSPACER(colored('Links found on intelx.io: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+        else:
+            write(getSPACER(colored('Extra links found on intelx.io: ', 'cyan')+colored(str(linkCount),'white'))+'\n') 
+        
+    except Exception as e:
+        writerr(colored('ERROR getIntelxUrls 1: ' + str(e), 'red'))
 
 def processResponses():
     """
@@ -2993,7 +3212,7 @@ def combineInlineJS():
         
 # Run waymore
 def main():
-    global args, DEFAULT_TIMEOUT, inputValues, argsInput, linksFound, linkMimes, successCount, failureCount, fileCount, totalResponses, totalPages, indexFile, path, stopSource, stopProgram, VIRUSTOTAL_API_KEY, inputIsSubDomain, argsInputHostname, WEBHOOK_DISCORD, responseOutputDirectory, fileCount
+    global args, DEFAULT_TIMEOUT, inputValues, argsInput, linksFound, linkMimes, successCount, failureCount, fileCount, totalResponses, totalPages, indexFile, path, stopSource, stopProgram, VIRUSTOTAL_API_KEY, inputIsSubDomain, argsInputHostname, WEBHOOK_DISCORD, responseOutputDirectory, fileCount, INTELX_API_KEY
 
     # Tell Python to run the handler() function when SIGINT is received
     signal(SIGINT, handler)
@@ -3051,7 +3270,7 @@ def main():
     parser.add_argument(
         '-ft',
         action='store',
-        help='Filter MIME Types for retrieved URLs and responses. Comma separated list of MIME Types (default: the FILTER_MIME values from config.yml). Passing this argument will override the value from config.yml. NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you.',
+        help='Filter MIME Types for retrieved URLs and responses. Comma separated list of MIME Types (default: the FILTER_MIME values from config.yml). Passing this argument will override the value from config.yml. NOTE: This will NOT be applied to Alien Vault OTX, Virus Total and Intelligence X because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you.',
         type=validateArgMimeTypes,
     )
     parser.add_argument(
@@ -3063,7 +3282,7 @@ def main():
     parser.add_argument(
         '-mt',
         action='store',
-        help='Only MIME Types for retrieved URLs and responses. Comma separated list of MIME types. Passing this argument overrides the config FILTER_MIME and -ft. NOTE: This will NOT be applied to Alien Vault OTX and Virus Total because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you.',
+        help='Only MIME Types for retrieved URLs and responses. Comma separated list of MIME types. Passing this argument overrides the config FILTER_MIME and -ft. NOTE: This will NOT be applied to Alien Vault OTX, Virus Total and Intelligence X because they don\'t have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined - these will always be included. Consider excluding sources if this matters to you.',
         type=validateArgMimeTypes,
     )
     parser.add_argument(
@@ -3142,12 +3361,18 @@ def main():
         default=False
     )
     parser.add_argument(
+        '-xix',
+        action='store_true',
+        help='Exclude checks for links from intelx.io',
+        default=False
+    )
+    parser.add_argument(
         '--providers',
         action='store',
-        help='A comma separated list of source providers that you want to get URLs from. The values can be wayback,commoncrawl,otx,urlscan and virustotal. Passing this will override any exclude arguments (e.g. -xwm,-xcc, etc.) passed to exclude sources, and reset those based on what was passed with this argument.',
+        help='A comma separated list of source providers that you want to get URLs from. The values can be wayback,commoncrawl,otx,urlscan,virustotal and intelx. Passing this will override any exclude arguments (e.g. -xwm,-xcc, etc.) passed to exclude sources, and reset those based on what was passed with this argument.',
         default=[],
         type=validateArgProviders,
-        metavar='{wayback,commoncrawl,otx,urlscan,virustotal}'
+        metavar='{wayback,commoncrawl,otx,urlscan,virustotal,intelx}'
     )
     parser.add_argument(
         '-lcc',
@@ -3301,6 +3526,10 @@ def main():
             args.xvt = True
         else:
             args.xvt = False
+        if 'intelx' not in args.providers:
+            args.xix = True
+        else:
+            args.xix = False
                
     # If no input was given, raise an error
     if sys.stdin.isatty():
@@ -3390,6 +3619,10 @@ def main():
                 # If not requested to exclude, get URLs from virustotal.com if we have an API key
                 if not args.xvt and VIRUSTOTAL_API_KEY != '' and stopProgram is None:
                     getVirusTotalUrls()
+                
+                # If not requested to exclude, get URLs from intelx.io if we have an API key
+                if not args.xix and INTELX_API_KEY != '' and stopProgram is None:
+                    getIntelxUrls()
                     
                 # Output results of all searches
                 processURLOutput()

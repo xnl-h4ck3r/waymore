@@ -1,5 +1,13 @@
 ## Changelog
 
+- v5.0
+
+  - New
+
+    - Add source **Intelligence X - intelx.io**. It requires a paid API key to do the `/phonebook/search` through their API (as of 2024-09-01, the Phonebook service has been restricted to paid users due to constant abuse by spam accounts).
+    - Add argument `-xix` to exclude checks for links from Intelligence X (intelx.io).
+    - Add `INTELX_API_KEY` to `config.yml`.
+
 - v4.9
 
   - Changed
