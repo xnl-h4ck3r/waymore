@@ -1,5 +1,9 @@
 ## Changelog
 
+- v5.1
+
+  - BUG FIX: When calling URLScan API, it would sometimes return a 429 response straight away. It was assumed this was just to do with the API rate limiting, but it seemed to been related to the User-Agent and was a WAF 429 rather than a specific API 429. It now sets a specific user agent of `waymore by xnl-h4ck3r` which always works for now.
+
 - v5.0
 
   - New

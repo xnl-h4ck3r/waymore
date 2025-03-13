@@ -1316,7 +1316,7 @@ def validateArgProviders(x):
             invalid = True
             break
     if invalid:
-        raise argparse.ArgumentTypeError('Pass providers separated by a comma, e.g. wayback,commoncrawl,otx,urlscan,virustotal')     
+        raise argparse.ArgumentTypeError('Pass providers separated by a comma, e.g. wayback,commoncrawl,otx,urlscan,virustotal,intelx')     
     return x
 
 def processAlienVaultPage(url):
@@ -1638,7 +1638,10 @@ def getURLScanUrls():
         # Get the first page from urlscan.io
         try:
             # Choose a random user agent string to use for any requests
-            userAgent = random.choice(USER_AGENT)
+            # For other sources we would use `random.choice(USER_AGENT)` to asignn a random user-agent, but it seems 
+            # that there are a handful of those that ALWAYS return 429. Passing a specific one all the time seems to
+            # be successful all the time 
+            userAgent = "waymore by xnl-h4ck3r" 
             session = requests.Session()
             session.mount('https://', HTTP_ADAPTER)
             session.mount('http://', HTTP_ADAPTER)
@@ -1789,7 +1792,6 @@ def getURLScanUrls():
                             # Get the next page from urlscan.io
                             try:
                                 # Choose a random user agent string to use for any requests
-                                userAgent = random.choice(USER_AGENT)
                                 session = requests.Session()
                                 session.mount('https://', HTTP_ADAPTER)
                                 session.mount('http://', HTTP_ADAPTER)
