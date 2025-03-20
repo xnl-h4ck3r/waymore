@@ -58,10 +58,12 @@ stopSource = False
 successCount = 0
 failureCount = 0
 fileCount = 0
+totalFileCount = 0
 totalResponses = 0
 totalPages = 0
 indexFile = None
 continueRespFile = None
+continueRespFileURLScan = None
 inputIsDomainANDPath = False
 inputIsSubDomain = False
 subs = '*.'
@@ -82,12 +84,14 @@ checkVirusTotal = 0
 checkIntelx = 0
 argsInputHostname = ''
 responseOutputDirectory = ''
+urlscanRequestLinks = set()
 
 # Source Provider URLs
 WAYBACK_URL = 'https://web.archive.org/cdx/search/cdx?url={DOMAIN}{COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest'
 CCRAWL_INDEX_URL = 'https://index.commoncrawl.org/collinfo.json'
 ALIENVAULT_URL = 'https://otx.alienvault.com/api/v1/indicators/{TYPE}/{DOMAIN}/url_list?limit=500'
-URLSCAN_URL = 'https://urlscan.io/api/v1/search/?q=domain:{DOMAIN}&size=10000'
+URLSCAN_URL = 'https://urlscan.io/api/v1/search/?q=domain:{DOMAIN}{DATERANGE}&size=10000'
+URLSCAN_DOM_URL = 'https://urlscan.io/dom/'
 VIRUSTOTAL_URL = 'https://www.virustotal.com/vtapi/v2/domain/report?apikey={APIKEY}&domain={DOMAIN}'
 INTELX_SEARCH_URL = 'https://2.intelx.io/phonebook/search'
 INTELX_RESULTS_URL = 'https://2.intelx.io/phonebook/search/result?id='
@@ -952,7 +956,7 @@ def processArchiveUrl(url):
                                     indexFile.write(hashValue+','+archiveUrl+' ,'+timestamp+'\n')
                                     indexFile.flush()
                                 except Exception as e:
-                                    writerr(colored(getSPACER('[ ERR ] Failed to write to index.txt for "' + archiveUrl + '": '+ str(e)), 'red'))
+                                    writerr(colored(getSPACER('[ ERR ] Failed to write to waymore_index.txt for "' + archiveUrl + '": '+ str(e)), 'red'))
 
                             # FOR DEBUGGING PURPOSES
                             try:
@@ -1188,27 +1192,6 @@ def processURLOutput():
         if verbose():
             writerr(colored("ERROR processURLOutput 1: " + str(e), "red"))
 
-def processResponsesOutput():
-    """
-    Show results of the archive responses saved
-    """
-    global successCount, failureCount, subs, fileCount, argsInput, DEFAULT_OUTPUT_DIR, responseOutputDirectory
-    try:
-            
-        if failureCount > 0:
-            if verbose():
-                write(colored('\nResponses saved to ','cyan')+colored(responseOutputDirectory,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' failed)\n','red'))
-            else:
-                write(colored('\nResponses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' failed)\n','red'))
-        else:
-            if verbose():
-                write(colored('\nResponses saved to ','cyan')+colored(responseOutputDirectory,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
-            else:
-                write(colored('\nResponses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
-    except Exception as e:
-        if verbose():
-            writerr(colored("ERROR processResponsesOutput 1: " + str(e), "red"))    
-
 def validateArgProcesses(x):
     """
     Validate the -p / --processes argument 
@@ -1278,6 +1261,38 @@ def validateArgStatusCodes(x):
             break
     if invalid:
         raise argparse.ArgumentTypeError('Pass HTTP status codes separated by a comma')     
+    return x
+
+def validateArgDate(x):
+    """
+    Validate the -from and -to arguments
+    """
+    invalid = False
+    
+    # Map string lengths to their corresponding datetime formats
+    formats = {
+        4: "%Y",
+        6: "%Y%m",
+        8: "%Y%m%d",
+        10: "%Y%m%d%H",
+        12: "%Y%m%d%H%M",
+        14: "%Y%m%d%H%M%S",
+    }
+    
+    # Check if length matches any expected format
+    fmt = formats.get(len(x))
+    if not fmt:
+        invalid = True
+    
+    # Try to parse with the matching format
+    try:
+        datetime.strptime(x, fmt)
+    except ValueError:
+        invalid = True
+
+    # If invalid then return an error
+    if invalid:
+        raise argparse.ArgumentTypeError('A valid date/time needs to be passed in YYYYMMDDhhmmss format (or part of, e.g. YYYYMM) .')     
     return x
 
 def validateArgMimeTypes(x):
@@ -1534,17 +1549,22 @@ def getAlienVaultUrls():
     except Exception as e:
         writerr(colored('ERROR getAlienVaultUrls 1: ' + str(e), 'red'))
 
-def processURLScanUrl(url, httpCode, mimeType):
+def processURLScanUrl(url, httpCode, mimeType, urlscanID=''):
     """
     Process a specific URL from urlscan.io to determine whether to save the link
     """
-    global argsInput, argsInputHostname
+    global argsInput, argsInputHostname, urlscanRequestLinks
     
     addLink = True
     
-    try:      
+    try:
+        # If the input has a / in it, then a URL was passed, so the link will only be added if the URL matches
+        if url.contains('/'):
+            if argsInput not in url:
+                addLink = False
+                
         # If filters are required then test them
-        if not args.filter_responses_only:
+        if addLink and not args.filter_responses_only:
             
             # If the user requested -n / --no-subs then we don't want to add it if it has a sub domain (www. will not be classed as a sub domain)
             if args.no_subs:
@@ -1593,7 +1613,8 @@ def processURLScanUrl(url, httpCode, mimeType):
                                 
                 # Add MIME Types if --verbose option was selected
                 if verbose():
-                    linkMimes.add(mimeType)            
+                    if mimeType.strip() != '':
+                        linkMimes.add(mimeType)            
                     
         # Add link if it passed filters        
         if addLink:
@@ -1608,11 +1629,183 @@ def processURLScanUrl(url, httpCode, mimeType):
             # Check the URL
             match = re.search(r'(^|\.)'+re.escape(argsInputHostname)+'$', domainOnly, flags=re.IGNORECASE)
             if match is not None:
-                linksFoundAdd(url)  
-            
+                if args.mode in ('U','B'):
+                    linksFoundAdd(url)
+                # If Response mode is requested then add the DOM ID to try later, for the number of responses wanted
+                if urlscanID != '' and args.mode in ('R','B'):
+                    if args.limit == 0 or len(urlscanRequestLinks) < args.limit:
+                        urlscanRequestLinks.add((url, URLSCAN_DOM_URL+urlscanID))
+
     except Exception as e:
         writerr(colored('ERROR processURLScanUrl 1: ' + str(e), 'red'))
+
+def getURLScanDOM(originalUrl, domUrl):
+    """
+    Get the DOM for the passed URLScan link
+    """ 
+    global stopProgram, successCount, failureCount, fileCount, DEFAULT_OUTPUT_DIR, totalResponses, indexFile, argsInput, continueRespFileURLScan, REGEX_404
+    try:
+        if stopProgram is None:
+            
+            hashValue = ''
         
+            # Get memory usage every 100 responses
+            if (successCount + failureCount) % 100 == 0:
+                try:
+                    getMemory()
+                except:
+                    pass
+                
+            # Make a request to URLScan
+            try:
+                try:
+                    # Choose a random user agent string to use for any requests
+                    userAgent = "waymore v"+__version__+" by xnl-h4ck3r" 
+                    session = requests.Session()
+                    session.mount('https://', HTTP_ADAPTER)
+                    session.mount('http://', HTTP_ADAPTER)
+                    resp = session.get(domUrl, headers={"User-Agent":userAgent}, allow_redirects = True)
+                    archiveHtml = str(resp.text)
+                    
+                    # If there is a specific URLScan error in the response, raise an exception 
+                    if archiveHtml.lower().strip() == 'not found!':
+                        raise WayBackException
+                    
+                    # Only create a file if there is a response
+                    if len(archiveHtml) != 0:
+                        
+                        # Add the URL as a comment at the start of the response
+                        if args.url_filename:
+                            archiveHtml = '/* Original URL: ' + originalUrl + ' */\n' + archiveHtml
+                        
+                        # Create file name based on url or hash value of the response, depending on selection. Ensure the file name isn't over 255 characters 
+                        if args.url_filename:
+                            fileName = originalUrl.replace('/','-').replace(':','')
+                            fileName = fileName[0:254]
+                        else:
+                            hashValue = filehash(archiveHtml)
+                            fileName = hashValue
+                            
+                            # Determine extension of file from the content-type using the mimetypes library
+                            extension = ''
+                            try:
+                                # Get path extension
+                                targetUrl = 'https://' + originalUrl.split("://")[1]
+                                parsed = urlparse(targetUrl.strip())
+                                path = parsed.path
+                                extension = path[path.rindex('.')+1:]
+                                # If there is a / in the extension then it's not the extension at all, so reset to blank
+                                if '/' in extension:
+                                    extension = ''
+                            except:
+                                pass
+                            
+                            # If the extension is blank, numeric, longer than 4 characters or not alphanumeric - then set to html if the content ends with HTML tag, otherwise set to unknown
+                            if extension == '':
+                                if archiveHtml.lower().strip().endswith('</html>') or archiveHtml.lower().strip().endswith('</body>') or archiveHtml.lower().strip().startswith('<!doctype html') or archiveHtml.lower().strip().startswith('<html') or archiveHtml.lower().strip().startswith('<head'):
+                                    extension = 'html'
+                                else:
+                                    extension = 'unknown'
+
+                            fileName = fileName + '.' + extension
+                        
+                        # If -oR / --output-responses was passed then add the file to that directory, 
+                        # else add to the default "results/{target.domain}" directory in the same path as the .py file
+                        if args.output_responses != '':
+                            filePath = args.output_responses + '/' + f'{fileName}'
+                        else: 
+                            filePath = (DEFAULT_OUTPUT_DIR + '/results/' + str(argsInput).replace('/','-') + '/' + f'{fileName}')
+                            
+                        # Write the file
+                        try:
+                            responseFile = open(filePath, 'w', encoding='utf8')
+                            responseFile.write(archiveHtml)
+                            responseFile.close()
+                            fileCount = fileCount + 1
+                        except Exception as e:
+                            writerr(colored(getSPACER('[ ERR ] Failed to write file ' + filePath + ': '+ str(e)), 'red'))
+                            
+                        # Write the hash value and URL to the index file
+                        if not args.url_filename:
+                            try:
+                                timestamp = str(datetime.now())
+                                indexFile.write(hashValue+','+domUrl+'/'+originalUrl+' ,'+timestamp+'\n')
+                                indexFile.flush()
+                            except Exception as e:
+                                writerr(colored(getSPACER('[ ERR ] Failed to write to waymore_index.txt for "' + domUrl + '": '+ str(e)), 'red'))
+                                
+                    successCount = successCount + 1
+                
+                except WayBackException as wbe:
+                    failureCount = failureCount + 1
+                    
+                except Exception as e:
+                    failureCount = failureCount + 1
+                    if verbose():
+                        try:
+                            writerr(colored(getSPACER('[ ' + str(resp.status_code) +' ] Failed to get response for "' + domUrl + '"'), 'red'))
+                        except:
+                            writerr(colored(getSPACER('[ ERR ] Failed to get response for "' + domUrl + '": '+ str(e)), 'red'))
+                
+                # Show progress bar
+                fillTest = (successCount + failureCount) % 2
+                fillChar = "o"
+                if fillTest == 0:
+                    fillChar = "O"
+                suffix="Complete "
+                # Show memory usage if -v option chosen, and check memory every 25 responses (or if its the last)
+                if (successCount + failureCount) % 25 == 1 or (successCount + failureCount) == totalResponses:
+                    try:
+                        getMemory()
+                        if verbose():
+                            suffix = (
+                                "Complete (Mem Usage "
+                                + humanReadableSize(currentMemUsage)
+                                + ", Total Mem "
+                                + str(currentMemPercent)
+                                + "%)   "
+                            )
+                    except:
+                        if verbose():
+                            suffix = 'Complete (To show mem use, run "pip install psutil")'
+                printProgressBar(
+                    successCount + failureCount,
+                    totalResponses,
+                    prefix="Downloading " + str(totalResponses) + " responses:",
+                    suffix=suffix,
+                    length=getProgressBarLength(),
+                    fill=fillChar
+                )
+                
+                # Write the total count to the continueResp.URLScan.tmp file
+                try:
+                    continueRespFileURLScan.seek(0)
+                    continueRespFileURLScan.write(str(successCount + failureCount)+'\n')
+                except Exception as e:
+                    if verbose():
+                        writerr(colored(getSPACER('ERROR getURLScanDOM 2:  ' + str(e)), 'red'))
+                
+            except Exception as e:
+                if verbose():
+                    writerr(colored(getSPACER('Error for "'+domUrl+'": ' + str(e)), 'red'))
+            
+    except Exception as e:
+        writerr(colored('ERROR getURLScanDOM 1:  ' + str(e), 'red'))
+        
+def format_date_for_urlscan(date_str):
+    # Handle different lengths of input
+    if len(date_str) == 4:  # YYYY
+        date_str += "0101"
+    elif len(date_str) == 6:  # YYYYMM
+        date_str += "01"
+    
+    # Convert to YYYY-MM-DD format
+    try:
+        formatted_date = datetime.strptime(date_str, "%Y%m%d").strftime("%Y-%m-%d")
+        return formatted_date
+    except:
+        return ''
+    
 def getURLScanUrls():
     """
     Get URLs from the URLSCan API, urlscan.io
@@ -1628,9 +1821,26 @@ def getURLScanUrls():
         
         # Set the URL to just the hostname
         url = URLSCAN_URL.replace('{DOMAIN}',quote(argsInputHostname))
+        
+        # If the --from-date or --to-date parameters were paassed then also add a date filter
+        if args.from_date or args.to_date:
+            if args.from_date:
+                fromDate = format_date_for_urlscan(str(args.from_date)[:8])
+            else:
+                fromDate = '2016-01-01' # The year URLScan started
+            if args.to_date:
+                toDate = format_date_for_urlscan(str(args.to_date)[:8])
+            else:
+                toDate = 'now'
+            url = url.replace('{DATERANGE}',f'%20date:[{fromDate}%20TO%20{toDate}]')
+        else:
+            url = url.replace('{DATERANGE}','')
 
         if verbose():
-            write(colored('The URLScan URL requested to get links: ','magenta')+colored(url+'\n','white'))
+            if args.mode == 'R':
+                write(colored('The URLScan URL requested to get links for responses: ','magenta')+colored(url+'\n','white'))
+            else:
+                write(colored('The URLScan URL requested to get links: ','magenta')+colored(url+'\n','white'))
         
         if not args.check_only:           
             write(colored('\rGetting links from urlscan.io API (this can take a while for some domains)...\r','cyan'))
@@ -1641,7 +1851,7 @@ def getURLScanUrls():
             # For other sources we would use `random.choice(USER_AGENT)` to asignn a random user-agent, but it seems 
             # that there are a handful of those that ALWAYS return 429. Passing a specific one all the time seems to
             # be successful all the time 
-            userAgent = "waymore by xnl-h4ck3r" 
+            userAgent = "waymore v"+__version__+" by xnl-h4ck3r"  
             session = requests.Session()
             session.mount('https://', HTTP_ADAPTER)
             session.mount('http://', HTTP_ADAPTER)
@@ -1705,7 +1915,7 @@ def getURLScanUrls():
             totalUrls = 0
         
         # Carry on if something was found
-        if args.check_only:
+        if args.check_only and args.mode != 'R':
             try:
                 hasMore = jsonResp['has_more']
                 if hasMore:
@@ -1771,9 +1981,17 @@ def getURLScanUrls():
                         except:
                             mimeType = ''
                         
+                        # If we are going to be downloading responses, then get the unique ID to retrieve the DOM later
+                        urlscanID = ''
+                        if args.mode in ('R','B'):
+                            try:
+                                urlscanID = urlSection['_id']
+                            except:
+                                pass
+                            
                         # If a URL was found the process it
                         if foundUrl != '':
-                            processURLScanUrl(foundUrl, httpCode, mimeType)
+                            processURLScanUrl(foundUrl, httpCode, mimeType, urlscanID)
                         
                         # If a pointer was found the process it
                         if pointer != '':    
@@ -1831,19 +2049,20 @@ def getURLScanUrls():
                             jsonResp = json.loads(resp.text.strip())
                             
                             # If there are no more results, or if the requests limit was specified and has been exceeded, then stop
-                            if jsonResp['results'] is None or len(jsonResp['results']) == 0 or (args.limit_requests != 0 and requestsMade > args.limit_requests):
+                            if jsonResp['results'] is None or len(jsonResp['results']) == 0 or (args.limit_requests != 0 and requestsMade > args.limit_requests) or (args.mode == 'R' and args.limit != 0 and requestsMade > args.limit):
                                 stopSource = True
         
             # Show the MIME types found (in case user wants to exclude more)
-            if verbose() and len(linkMimes) > 0:
+            if verbose() and len(linkMimes) > 0 and args.mode != 'R':
                 linkMimes.discard('warc/revisit')
                 write(getSPACER(colored('MIME types found: ','magenta')+colored(str(linkMimes),'white'))+'\n')
                         
             linkCount = len(linksFound) - originalLinkCount
-            if args.xwm and args.xcc and args.xav:
-                write(getSPACER(colored('Links found on urlscan.io: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
-            else:
-                write(getSPACER(colored('Extra links found on urlscan.io: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+            if args.mode != 'R':
+                if args.xwm and args.xcc and args.xav:
+                    write(getSPACER(colored('Links found on urlscan.io: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
+                else:
+                    write(getSPACER(colored('Extra links found on urlscan.io: ', 'cyan')+colored(str(linkCount),'white'))+'\n')
         
     except Exception as e:
         writerr(colored('ERROR getURLScanUrls 1: ' + str(e), 'red'))
@@ -1941,7 +2160,9 @@ def processWayBackPage(url):
                         # Only get MIME Types if --verbose option was selected
                         if verbose():
                             try:
-                                linkMimes.add(str(results).split(' ')[2])
+                                mimeType = str(results).split(' ')[2]
+                                if mimeType != '':
+                                    linkMimes.add(mimeType)
                             except Exception as e:
                                 if verbose():
                                     writerr(colored(getSPACER('ERROR processWayBackPage 2: Cannot get MIME type from line: ' + str(line)),'red'))
@@ -2178,7 +2399,8 @@ def processCommonCrawlCollection(cdxApiUrl):
                     # Get MIME Types if --verbose option was seletced
                     if verbose():
                         try:
-                            linkMimes.add(data['mime'])
+                            if data['mime'] != '':
+                                linkMimes.add(data['mime'])
                         except:
                             pass
                     linksFoundAdd(data['url'])
@@ -2715,12 +2937,200 @@ def getIntelxUrls():
     except Exception as e:
         writerr(colored('ERROR getIntelxUrls 1: ' + str(e), 'red'))
 
-def processResponses():
+def processResponses(): 
+    """
+    Get archived responses from al sources
+    """
+    global stopProgram, totalFileCount
+    try:
+
+        # Get responses from URLScan unless excluded
+        if stopProgram is None and not args.xus:
+            processResponsesURLScan()
+                    
+        # Get responses from wayback machine unless excluded
+        if stopProgram is None and not args.xwm:
+            processResponsesWayback()
+        
+        # If requested, generate the combined inline JS files
+        if not args.check_only and stopProgram is None and totalFileCount > 0 and args.output_inline_js:
+            combineInlineJS()
+            
+    except Exception as e:
+        writerr(colored(getSPACER('ERROR processResponses 1: ' + str(e)), 'red'))
+
+def processResponsesURLScan():
+    """
+    Get archived responses from URLScan (urlscan.io)
+    """
+    global subs, path, indexFile, totalResponses, stopProgram, argsInput, continueRespFileURLScan, successCount, fileCount, DEFAULT_OUTPUT_DIR, responseOutputDirectory, urlscanRequestLinks, failureCount, totalFileCount, checkURLScan
+    try:
+        fileCount = 0
+        failureCount = 0
+        if not args.check_only:
+            # Create 'results' and domain directory if needed
+            createDirs()
+            
+            # Get the path of the files, depending on whether -oR / --output_responses was passed
+            try:
+                continuePath = responseOutputDirectory + 'continueRes.URLScan.tmp'
+                responsesPath = responseOutputDirectory + 'responses.URLScan.tmp'
+                indexPath = responseOutputDirectory + 'waymore_index.txt'
+            except Exception as e:
+                if verbose():
+                    writerr(colored('ERROR processResponsesURLScan 4: ' + str(e), 'red'))
+        
+        # Get URLs from URLScan.io if the DOM ID's haven't been retrieved yet
+        if args.mode == 'R' and stopProgram is None and not args.check_only:
+            write(colored('\rGetting list of response links (this can take a while for some domains)...\r','cyan'))
+            getURLScanUrls()
+                           
+        # Check if a continueResp.URLScan.tmp and responses.URLScan.tmp files exists
+        runPrevious = 'n'
+        if not args.check_only and os.path.exists(continuePath) and os.path.exists(responsesPath):
+            
+            # Load the links into the set
+            with open(responsesPath,'rb') as fl:
+                linkRequests = pickle.load(fl)
+            totalPrevResponses = len(linkRequests)        
+            
+            # Get the previous end position to start again at this point
+            try:
+                with open(continuePath,'r') as fc:
+                    successCount = int(fc.readline().strip())
+            except Exception as e:
+                successCount = 0
+                
+            # Ask the user if we should continue with previous run if the current starting position is greater than 0 and less than the total
+            if successCount > 0 and successCount < totalPrevResponses:
+                # If the program is not piped from or to another process, then ask whether to continue with previous run
+                if sys.stdout.isatty() and sys.stdin.isatty():
+                    write(colored('The previous run to get archived responses for ' + argsInput  + ' was not completed.\nYou can start from response ' + str(successCount) + ' of ' + str(totalPrevResponses) + ' for the previous run, or you can start a new run with your specified arguments.', 'yellow'))
+                    runPrevious = input('Continue with previous run? y/n: ')
+                else:
+                    if CONTINUE_RESPONSES_IF_PIPED:
+                        runPrevious = 'y'
+                        writerr(colored('The previous run to get archived responses for ' + argsInput  + ' was not completed. Starting from response ' + str(successCount) + ' of ' + str(totalPrevResponses) + '... ', 'yellow'))
+                    else:
+                        runPrevious = 'n'
+                
+        # If we are going to run a new run
+        if runPrevious.lower() == 'n':
+                        
+            # Set start point
+            successCount = 0
+            
+            # Get the URLScan DOM links
+            linkRequests = []
+            for originalUrl, domUrl in urlscanRequestLinks:
+               linkRequests.append((originalUrl,domUrl))
+                    
+            # Write the links to a temp file
+            if not args.check_only:
+                with open(responsesPath,'wb') as f:
+                    pickle.dump(linkRequests, f)
+                
+        # Get the total number of responses we will try to get and set the current file count to the success count
+        totalResponses = len(linkRequests)
+        checkURLScan = checkURLScan + totalResponses
+        
+        # If there are no reponses to download, diaplay an error and exit
+        if args.mode != 'R' and totalResponses == 0:
+            writerr(colored(getSPACER('Failed to get responses from URLScan (urlscan.io) - check input and try again.'), 'red'))
+            return
+        
+        fileCount = successCount
+        
+        if args.check_only:
+            writerr(colored('Downloading archived responses: ','cyan')+colored('UNKNOWN requests','cyan'))
+            writerr(colored('\n-> Downloading the responses can vary depending on the target and the rate limiting on URLScan','green'))
+            # if args.limit == 5000 and totalResponses == 5000:
+            #     writerr(colored('Downloading archived responses: ','cyan')+colored(str(totalResponses+1)+' requests (the --limit argument defaults to '+str(DEFAULT_LIMIT)+')','cyan'))
+            # else:
+            #     writerr(colored('Downloading archived responses: ','cyan')+colored(str(totalResponses+1)+' requests','white'))
+            # minutes = round(totalResponses*2.5 // 60)
+            # hours = minutes // 60
+            # days = hours // 24
+            # if minutes < 5:
+            #     write(colored('\n-> Downloading the responses (depending on their size) should be quite quick!','green'))
+            # elif hours < 2:
+            #     write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(minutes)+' minutes.','green'))
+            # elif hours < 6:
+            #     write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(hours)+' hours.','green'))
+            # elif hours < 24:
+            #     write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(hours)+' hours.','yellow'))
+            # elif days < 7:
+            #     write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(days)+' days. Consider using arguments -ko, -l, -ci, -from and -to wisely! ','red'))
+            # else:
+            #     write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(days)+' days!!! Consider using arguments -ko, -l, -ci, -from and -to wisely!','red'))
+            write('')
+        else:
+            # If the limit has been set over the default, give a warning that this could take a long time!
+            if totalResponses - successCount > DEFAULT_LIMIT:
+                if successCount > 0:
+                    writerr(colored(getSPACER('WARNING: Downloading remaining ' + str(totalResponses - successCount) + ' responses may take a loooooooong time! Consider using arguments -ko, -l, -ci, -from and -to wisely!'),'yellow'))
+                else:
+                    writerr(colored(getSPACER('WARNING: Downloading ' + str(totalResponses) + ' responses may take a loooooooong time! Consider using arguments -ko, -l, -ci, -from and -to wisely!'),'yellow'))
+            
+            # Open the index file if hash value is going to be used (not URL)
+            if not args.url_filename:
+                indexFile = open(indexPath,'a')
+            
+            # Open the continue.URLScan.tmp file to store what record we are upto
+            continueRespFileURLScan = open(continuePath,'w+')
+            
+            # Process the URLs from URLScan  
+            if stopProgram is None:
+                p = mp.Pool(args.processes)
+                p.starmap(getURLScanDOM, linkRequests[successCount:])
+                p.close()
+                p.join()
+                
+            # Delete the tmp files now it has run successfully
+            if stopProgram is None:
+                try:
+                    os.remove(continuePath)
+                    os.remove(responsesPath)
+                except:
+                    pass
+            
+            # Close the index file if hash value is going to be used (not URL)
+            if not args.url_filename:
+                indexFile.close()
+                
+            # Close the continueResp.URLScan.tmp file
+            continueRespFileURLScan.close()
+        
+        if not args.check_only:
+            try:
+                if failureCount > 0:
+                    if verbose():
+                        write(colored('\nURLScan responses saved to ','cyan')+colored(responseOutputDirectory,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' not found)\n','red'))
+                    else:
+                        write(colored('\nURLScan responses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' not found)\n','red'))
+                else:
+                    if verbose():
+                        write(colored('\nURLScan responses saved to ','cyan')+colored(responseOutputDirectory,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
+                    else:
+                        write(colored('\nURLScan responses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
+            except Exception as e:
+                if verbose():
+                    writerr(colored("ERROR processResponsesURLScan 5: " + str(e), "red"))   
+        
+        totalFileCount = totalFileCount + fileCount   
+    except Exception as e:
+        writerr(colored(getSPACER('ERROR processResponsesURLScan 1: ' + str(e)), 'red'))
+    finally:
+        linkRequests = None    
+        
+def processResponsesWayback():
     """
     Get archived responses from Wayback Machine (archive.org)
     """
-    global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput, continueRespFile, successCount, fileCount, DEFAULT_OUTPUT_DIR, responseOutputDirectory
+    global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput, continueRespFile, successCount, fileCount, DEFAULT_OUTPUT_DIR, responseOutputDirectory, failureCount, totalFileCount
     try:
+        fileCount = 0
+        failureCount = 0
         if not args.check_only:
             # Create 'results' and domain directory if needed
             createDirs()
@@ -2729,11 +3139,11 @@ def processResponses():
             try:
                 continuePath = responseOutputDirectory + 'continueResp.tmp'
                 responsesPath = responseOutputDirectory + 'responses.tmp'
-                indexPath = responseOutputDirectory + 'index.txt'
+                indexPath = responseOutputDirectory + 'waymore_index.txt'
             except Exception as e:
                 if verbose():
-                    writerr(colored('ERROR processResponses 4: ' + str(e), 'red'))
-                
+                    writerr(colored('ERROR processResponsesWayback 4: ' + str(e), 'red'))
+                               
         # Check if a continueResp.tmp and responses.tmp files exists
         runPrevious = 'n'
         if not args.check_only and os.path.exists(continuePath) and os.path.exists(responsesPath):
@@ -2822,7 +3232,7 @@ def processResponses():
             url = WAYBACK_URL.replace('{DOMAIN}',subs + quote(argsInput) + path).replace('{COLLAPSE}',collapse) + filterMIME + filterCode + filterLimit + filterFrom + filterTo + filterKeywords
                 
             if verbose():
-                write(colored('The archive URL requested to get responses: ','magenta')+colored(url+'\n','white'))
+                write(colored('The Wayback Machine URL requested to get responses: ','magenta')+colored(url+'\n','white'))
             
             if args.check_only:
                 write(colored('\rChecking archived response requests...\r','cyan'))
@@ -2855,7 +3265,7 @@ def processResponses():
                         if resp.text == '':
                             writerr(colored(getSPACER('No archived responses were found on Wayback Machine (archive.org) for the given search parameters.'),'red'))
                             success = False
-                        # If a status other of 429, then stop processing Alien Vault
+                        # If a status other of 429, then stop processing
                         if resp.status_code == 429:
                             writerr(colored(getSPACER('[ 429 ] Wayback Machine (archive.org) rate limit reached, so stopping. Links that have already been retrieved will be saved.'),'red'))
                             success = False
@@ -2892,7 +3302,7 @@ def processResponses():
                     originalUrl = parts[1]
                     linksFoundResponseAdd(timestamp+'/'+originalUrl)
                 except Exception as e:
-                    writerr(colored(getSPACER('ERROR processResponses 3: Cannot to get link from line: '+str(line)), 'red'))
+                    writerr(colored(getSPACER('ERROR processResponsesWayback 3: Cannot to get link from line: '+str(line)), 'red'))
             
             # Remove any links that have URL exclusions
             linkRequests = []
@@ -2956,7 +3366,7 @@ def processResponses():
             if not args.url_filename:
                 indexFile = open(indexPath,'a')
             
-            # Open the continue.tmp file to store what record we are upto
+            # Open the continueResp.tmp file to store what record we are upto
             continueRespFile = open(continuePath,'w+')
             
             # Process the URLs from web archive   
@@ -2981,8 +3391,26 @@ def processResponses():
             # Close the continueResp.tmp file
             continueRespFile.close()
         
+        # Output results if not just checking
+        if not args.check_only:
+            try:
+                if failureCount > 0:
+                    if verbose():
+                        write(colored('\nWayback responses saved to ','cyan')+colored(responseOutputDirectory,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' failed)\n','red'))
+                    else:
+                        write(colored('\nWayback responses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘','white')+colored(' (' + str(failureCount) + ' failed)\n','red'))
+                else:
+                    if verbose():
+                        write(colored('\nWayback responses saved to ','cyan')+colored(responseOutputDirectory,'white') + colored(' for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
+                    else:
+                        write(colored('\nWayback responses saved for ' + subs + argsInput + ': ', 'cyan')+colored(str(fileCount) +' (' +str(successCount-fileCount) + ' empty responses) 🤘\n','white'))
+            except Exception as e:
+                if verbose():
+                    writerr(colored("ERROR processResponsesWayback 5: " + str(e), "red"))    
+        
+        totalFileCount = totalFileCount + fileCount             
     except Exception as e:
-        writerr(colored(getSPACER('ERROR processResponses 1: ' + str(e)), 'red'))
+        writerr(colored(getSPACER('ERROR processResponsesWayback 1: ' + str(e)), 'red'))
     finally:
         linkRequests = None    
 
@@ -3098,7 +3526,7 @@ def combineInlineJS():
     try:
         write(colored('Creating combined inline JS files...', 'cyan'))
         outputFileTemplate = "combinedInline{}.js"
-        excludedNames = ['index.txt', 'continueResp.tmp', 'responses.tmp']
+        excludedNames = ['waymore_index.txt', 'continueResp.tmp', 'continueResp.URLScan.tmp', 'responses.tmp', 'responses.URLScan.tmp']
         fileList = [name for name in os.listdir(responseOutputDirectory) 
             if os.path.isfile(os.path.join(responseOutputDirectory, name)) 
             and not any(name.lower().endswith(ext) for ext in INLINE_JS_EXCLUDE) 
@@ -3300,15 +3728,15 @@ def main():
         '-from',
         '--from-date',
         action='store',
-        type=int,
+        type=validateArgDate,
         help='What date to get responses from. If not specified it will get from the earliest possible results. A partial value can be passed, e.g. 2016, 201805, etc.',
-        metavar='<yyyyMMddhhmmss>'
+        metavar='<yyyyMMddhhmmss>',
     )
     parser.add_argument(
         '-to',
         '--to-date',
         action='store',
-        type=int,
+        type=validateArgDate,
         help='What date to get responses to. If not specified it will get to the latest possible results. A partial value can be passed, e.g. 2016, 201805, etc.',
         metavar='<yyyyMMddhhmmss>'
     )
@@ -3476,7 +3904,7 @@ def main():
         "-co",
         "--check-only",
         action="store_true",
-        help="This will make a few minimal requests to show you how many requests, and roughly how long it could take, to get URLs from the sources and downloaded responses from Wayback Machine.",
+        help="This will make a few minimal requests to show you how many requests, and roughly how long it could take, to get URLs from the sources and downloaded responses from Wayback Machine (unfortunately it isn't possible to check how long it will take to download responses from URLScan).",
     )
     parser.add_argument(
         "-nd",
@@ -3589,6 +4017,7 @@ def main():
             indexFile = None
             path = ''
             stopSource = False
+            urlscanRequestLinks = set()
             
             # Get the config settings from the config.yml file
             getConfig()
@@ -3640,16 +4069,9 @@ def main():
                     responseOutputDirectory = args.output_responses + '/'
                 else:
                     responseOutputDirectory = str(DEFAULT_OUTPUT_DIR) + '/results/' + str(argsInput).replace('/','-') + '/'
-            
+
+                # Get the responses
                 processResponses()
-                
-                # Output details of the responses downloaded
-                if not args.check_only:
-                    processResponsesOutput()
-            
-                    # If requested, generate the combined inline JS files
-                    if stopProgram is None and fileCount > 0 and args.output_inline_js:
-                        combineInlineJS()
                     
             if args.check_only:
                 write(colored('NOTE: The time frames are a very rough guide and doesn\'t take into account additonal time for rate limiting.','magenta'))

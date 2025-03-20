@@ -1,5 +1,19 @@
 ## Changelog
 
+- v6.0
+
+  - New
+
+    - Get archived responses from URLScan in addition to wayback machine. The same processing to get the links will be done, but the `_id` values will be stored and then the DOM for each response can be retrieved from `https://urlscan.io/dom/{UUID}`. Sometimes the API may not have saved the DOM, so these are just skipped.
+    - BUG FIX: The `-from`/`--from-date` and `-to`/`--to-date` values can take the format `YYYYMMDDhhmmss` (or part of) but wasn't validated that it was a valid date/time. Validation now added.
+    - BUG FIX: The search for links on URLScan wasn't taking into account the `-from` or `-to` fields. These are now used to format the `{DATERANGE}` section in `URLSCAN_URL`.
+    - BUG FIX: If a URL is passed as input, then the links from URLScan would just match the domain, not the URL.
+
+  - Changed
+
+    - Pass the waymore version in the User-Agent when making requests to URLScan.
+    - Rename `index.txt` to `waymore_index.txt` instead, to allow `xnLinKFinder` identify a `waymore` response directory better.
+
 - v5.1
 
   - BUG FIX: When calling URLScan API, it would sometimes return a 429 response straight away. It was assumed this was just to do with the API rate limiting, but it seemed to been related to the User-Agent and was a WAF 429 rather than a specific API 429. It now sets a specific user agent of `waymore by xnl-h4ck3r` which always works for now.
