@@ -1559,7 +1559,7 @@ def processURLScanUrl(url, httpCode, mimeType, urlscanID=''):
     
     try:
         # If the input has a / in it, then a URL was passed, so the link will only be added if the URL matches
-        if url.contains('/'):
+        if '/' in url:
             if argsInput not in url:
                 addLink = False
                 

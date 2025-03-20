@@ -1,6 +1,8 @@
 ## Changelog
 
-- v6.0
+- v6.1
+
+  - INFO: v6.0 was skipped because there was an error in the version uploaded to PyPi and it cannot be replaced
 
   - New
 
