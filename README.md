@@ -286,3 +286,7 @@ Good luck and good hunting!
 If you really love the tool (or any others), or they helped you find an awesome bounty, consider [BUYING ME A COFFEE!](https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
 
 🤘 /XNL-h4ck3r
+
+### Tips for rate limits
+* Some APIs/Common Crawl may 429 or throttle; keep requests smaller (limit years / date windows) and filter codes/MIME to control volume.
+* If CI jobs hit limits, retry with backoff or narrow the time window.
