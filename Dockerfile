@@ -9,6 +9,6 @@ RUN pip install --upgrade pip && test -f requirements.txt && pip install -r requ
 COPY . .
 
 FROM base AS runtime
-RUN useradd -u 10001 -ms /bin/bash appuser
+RUN useradd -ms /bin/bash appuser
 USER appuser
 ENTRYPOINT ["python", "-m", "waymore"]
