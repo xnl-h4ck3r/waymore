@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # Python 3
-# waymore - by @Xnl-h4ck3r: Find way more from the Wayback Machine (also get links from Common Crawl, AlienVault OTX, URLScan and VirusTotal)
+# waymore - by @Xnl-h4ck3r: Find way more from the Wayback Machine (also get links from Common Crawl, AlienVault OTX, URLScan, VirusTotal and Intelligence X)
 # Full help here: https://github.com/xnl-h4ck3r/waymore/blob/main/README.md
 # Good luck and good hunting! If you really love the tool (or any others), or they helped you find an awesome bounty, consider BUYING ME A COFFEE! (https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
 
