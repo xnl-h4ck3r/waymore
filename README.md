@@ -263,6 +263,14 @@ xnLinkFinder -i ~/Tools/waymore/results/redbull.com -sp https://www.redbull.com 
 
 Or run other tools such as [trufflehog](https://github.com/trufflesecurity/trufflehog) or [gf](https://github.com/tomnomnom/gf) over the directory of responses to find even more from the archived responses!
 
+## In Depth Instructions
+
+Below is an in-depth talk I did for [Jason Haddix's discord channel](https://discord.gg/jhaddix) back in March 2024 to cover **EVERYTHING** you need to know about `waymore`.
+
+**NOTE: This video is from March 2024, so any features added after this will not be featured and some features may have changed. Please double check the current instructions.**
+
+[![waymore talk](https://img.youtube.com/vi/hMaYSi9ErnM/0.jpg)](https://www.youtube.com/watch?v=hMaYSi9ErnM)
+
 ## Issues
 
 If you come across any problems at all, or have ideas for improvements, please feel free to raise an issue on Github. If there is a problem, it will be useful if you can provide the exact command you ran and a detailed description of the problem. If possible, run with `-v` to reproduce the problem and let me know about any error messages that are given.
