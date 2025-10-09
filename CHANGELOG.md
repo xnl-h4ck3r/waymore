@@ -1,5 +1,15 @@
 ## Changelog
 
+- v6.2
+
+  - New
+
+    - Add argument `--stream`. Using it will output URLs to STDOUT as soon as they are found (duplicates will be shown). Only works with `-mode U`. All other output is suppressed, so use `-v` to see any errors. Use `-oU` to explicitly save results to file (wil be deduplicated). [Issue 54](https://github.com/xnl-h4ck3r/waymore/issues/54)
+
+  - Changed
+
+    - Change the `--version` argument to show the version and whether it is outdated or not, in the same way as the banner.
+
 - v6.1
 
   - INFO: v6.0 was skipped because there was an error in the version uploaded to PyPi and it cannot be replaced

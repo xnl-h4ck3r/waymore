@@ -205,7 +205,9 @@ def processStats():
 def write(text='',pipe=False):
     # Only send text to stdout if the tool isn't piped to pass output to something else, 
     # or if the tool has been piped and the pipe parameter is True
-    if sys.stdout.isatty() or (not sys.stdout.isatty() and pipe):
+    # AND if --stream is NOT active OR if it is active but we are explicitly piping (e.g. for URLs)
+    if (sys.stdout.isatty() or (not sys.stdout.isatty() and pipe)) and \
+       (not (args.stream and args.mode == 'U') or (args.stream and args.mode == 'U' and pipe)):
         # If it has carriage return in the string, don't add a newline
         if text.find('\r') > 0:
             sys.stdout.write(text)
@@ -213,20 +215,22 @@ def write(text='',pipe=False):
             sys.stdout.write(text+'\n')
 
 def writerr(text='',pipe=False):
-    # Only send text to stdout if the tool isn't piped to pass output to something else, 
-    # or If the tool has been piped to output the send to stderr
-    if sys.stdout.isatty():
-        # If it has carriage return in the string, don't add a newline
-        if text.find('\r') > 0:
-            sys.stdout.write(text)
-        else:
-            sys.stdout.write(text+'\n')
+    # If --stream is active and mode is 'U', and verbose is NOT true, suppress output.
+    # Otherwise, use the existing logic.
+    if args.stream and args.mode == 'U' and not args.verbose:
+        pass # Suppress output
     else:
-        # If it has carriage return in the string, don't add a newline
-        if text.find('\r') > 0:
-            sys.stderr.write(text)
+        # Original logic: write to stdout if interactive, else stderr
+        if sys.stdout.isatty():
+            if text.find('\r') > 0:
+                sys.stdout.write(text)
+            else:
+                sys.stdout.write(text+'\n')
         else:
-            sys.stderr.write(text+'\n')
+            if text.find('\r') > 0:
+                sys.stderr.write(text)
+            else:
+                sys.stderr.write(text+'\n')
 
 def showVersion():
     try:
@@ -710,27 +714,29 @@ def printProgressBar(
         fill        - Optional  : bar fill character (Str)
         printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
     """
-    try:
-        percent = ("{0:." + str(decimals) + "f}").format(
-            100 * (iteration / float(total))
-        ).rjust(5)
-        filledLength = int(length * iteration // total)
-        bar = fill * filledLength + "-" * (length - filledLength)
-        # If the program is not piped with something else, write to stdout, otherwise write to stderr
-        if sys.stdout.isatty():
-            write(colored(f"\r{prefix} |{bar}| {percent}% {suffix}\r", "green"))
-        else:
-            writerr(colored(f"\r{prefix} |{bar}| {percent}% {suffix}\r", "green"))
-        # Print New Line on Complete
-        if iteration == total:
+    # Only show progress bar if not streaming
+    if not (args.stream and args.mode == 'U'):
+        try:
+            percent = ("{0:." + str(decimals) + "f}").format(
+                100 * (iteration / float(total))
+            ).rjust(5)
+            filledLength = int(length * iteration // total)
+            bar = fill * filledLength + "-" * (length - filledLength)
             # If the program is not piped with something else, write to stdout, otherwise write to stderr
             if sys.stdout.isatty():
-                write()
-            else: 
-                writerr()
-    except Exception as e:
-        if verbose():
-            writerr(colored("ERROR printProgressBar: " + str(e), "red"))
+                write(colored(f"\r{prefix} |{bar}| {percent}% {suffix}\r", "green"))
+            else:
+                writerr(colored(f"\r{prefix} |{bar}| {percent}% {suffix}\r", "green"))
+            # Print New Line on Complete
+            if iteration == total:
+                # If the program is not piped with something else, write to stdout, otherwise write to stderr
+                if sys.stdout.isatty():
+                    write()
+                else:
+                    writerr()
+        except Exception as e:
+            if verbose():
+                writerr(colored("ERROR printProgressBar: " + str(e), "red"))
 
 def filehash(text):
     """
@@ -786,19 +792,25 @@ def linksFoundResponseAdd(link):
         # Don't write it if the link does not contain the requested domain (this can sometimes happen)
         if parsed_url.lower().find(checkInput.lower()) >= 0:
             linksFound.add(link)
+            # If streaming is enabled and mode is 'U', print the link to stdout
+            if args.stream and args.mode == 'U':
+                write(link, pipe=True)
     except Exception as e:
         linksFound.add(link)
+        # If streaming is enabled and mode is 'U', print the link to stdout
+        if args.stream and args.mode == 'U':
+            write(link, pipe=True)
         
 # Add a link to the linksFound collection
 def linksFoundAdd(link):
     global linksFound, argsInput, argsInputHostname
-    
+
     try:
         if inputIsDomainANDPath:
             checkInput = argsInput
         else:
             checkInput = argsInputHostname
-        
+
         # If the link specifies port 80 or 443, e.g. http://example.com:80, then remove the port
         parsed = urlparse(link.strip())
         if parsed.port in (80, 443):
@@ -806,12 +818,18 @@ def linksFoundAdd(link):
             parsed_url = parsed._replace(netloc=new_netloc).geturl()
         else:
             parsed_url = link
-        
+
         # Don't write it if the link does not contain the requested domain (this can sometimes happen)
         if parsed_url.find(checkInput) >= 0:
             linksFound.add(link)
+            # If streaming is enabled and mode is 'U', print the link to stdout
+            if args.stream and args.mode == 'U':
+                write(link, pipe=True)
     except Exception as e:
         linksFound.add(link)
+        # If streaming is enabled and mode is 'U', print the link to stdout
+        if args.stream and args.mode == 'U':
+            write(link, pipe=True)
     
 def processArchiveUrl(url):
     """
@@ -1062,7 +1080,7 @@ def processURLOutput():
             else:
                 write(colored('\n-> Getting URLs (e.g. at 1 req/sec) could take more than '+str(days)+' days!!! Consider using arguments -lr, -ci, -from and -to wisely!','red'))
             write('')
-        else:
+        elif not (args.stream and args.mode == 'U' and args.output_urls == ''): # Only write to file if not streaming OR if streaming but -oU is provided
             linkCount = len(linksFound)
             write(getSPACER(colored('Links found for ' + subs + argsInput + ': ', 'cyan')+colored(str(linkCount) + ' 🤘','white'))+'\n')
             
@@ -3879,6 +3897,11 @@ def main():
         help="If this argument is passed, a .new file will also be written that will contain links for the latest run. This is only relevant for mode U.",
     )
     parser.add_argument(
+        '--stream',
+        action='store_true',
+        help='Output URLs to STDOUT as soon as they are found (duplicates will be shown). Only works with -mode U. All other output is suppressed, so use -v to see any errors. Use -oU to explicitly save results to file (wil be deduplicated).',
+    )
+    parser.add_argument(
         "-c",
         "--config",
         action="store",
@@ -3924,7 +3947,7 @@ def main():
 
     # If --version was passed, display version and exit
     if args.version:
-        write(colored('Waymore - v' + __version__,'cyan'))
+        showVersion()
         sys.exit()
     
     # If -lcc wasn't passed then set to the default of 1 if -lcy is 0. This will make them work together
@@ -3975,7 +3998,8 @@ def main():
     except:
         pass
         
-    showBanner()
+    if not (args.stream and args.mode == 'U'):
+        showBanner()
              
     try:     
 
@@ -4022,7 +4046,7 @@ def main():
             # Get the config settings from the config.yml file
             getConfig()
 
-            if verbose():
+            if verbose() and not (args.stream and args.mode == 'U'):
                 showOptions()
             
             if args.check_only:
