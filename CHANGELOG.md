@@ -1,5 +1,15 @@
 ## Changelog
 
+- v6.3
+
+  - Changed
+
+    - Code quality improvements: Fixed all bare `except:` statements to use `except Exception:` for better error handling practices.
+    - Fixed undefined variable issue by properly declaring `process` as a global variable.
+    - Removed unused variable assignments to clean up the codebase.
+    - Applied consistent code formatting (black) and linting (ruff) across all Python files.
+    - All changes are code quality improvements with no functional impact.
+
 - v6.2
 
   - New
