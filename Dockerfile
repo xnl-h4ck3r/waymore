@@ -16,5 +16,7 @@ WORKDIR /app
 RUN mkdir -p results && chown -R appuser:appuser /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin/waymore /usr/local/bin/waymore
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 USER appuser
-ENTRYPOINT ["waymore"]
+ENTRYPOINT ["docker-entrypoint.sh"]
