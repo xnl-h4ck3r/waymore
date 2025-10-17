@@ -11,6 +11,9 @@ license = {text = "MIT"}
 authors = [{name="xnl-h4ck3r"}]
 dynamic = ["version", "dependencies"]
 
+[project.scripts]
+waymore = "waymore.waymore:main"
+
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 version = {attr = "waymore.__version__"}
