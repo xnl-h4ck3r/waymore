@@ -279,7 +279,7 @@ def showVersion():
                 + __version__
                 + " (unable to check if latest)\n"
             )
-        if __version__ == resp.text.split("=")[1].replace('"', ""):
+        if __version__ == resp.text.split("=")[1].replace('"', "").strip():
             write(
                 "Current waymore version "
                 + __version__

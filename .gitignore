@@ -4,3 +4,5 @@ dist/
 waymore.egg-info
 __pycache__
 collinfo.json
+.ruff_cache
+.pytest_cache

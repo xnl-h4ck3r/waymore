@@ -1,5 +1,15 @@
 ## Changelog
 
+- v6.4
+
+  - New
+
+    - Add `.ruff_cache` and `.pytest_cache` to `.gitignore` now required after v6.3 changes.
+
+  - Changed
+
+    - BUG FIX: The version was now being shown as outdated because of changes made in v6.3. The version just needed white space stripped now.
+
 - v6.3
 
   - Changed
