@@ -17,4 +17,4 @@ RUN mkdir -p results && chown -R appuser:appuser /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin/waymore /usr/local/bin/waymore
 USER appuser
-CMD ["waymore"]
+ENTRYPOINT ["waymore"]
