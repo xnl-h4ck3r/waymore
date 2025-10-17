@@ -123,7 +123,7 @@ docker build -t waymore .
 Run waymore with this command:
 
 ```bash
-docker run -it --rm -v $PWD/results:/app/results waymore:latest waymore -i example.com -oU example.com.links -oR results/example.com/
+docker run -it --rm -v $PWD/results:/app/results waymore:latest -i example.com -oU example.com.links -oR results/example.com/
 ```
 
 ## Input and Mode
