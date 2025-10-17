@@ -7,8 +7,11 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --upgrade pip && test -f requirements.txt && pip install -r requirements.txt
 COPY . .
+RUN pip install .
 
 FROM base AS runtime
 RUN useradd -ms /bin/bash appuser
 USER appuser
-ENTRYPOINT ["python", "-m", "waymore"]
+WORKDIR /app
+RUN mkdir -p results
+ENTRYPOINT ["waymore"]
