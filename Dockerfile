@@ -9,3 +9,4 @@ RUN mkdir -p results
 
 RUN python3 setup.py install
 
+ENTRYPOINT ["/usr/local/bin/waymore"]
