@@ -7,21 +7,21 @@ name = "waymore"
 description = "Find way more from the Wayback Machine, Common Crawl, Alien Vault OTX, URLScan, VirusTotal & Intelligence X!"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {text = "MIT"}
-authors = [{name="xnl-h4ck3r"}]
+license = { text = "MIT" }
+authors = [{ name = "xnl-h4ck3r" }]
 dynamic = ["version", "dependencies"]
 
 [project.scripts]
 waymore = "waymore.waymore:main"
 
 [tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
-version = {attr = "waymore.__version__"}
+dependencies = { file = ["requirements.txt"] }
+version = { attr = "waymore.__version__" }
 
 [tool.ruff]
 line-length = 100
 target-version = "py39"
-select = ["E","F","I","UP"]
+select = ["E", "F", "I", "UP"]
 
 [tool.black]
 line-length = 100

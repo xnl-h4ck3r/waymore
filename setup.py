@@ -5,14 +5,18 @@ import shutil
 from setuptools import setup, find_packages
 
 # Read version from __init__.py without importing
+
+
 def get_version():
-    init_path = os.path.join(os.path.dirname(__file__), "waymore", "__init__.py")
+    init_path = os.path.join(os.path.dirname(
+        __file__), "waymore", "__init__.py")
     with open(init_path, "r", encoding="utf-8") as f:
         content = f.read()
         match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content)
         if match:
             return match.group(1)
     raise RuntimeError("Unable to find version string.")
+
 
 target_directory = (
     os.path.join(os.getenv("APPDATA", ""), "waymore")
@@ -22,7 +26,8 @@ target_directory = (
         if os.name == "posix"
         else (
             os.path.join(
-                os.path.expanduser("~"), "Library", "Application Support", "waymore"
+                os.path.expanduser(
+                    "~"), "Library", "Application Support", "waymore"
             )
             if os.name == "darwin"
             else None
