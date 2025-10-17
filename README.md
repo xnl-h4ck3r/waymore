@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
-## About - v6.1
+## About - v6.4
 
 The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
 
@@ -94,6 +94,7 @@ pipx install git+https://github.com/xnl-h4ck3r/waymore.git
 | -lr           | --limit-requests           | Limit the number of requests that will be made when getting links from a source (this doesn\'t apply to Common Crawl). Some targets can return a huge amount of requests needed that are just not feasible to get, so this can be used to manage that situation. This defaults to 0 (Zero) which means there is no limit.                                                                                                                                                                                                                                                                                                                                      |
 | -ow           | --output-overwrite         | If the URL output file (default `waymore.txt`, or specified by `-oU`) already exists, it will be overwritten instead of being appended to.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | -nlf          | --new-links-file           | If this argument is passed, a `waymore.new` file (or if `-oU` is used it will be the name of that file suffixed with `.new`) will also be written, and will contain links for the latest run. This can be used for continuous monitoring of a target (only for `mode U`, not `mode R`).                                                                                                                                                                                                                                                                                                                                                                        |
+|               | --stream                   | Output URLs to STDOUT as soon as they are found (duplicates will be shown). Only works with `-mode U`. All other output is suppressed, so use `-v` to see any errors. Use `-oU` to explicitly save results to file (wil be deduplicated).                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | -c            | --config                   | Path to the YML config file. If not passed, it looks for file `config.yml` in the default directory, typically `~/.config/waymore`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | -wrlr         | --wayback-rate-limit-retry | The number of minutes the user wants to wait for a rate limit pause on Wayback Machine (archive.org) instead of stopping with a `429` error (default: 3).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | -urlr         | --urlscan-rate-limit-retry | The number of minutes the user wants to wait for a rate limit pause on URLScan.io instead of stopping with a `429` error (default: 1).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -262,6 +263,14 @@ xnLinkFinder -i ~/Tools/waymore/results/redbull.com -sp https://www.redbull.com 
 ```
 
 Or run other tools such as [trufflehog](https://github.com/trufflesecurity/trufflehog) or [gf](https://github.com/tomnomnom/gf) over the directory of responses to find even more from the archived responses!
+
+## In Depth Instructions
+
+Below is an in-depth talk I did for [Jason Haddix's discord channel](https://discord.gg/jhaddix) back in March 2024 to cover **EVERYTHING** you need to know about `waymore`.
+
+**NOTE: This video is from March 2024, so any features added after this will not be featured and some features may have changed. Please double check the current instructions.**
+
+[![waymore talk](https://img.youtube.com/vi/hMaYSi9ErnM/0.jpg)](https://www.youtube.com/watch?v=hMaYSi9ErnM)
 
 ## Issues
 

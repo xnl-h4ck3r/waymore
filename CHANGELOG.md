@@ -1,5 +1,35 @@
 ## Changelog
 
+- v6.4
+
+  - New
+
+    - Add `.ruff_cache` and `.pytest_cache` to `.gitignore` now required after v6.3 changes.
+
+  - Changed
+
+    - BUG FIX: The version was now being shown as outdated because of changes made in v6.3. The version just needed white space stripped now.
+
+- v6.3
+
+  - Changed
+
+    - Code quality improvements: Fixed all bare `except:` statements to use `except Exception:` for better error handling practices.
+    - Fixed undefined variable issue by properly declaring `process` as a global variable.
+    - Removed unused variable assignments to clean up the codebase.
+    - Applied consistent code formatting (black) and linting (ruff) across all Python files.
+    - All changes are code quality improvements with no functional impact.
+
+- v6.2
+
+  - New
+
+    - Add argument `--stream`. Using it will output URLs to STDOUT as soon as they are found (duplicates will be shown). Only works with `-mode U`. All other output is suppressed, so use `-v` to see any errors. Use `-oU` to explicitly save results to file (wil be deduplicated). [Issue 54](https://github.com/xnl-h4ck3r/waymore/issues/54)
+
+  - Changed
+
+    - Change the `--version` argument to show the version and whether it is outdated or not, in the same way as the banner.
+
 - v6.1
 
   - INFO: v6.0 was skipped because there was an error in the version uploaded to PyPi and it cannot be replaced
