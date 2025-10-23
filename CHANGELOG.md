@@ -1,5 +1,27 @@
 ## Changelog
 
+- v6.5
+
+  - New
+
+    - Added GitHub Actions CI workflow with automated linting (ruff), formatting checks (black), and testing (pytest) across Python 3.9-3.12
+    - Added `pyproject.toml` with modern Python project configuration and tool settings
+    - Added basic test suite with import test
+    - Added `docker-entrypoint.sh` for proper permission handling in Docker containers
+
+  - Changed
+
+    - **Docker improvements**: Upgraded to multi-stage build using Python 3.12-slim for smaller image size and better security
+    - **Docker security**: Container now runs as non-root user (appuser) with proper permission handling via gosu
+    - **Docker build**: Now uses `python -m build --wheel` instead of deprecated `setup.py install`
+    - Fixed circular import issue in `setup.py` by adding `get_version()` function to read version via regex
+    - Simplified Docker usage command in README (removed redundant `waymore` command from entrypoint)
+    - Applied black and ruff formatting to `setup.py` and `pyproject.toml`
+
+  - Thanks
+
+    - Thanks to [@Donovoi](https://github.com/Donovoi) for PR [#70](https://github.com/xnl-h4ck3r/waymore/pull/70)
+
 - v6.4
 
   - New
