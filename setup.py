@@ -2,15 +2,15 @@
 import os
 import re
 import shutil
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
 
 # Read version from __init__.py without importing
 
 
 def get_version():
-    init_path = os.path.join(os.path.dirname(
-        __file__), "waymore", "__init__.py")
-    with open(init_path, "r", encoding="utf-8") as f:
+    init_path = os.path.join(os.path.dirname(__file__), "waymore", "__init__.py")
+    with open(init_path, encoding="utf-8") as f:
         content = f.read()
         match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content)
         if match:
@@ -25,10 +25,7 @@ target_directory = (
         os.path.join(os.path.expanduser("~"), ".config", "waymore")
         if os.name == "posix"
         else (
-            os.path.join(
-                os.path.expanduser(
-                    "~"), "Library", "Application Support", "waymore"
-            )
+            os.path.join(os.path.expanduser("~"), "Library", "Application Support", "waymore")
             if os.name == "darwin"
             else None
         )
@@ -42,16 +39,10 @@ if target_directory and os.path.isfile("config.yml"):
     # If file already exists, create a new one
     if os.path.isfile(target_directory + "/config.yml"):
         configNew = True
-        os.rename(
-            target_directory + "/config.yml", target_directory + "/config.yml.OLD"
-        )
+        os.rename(target_directory + "/config.yml", target_directory + "/config.yml.OLD")
         shutil.copy("config.yml", target_directory)
-        os.rename(
-            target_directory + "/config.yml", target_directory + "/config.yml.NEW"
-        )
-        os.rename(
-            target_directory + "/config.yml.OLD", target_directory + "/config.yml"
-        )
+        os.rename(target_directory + "/config.yml", target_directory + "/config.yml.NEW")
+        os.rename(target_directory + "/config.yml.OLD", target_directory + "/config.yml")
     else:
         shutil.copy("config.yml", target_directory)
 
@@ -86,8 +77,4 @@ if configNew:
         + "/config.yml already exists.\nCreating config.yml.NEW but leaving existing config.\nIf you need the new file, then remove the current one and rename config.yml.NEW to config.yml\n\033[0m"
     )
 else:
-    print(
-        "\n\033[92mThe file "
-        + target_directory
-        + "/config.yml has been created.\n\033[0m"
-    )
+    print("\n\033[92mThe file " + target_directory + "/config.yml has been created.\n\033[0m")

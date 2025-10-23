@@ -21,7 +21,10 @@ version = { attr = "waymore.__version__" }
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+ignore = ["E501"]  # Ignore line length violations for existing code
 
 [tool.black]
 line-length = 100

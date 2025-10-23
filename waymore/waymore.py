@@ -4,28 +4,29 @@
 # Full help here: https://github.com/xnl-h4ck3r/waymore/blob/main/README.md
 # Good luck and good hunting! If you really love the tool (or any others), or they helped you find an awesome bounty, consider BUYING ME A COFFEE! (https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
 
-from urllib.parse import urlparse
-import requests
-from requests.exceptions import ConnectionError
-from requests.utils import quote
-from requests.adapters import HTTPAdapter, Retry
 import argparse
-from signal import SIGINT, signal
+import enum
+import json
+import math
 import multiprocessing.dummy as mp
-from termcolor import colored
+import os
+import pickle
+import random
+import re
+import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
-import yaml
-import os
-import json
-import re
-import random
-import sys
-import math
-import enum
-import pickle
-import time
+from signal import SIGINT, signal
+from urllib.parse import urlparse
+
+import requests
 import tldextract
+import yaml
+from requests.adapters import HTTPAdapter, Retry
+from requests.exceptions import ConnectionError
+from requests.utils import quote
+from termcolor import colored
 
 try:
     from . import __version__
@@ -94,16 +95,10 @@ urlscanRequestLinks = set()
 # Source Provider URLs
 WAYBACK_URL = "https://web.archive.org/cdx/search/cdx?url={DOMAIN}{COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest"
 CCRAWL_INDEX_URL = "https://index.commoncrawl.org/collinfo.json"
-ALIENVAULT_URL = (
-    "https://otx.alienvault.com/api/v1/indicators/{TYPE}/{DOMAIN}/url_list?limit=500"
-)
-URLSCAN_URL = (
-    "https://urlscan.io/api/v1/search/?q=domain:{DOMAIN}{DATERANGE}&size=10000"
-)
+ALIENVAULT_URL = "https://otx.alienvault.com/api/v1/indicators/{TYPE}/{DOMAIN}/url_list?limit=500"
+URLSCAN_URL = "https://urlscan.io/api/v1/search/?q=domain:{DOMAIN}{DATERANGE}&size=10000"
 URLSCAN_DOM_URL = "https://urlscan.io/dom/"
-VIRUSTOTAL_URL = (
-    "https://www.virustotal.com/vtapi/v2/domain/report?apikey={APIKEY}&domain={DOMAIN}"
-)
+VIRUSTOTAL_URL = "https://www.virustotal.com/vtapi/v2/domain/report?apikey={APIKEY}&domain={DOMAIN}"
 INTELX_SEARCH_URL = "https://2.intelx.io/phonebook/search"
 INTELX_RESULTS_URL = "https://2.intelx.io/phonebook/search/result?id="
 INTELX_ACCOUNT_URL = "https://2.intelx.io/authenticate/info"
@@ -237,8 +232,7 @@ def write(text="", pipe=False):
     # or if the tool has been piped and the pipe parameter is True
     # AND if --stream is NOT active OR if it is active but we are explicitly piping (e.g. for URLs)
     if (sys.stdout.isatty() or (not sys.stdout.isatty() and pipe)) and (
-        not (args.stream and args.mode == "U")
-        or (args.stream and args.mode == "U" and pipe)
+        not (args.stream and args.mode == "U") or (args.stream and args.mode == "U" and pipe)
     ):
         # If it has carriage return in the string, don't add a newline
         if text.find("\r") > 0:
@@ -274,26 +268,14 @@ def showVersion():
                 timeout=3,
             )
         except Exception:
-            write(
-                "Current waymore version "
-                + __version__
-                + " (unable to check if latest)\n"
-            )
+            write("Current waymore version " + __version__ + " (unable to check if latest)\n")
         if __version__ == resp.text.split("=")[1].replace('"', "").strip():
             write(
-                "Current waymore version "
-                + __version__
-                + " ("
-                + colored("latest", "green")
-                + ")\n"
+                "Current waymore version " + __version__ + " (" + colored("latest", "green") + ")\n"
             )
         else:
             write(
-                "Current waymore version "
-                + __version__
-                + " ("
-                + colored("outdated", "red")
-                + ")\n"
+                "Current waymore version " + __version__ + " (" + colored("outdated", "red") + ")\n"
             )
     except Exception:
         pass
@@ -307,9 +289,7 @@ def showBanner():
     write(colored("| | | / ___ | |_| ", "red") + "| | | | |_| | |   | |_| |")
     write(colored(r" \___/\_____|\__  ", "red") + r"|_|_|_|\___/| |   | ____/")
     write(
-        colored("            (____/ ", "red")
-        + colored("  by Xnl-h4ck3r ", "magenta")
-        + r" \_____)"
+        colored("            (____/ ", "red") + colored("  by Xnl-h4ck3r ", "magenta") + r" \_____)"
     )
     try:
         currentDate = datetime.now().date()
@@ -322,11 +302,7 @@ def showBanner():
                 )
             )
         elif currentDate.month == 10 and currentDate.day == 31:
-            write(
-                colored(
-                    "            *** 🎃 HAPPY HALLOWEEN! 🎃 ***", "red", attrs=["blink"]
-                )
-            )
+            write(colored("            *** 🎃 HAPPY HALLOWEEN! 🎃 ***", "red", attrs=["blink"]))
         elif currentDate.month == 1 and currentDate.day in (1, 2, 3, 4, 5):
             write(
                 colored(
@@ -360,9 +336,7 @@ def handler(signal_received, frame):
         if stopProgramCount == 1:
             writerr(
                 colored(
-                    getSPACER(
-                        ">>> Please be patient... Trying to save data and end gracefully!"
-                    ),
+                    getSPACER(">>> Please be patient... Trying to save data and end gracefully!"),
                     "red",
                 )
             )
@@ -390,11 +364,7 @@ def handler(signal_received, frame):
                 "red",
             )
         )
-        writerr(
-            colored(
-                getSPACER(">>> Attempting to rescue any data gathered so far..."), "red"
-            )
-        )
+        writerr(colored(getSPACER(">>> Attempting to rescue any data gathered so far..."), "red"))
 
 
 def showOptions():
@@ -532,9 +502,7 @@ def showOptions():
                 )
             )
         else:
-            write(
-                colored("VirusTotal API Key: ", "magenta") + colored(VIRUSTOTAL_API_KEY)
-            )
+            write(colored("VirusTotal API Key: ", "magenta") + colored(VIRUSTOTAL_API_KEY))
 
         if INTELX_API_KEY == "":
             write(
@@ -545,9 +513,7 @@ def showOptions():
                 )
             )
         else:
-            write(
-                colored("Intelligence X API Key: ", "magenta") + colored(INTELX_API_KEY)
-            )
+            write(colored("Intelligence X API Key: ", "magenta") + colored(INTELX_API_KEY))
 
         if args.mode in ["U", "B"]:
             if args.output_urls != "":
@@ -589,9 +555,7 @@ def showOptions():
                     write(
                         colored("-l: " + str(args.limit), "magenta")
                         + colored(
-                            " Only save the FIRST "
-                            + str(args.limit)
-                            + " responses found.",
+                            " Only save the FIRST " + str(args.limit) + " responses found.",
                             "white",
                         )
                     )
@@ -599,9 +563,7 @@ def showOptions():
                     write(
                         colored("-l: " + str(args.limit), "magenta")
                         + colored(
-                            " Only save the LAST "
-                            + str(abs(args.limit))
-                            + " responses found.",
+                            " Only save the LAST " + str(abs(args.limit)) + " responses found.",
                             "white",
                         )
                     )
@@ -705,9 +667,7 @@ def showOptions():
                     )
                 )
         if not args.mc and args.fc:
-            write(
-                colored("Response Code exclusions: ", "magenta") + colored(FILTER_CODE)
-            )
+            write(colored("Response Code exclusions: ", "magenta") + colored(FILTER_CODE))
         write(colored("Response URL exclusions: ", "magenta") + colored(FILTER_URL))
 
         if args.mt:
@@ -771,14 +731,9 @@ def showOptions():
                     )
                 )
             else:
-                write(
-                    colored("Discord Webhook: ", "magenta") + colored(WEBHOOK_DISCORD)
-                )
+                write(colored("Discord Webhook: ", "magenta") + colored(WEBHOOK_DISCORD))
 
-        write(
-            colored("Default Output Directory: ", "magenta")
-            + colored(str(DEFAULT_OUTPUT_DIR))
-        )
+        write(colored("Default Output Directory: ", "magenta") + colored(str(DEFAULT_OUTPUT_DIR)))
 
         if args.regex_after is not None:
             write(
@@ -1084,10 +1039,7 @@ def getConfig():
             if args.notify_discord:
                 try:
                     WEBHOOK_DISCORD = config.get("WEBHOOK_DISCORD")
-                    if (
-                        str(WEBHOOK_DISCORD) == "None"
-                        or str(WEBHOOK_DISCORD) == "YOUR_WEBHOOK"
-                    ):
+                    if str(WEBHOOK_DISCORD) == "None" or str(WEBHOOK_DISCORD) == "YOUR_WEBHOOK":
                         writerr(
                             colored(
                                 'No value for "WEBHOOK_DISCORD" in config.yml - default set',
@@ -1164,9 +1116,7 @@ def getConfig():
             else:
                 writerr(
                     colored(
-                        'WARNING: Cannot find file "'
-                        + args.config
-                        + '", so using default values',
+                        'WARNING: Cannot find file "' + args.config + '", so using default values',
                         "yellow",
                     )
                 )
@@ -1238,9 +1188,7 @@ def printProgressBar(
     if not (args.stream and args.mode == "U"):
         try:
             percent = (
-                ("{0:." + str(decimals) + "f}")
-                .format(100 * (iteration / float(total)))
-                .rjust(5)
+                ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total))).rjust(5)
             )
             filledLength = int(length * iteration // total)
             bar = fill * filledLength + "-" * (length - filledLength)
@@ -1394,9 +1342,7 @@ def processArchiveUrl(url):
                     )
                     archiveHtml = str(resp.text)
                     try:
-                        contentType = (
-                            resp.headers.get("Content-Type").split(";")[0].lower()
-                        )
+                        contentType = resp.headers.get("Content-Type").split(";")[0].lower()
                     except Exception:
                         contentType = ""
 
@@ -1407,18 +1353,13 @@ def processArchiveUrl(url):
                         # If the FILTER_CODE includes 404, and it doesn't seem to be a custom 404 page
                         if "404" not in FILTER_CODE or (
                             "404" in FILTER_CODE
-                            and not re.findall(
-                                REGEX_404, archiveHtml, re.DOTALL | re.IGNORECASE
-                            )
+                            and not re.findall(REGEX_404, archiveHtml, re.DOTALL | re.IGNORECASE)
                         ):
 
                             # Add the URL as a comment at the start of the response
                             if args.url_filename:
                                 archiveHtml = (
-                                    "/* Original URL: "
-                                    + archiveUrl
-                                    + " */\n"
-                                    + archiveHtml
+                                    "/* Original URL: " + archiveUrl + " */\n" + archiveHtml
                                 )
 
                             # Remove all web archive references in the response
@@ -1565,9 +1506,7 @@ def processArchiveUrl(url):
                                     # Determine the extension from the content type
                                     try:
                                         if contentType != "":
-                                            extension = contentType.split("/")[
-                                                1
-                                            ].replace("x-", "")
+                                            extension = contentType.split("/")[1].replace("x-", "")
                                         if extension == "":
                                             extension = contentType.lower()
                                     except Exception:
@@ -1588,15 +1527,11 @@ def processArchiveUrl(url):
                                     # If extension is still blank, set to html if the content ends with HTML tag, otherwise set to unknown
                                     if extension == "":
                                         if (
-                                            archiveHtml.lower()
-                                            .strip()
-                                            .endswith("</html>")
+                                            archiveHtml.lower().strip().endswith("</html>")
                                             or archiveHtml.lower()
                                             .strip()
                                             .startswith("<!doctype html")
-                                            or archiveHtml.lower()
-                                            .strip()
-                                            .startswith("<html")
+                                            or archiveHtml.lower().strip().startswith("<html")
                                         ):
                                             extension = "html"
                                         else:
@@ -1641,12 +1576,7 @@ def processArchiveUrl(url):
                                 try:
                                     timestamp = str(datetime.now())
                                     indexFile.write(
-                                        hashValue
-                                        + ","
-                                        + archiveUrl
-                                        + " ,"
-                                        + timestamp
-                                        + "\n"
+                                        hashValue + "," + archiveUrl + " ," + timestamp + "\n"
                                     )
                                     indexFile.flush()
                                 except Exception as e:
@@ -1668,9 +1598,7 @@ def processArchiveUrl(url):
                                     debugText = ""
                                     if archiveHtml.lower().find("archive.org") > 0:
                                         debugText = "ARCHIVE.ORG"
-                                    elif (
-                                        archiveHtml.lower().find("internet archive") > 0
-                                    ):
+                                    elif archiveHtml.lower().find("internet archive") > 0:
                                         debugText = "INTERNET ARCHIVE"
                                     elif archiveHtml.lower().find("wombat") > 0:
                                         debugText = "WOMBAT (JS)"
@@ -1769,9 +1697,7 @@ def processArchiveUrl(url):
                             )
                     except Exception:
                         if verbose():
-                            suffix = (
-                                'Complete (To show mem use, run "pip install psutil")'
-                            )
+                            suffix = 'Complete (To show mem use, run "pip install psutil")'
                 printProgressBar(
                     successCount + failureCount,
                     totalResponses,
@@ -1796,9 +1722,7 @@ def processArchiveUrl(url):
 
             except Exception as e:
                 if verbose():
-                    writerr(
-                        colored(getSPACER('Error for "' + url + '": ' + str(e)), "red")
-                    )
+                    writerr(colored(getSPACER('Error for "' + url + '": ' + str(e)), "red"))
 
     except Exception as e:
         writerr(colored("ERROR processArchiveUrl 1:  " + str(e), "red"))
@@ -1926,7 +1850,7 @@ def processURLOutput():
             appendedUrls = False
             if not args.output_overwrite:
                 try:
-                    with open(filename, "r") as existingLinks:
+                    with open(filename) as existingLinks:
                         for link in existingLinks.readlines():
                             linksFound.add(link.strip())
                     appendedUrls = True
@@ -1968,16 +1892,10 @@ def processURLOutput():
                         writerr(colored("ERROR processURLOutput 3: " + str(e), "red"))
 
             # If there are less links output because of filters, show the new total
-            if (
-                args.regex_after is not None
-                and linkCount > 0
-                and outputCount < linkCount
-            ):
+            if args.regex_after is not None and linkCount > 0 and outputCount < linkCount:
                 write(
                     colored(
-                        'Links found after applying filter "'
-                        + args.regex_after
-                        + '": ',
+                        'Links found after applying filter "' + args.regex_after + '": ',
                         "cyan",
                     )
                     + colored(str(outputCount) + " 🤘\n", "white")
@@ -1992,11 +1910,7 @@ def processURLOutput():
 
             if verbose():
                 if outputCount == 0:
-                    write(
-                        colored(
-                            "No links were found so nothing written to file.", "cyan"
-                        )
-                    )
+                    write(colored("No links were found so nothing written to file.", "cyan"))
                 else:
                     if appendedUrls:
                         write(
@@ -2018,11 +1932,11 @@ def processURLOutput():
                     if os.path.exists(filenameOld) and os.path.exists(filename):
 
                         # Get all the old links
-                        with open(filenameOld, "r") as oldFile:
+                        with open(filenameOld) as oldFile:
                             oldLinks = set(oldFile.readlines())
 
                         # Get all the new links
-                        with open(filename, "r") as newFile:
+                        with open(filename) as newFile:
                             newLinks = set(newFile.readlines())
 
                         # Create a file with most recent new links
@@ -2061,7 +1975,7 @@ def stripUnwanted(url):
     """
     parsed = urlparse(url)
     # Strip scheme
-    scheme = "%s://" % parsed.scheme
+    scheme = f"{parsed.scheme}://"
     strippedUrl = parsed.geturl().replace(scheme, "", 1)
     # Strip query string and fragment
     strippedUrl = strippedUrl.split("#")[0].split("?")[0]
@@ -2092,7 +2006,7 @@ def validateArgInput(x):
         if os.path.isfile(x):
             isInputFile = True
             # Open file and put all values in input list
-            with open(x, "r") as inputFile:
+            with open(x) as inputFile:
                 lines = inputFile.readlines()
             # Check if any lines start with a *. and replace without the *.
             for line in lines:
@@ -2189,9 +2103,7 @@ def validateArgProviders(x):
     x = x.lower()
     providers = x.split(",")
     for provider in providers:
-        if not re.fullmatch(
-            r"(wayback|commoncrawl|otx|urlscan|virustotal|intelx)", provider
-        ):
+        if not re.fullmatch(r"(wayback|commoncrawl|otx|urlscan|virustotal|intelx)", provider):
             invalid = True
             break
     if invalid:
@@ -2222,9 +2134,7 @@ def processAlienVaultPage(url):
             except ConnectionError:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ ERR ] alienvault.org connection error for page " + page
-                        ),
+                        getSPACER("[ ERR ] alienvault.org connection error for page " + page),
                         "red",
                     )
                 )
@@ -2234,10 +2144,7 @@ def processAlienVaultPage(url):
                 writerr(
                     colored(
                         getSPACER(
-                            "[ ERR ] Error getting response for page "
-                            + page
-                            + " - "
-                            + str(e)
+                            "[ ERR ] Error getting response for page " + page + " - " + str(e)
                         ),
                         "red",
                     )
@@ -2264,11 +2171,7 @@ def processAlienVaultPage(url):
                             if verbose():
                                 writerr(
                                     colored(
-                                        getSPACER(
-                                            "[ ERR ] "
-                                            + url
-                                            + " gave an empty response."
-                                        ),
+                                        getSPACER("[ ERR ] " + url + " gave an empty response."),
                                         "red",
                                     )
                                 )
@@ -2279,10 +2182,7 @@ def processAlienVaultPage(url):
                                 writerr(
                                     colored(
                                         getSPACER(
-                                            "[ "
-                                            + str(resp.status_code)
-                                            + " ] Error for "
-                                            + url
+                                            "[ " + str(resp.status_code) + " ] Error for " + url
                                         ),
                                         "red",
                                     )
@@ -2332,9 +2232,7 @@ def processAlienVaultPage(url):
                             # Compare the HTTP code gainst the Code exclusions and matches
                             if MATCH_CODE != "":
                                 match = re.search(
-                                    r"("
-                                    + re.escape(MATCH_CODE).replace(",", "|")
-                                    + ")",
+                                    r"(" + re.escape(MATCH_CODE).replace(",", "|") + ")",
                                     httpCode,
                                     flags=re.IGNORECASE,
                                 )
@@ -2342,9 +2240,7 @@ def processAlienVaultPage(url):
                                     addLink = False
                             else:
                                 match = re.search(
-                                    r"("
-                                    + re.escape(FILTER_CODE).replace(",", "|")
-                                    + ")",
+                                    r"(" + re.escape(FILTER_CODE).replace(",", "|") + ")",
                                     httpCode,
                                     flags=re.IGNORECASE,
                                 )
@@ -2354,9 +2250,7 @@ def processAlienVaultPage(url):
                             # Check the URL exclusions
                             if addLink:
                                 match = re.search(
-                                    r"("
-                                    + re.escape(FILTER_URL).replace(",", "|")
-                                    + ")",
+                                    r"(" + re.escape(FILTER_URL).replace(",", "|") + ")",
                                     foundUrl,
                                     flags=re.IGNORECASE,
                                 )
@@ -2367,9 +2261,7 @@ def processAlienVaultPage(url):
                             if addLink and args.keywords_only:
                                 if args.keywords_only == "#CONFIG":
                                     match = re.search(
-                                        r"("
-                                        + re.escape(FILTER_KEYWORDS).replace(",", "|")
-                                        + ")",
+                                        r"(" + re.escape(FILTER_KEYWORDS).replace(",", "|") + ")",
                                         foundUrl,
                                         flags=re.IGNORECASE,
                                     )
@@ -2431,15 +2323,11 @@ def getAlienVaultUrls():
             session = requests.Session()
             session.mount("https://", HTTP_ADAPTER)
             session.mount("http://", HTTP_ADAPTER)
-            resp = session.get(
-                url + "&showNumPages=True", headers={"User-Agent": userAgent}
-            )
+            resp = session.get(url + "&showNumPages=True", headers={"User-Agent": userAgent})
         except Exception as e:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ ERR ] Unable to get links from alienvault.com: " + str(e)
-                    ),
+                    getSPACER("[ ERR ] Unable to get links from alienvault.com: " + str(e)),
                     "red",
                 )
             )
@@ -2449,9 +2337,7 @@ def getAlienVaultUrls():
         if resp.status_code == 429:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ 429 ] Alien Vault rate limit reached so unable to get links."
-                    ),
+                    getSPACER("[ 429 ] Alien Vault rate limit reached so unable to get links."),
                     "red",
                 )
             )
@@ -2531,9 +2417,7 @@ def getAlienVaultUrls():
             if verbose():
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ ERR ] An error was returned in the alienvault.com response."
-                        )
+                        getSPACER("[ ERR ] An error was returned in the alienvault.com response.")
                         + "\n",
                         "red",
                     )
@@ -2629,9 +2513,7 @@ def processURLScanUrl(url, httpCode, mimeType, urlscanID=""):
                             flags=re.IGNORECASE,
                         )
                     else:
-                        match = re.search(
-                            r"(" + args.keywords_only + ")", url, flags=re.IGNORECASE
-                        )
+                        match = re.search(r"(" + args.keywords_only + ")", url, flags=re.IGNORECASE)
                     if match is None:
                         addLink = False
 
@@ -2726,12 +2608,7 @@ def getURLScanDOM(originalUrl, domUrl):
 
                         # Add the URL as a comment at the start of the response
                         if args.url_filename:
-                            archiveHtml = (
-                                "/* Original URL: "
-                                + originalUrl
-                                + " */\n"
-                                + archiveHtml
-                            )
+                            archiveHtml = "/* Original URL: " + originalUrl + " */\n" + archiveHtml
 
                         # Create file name based on url or hash value of the response, depending on selection. Ensure the file name isn't over 255 characters
                         if args.url_filename:
@@ -2760,9 +2637,7 @@ def getURLScanDOM(originalUrl, domUrl):
                                 if (
                                     archiveHtml.lower().strip().endswith("</html>")
                                     or archiveHtml.lower().strip().endswith("</body>")
-                                    or archiveHtml.lower()
-                                    .strip()
-                                    .startswith("<!doctype html")
+                                    or archiveHtml.lower().strip().startswith("<!doctype html")
                                     or archiveHtml.lower().strip().startswith("<html")
                                     or archiveHtml.lower().strip().startswith("<head")
                                 ):
@@ -2795,10 +2670,7 @@ def getURLScanDOM(originalUrl, domUrl):
                             writerr(
                                 colored(
                                     getSPACER(
-                                        "[ ERR ] Failed to write file "
-                                        + filePath
-                                        + ": "
-                                        + str(e)
+                                        "[ ERR ] Failed to write file " + filePath + ": " + str(e)
                                     ),
                                     "red",
                                 )
@@ -2888,9 +2760,7 @@ def getURLScanDOM(originalUrl, domUrl):
                             )
                     except Exception:
                         if verbose():
-                            suffix = (
-                                'Complete (To show mem use, run "pip install psutil")'
-                            )
+                            suffix = 'Complete (To show mem use, run "pip install psutil")'
                 printProgressBar(
                     successCount + failureCount,
                     totalResponses,
@@ -2903,24 +2773,14 @@ def getURLScanDOM(originalUrl, domUrl):
                 # Write the total count to the continueResp.URLScan.tmp file
                 try:
                     continueRespFileURLScan.seek(0)
-                    continueRespFileURLScan.write(
-                        str(successCount + failureCount) + "\n"
-                    )
+                    continueRespFileURLScan.write(str(successCount + failureCount) + "\n")
                 except Exception as e:
                     if verbose():
-                        writerr(
-                            colored(
-                                getSPACER("ERROR getURLScanDOM 2:  " + str(e)), "red"
-                            )
-                        )
+                        writerr(colored(getSPACER("ERROR getURLScanDOM 2:  " + str(e)), "red"))
 
             except Exception as e:
                 if verbose():
-                    writerr(
-                        colored(
-                            getSPACER('Error for "' + domUrl + '": ' + str(e)), "red"
-                        )
-                    )
+                    writerr(colored(getSPACER('Error for "' + domUrl + '": ' + str(e)), "red"))
 
     except Exception as e:
         writerr(colored("ERROR getURLScanDOM 1:  " + str(e), "red"))
@@ -3005,9 +2865,7 @@ def getURLScanUrls():
             session.mount("https://", HTTP_ADAPTER)
             session.mount("http://", HTTP_ADAPTER)
             # Pass the API-Key header too. This can change the max endpoints per page, depending on URLScan subscription
-            resp = session.get(
-                url, headers={"User-Agent": userAgent, "API-Key": URLSCAN_API_KEY}
-            )
+            resp = session.get(url, headers={"User-Agent": userAgent, "API-Key": URLSCAN_API_KEY})
             requestsMade = requestsMade + 1
         except Exception as e:
             write(
@@ -3048,10 +2906,7 @@ def getURLScanUrls():
                     except Exception as e:
                         write(
                             colored(
-                                getSPACER(
-                                    "[ ERR ] Unable to get links from urlscan.io: "
-                                    + str(e)
-                                ),
+                                getSPACER("[ ERR ] Unable to get links from urlscan.io: " + str(e)),
                                 "red",
                             )
                         )
@@ -3085,9 +2940,7 @@ def getURLScanUrls():
                 except Exception as e:
                     writerr(
                         colored(
-                            getSPACER(
-                                "[ ERR ] Unable to get links from urlscan.io: " + str(e)
-                            ),
+                            getSPACER("[ ERR ] Unable to get links from urlscan.io: " + str(e)),
                             "red",
                         )
                     )
@@ -3107,9 +2960,7 @@ def getURLScanUrls():
             else:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ 429 ] URLScan rate limit reached so unable to get links."
-                        ),
+                        getSPACER("[ 429 ] URLScan rate limit reached so unable to get links."),
                         "red",
                     )
                 )
@@ -3118,9 +2969,7 @@ def getURLScanUrls():
             writerr(
                 colored(
                     getSPACER(
-                        "[ "
-                        + str(resp.status_code)
-                        + " ] Unable to get links from urlscan.io"
+                        "[ " + str(resp.status_code) + " ] Unable to get links from urlscan.io"
                     ),
                     "red",
                 )
@@ -3136,9 +2985,7 @@ def getURLScanUrls():
         except Exception:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ ERR ] There was an unexpected response from the URLScan API"
-                    ),
+                    getSPACER("[ ERR ] There was an unexpected response from the URLScan API"),
                     "red",
                 )
             )
@@ -3155,8 +3002,7 @@ def getURLScanUrls():
                     )
                 else:
                     write(
-                        colored("Get URLs from URLScan: ", "cyan")
-                        + colored("1 request", "white")
+                        colored("Get URLs from URLScan: ", "cyan") + colored("1 request", "white")
                     )
             except Exception:
                 pass
@@ -3203,9 +3049,7 @@ def getURLScanUrls():
                             sort = urlSection["sort"]
                         except Exception:
                             sort = ""
-                        searchAfter = (
-                            "&search_after=" + str(sort[0]) + "," + str(sort[1])
-                        )
+                        searchAfter = "&search_after=" + str(sort[0]) + "," + str(sort[1])
 
                         # Get the HTTP code
                         try:
@@ -3264,8 +3108,7 @@ def getURLScanUrls():
                                 writerr(
                                     colored(
                                         getSPACER(
-                                            "[ ERR ] Unable to get links from urlscan.io: "
-                                            + str(e)
+                                            "[ ERR ] Unable to get links from urlscan.io: " + str(e)
                                         ),
                                         "red",
                                     )
@@ -3342,10 +3185,7 @@ def getURLScanUrls():
                             if (
                                 jsonResp["results"] is None
                                 or len(jsonResp["results"]) == 0
-                                or (
-                                    args.limit_requests != 0
-                                    and requestsMade > args.limit_requests
-                                )
+                                or (args.limit_requests != 0 and requestsMade > args.limit_requests)
                                 or (
                                     args.mode == "R"
                                     and args.limit != 0
@@ -3359,8 +3199,7 @@ def getURLScanUrls():
                 linkMimes.discard("warc/revisit")
                 write(
                     getSPACER(
-                        colored("MIME types found: ", "magenta")
-                        + colored(str(linkMimes), "white")
+                        colored("MIME types found: ", "magenta") + colored(str(linkMimes), "white")
                     )
                     + "\n"
                 )
@@ -3423,10 +3262,7 @@ def processWayBackPage(url):
                 writerr(
                     colored(
                         getSPACER(
-                            "[ ERR ] Error getting response for page "
-                            + page
-                            + " - "
-                            + str(e)
+                            "[ ERR ] Error getting response for page " + page + " - " + str(e)
                         ),
                         "red",
                     )
@@ -3464,9 +3300,7 @@ def processWayBackPage(url):
                                     )
                                 time.sleep(seconds)
                                 try:
-                                    resp = session.get(
-                                        url, headers={"User-Agent": userAgent}
-                                    )
+                                    resp = session.get(url, headers={"User-Agent": userAgent})
                                 except ConnectionError:
                                     writerr(
                                         colored(
@@ -3522,11 +3356,7 @@ def processWayBackPage(url):
                             if verbose():
                                 writerr(
                                     colored(
-                                        getSPACER(
-                                            "[ ERR ] "
-                                            + url
-                                            + " gave an empty response."
-                                        ),
+                                        getSPACER("[ ERR ] " + url + " gave an empty response."),
                                         "red",
                                     )
                                 )
@@ -3537,10 +3367,7 @@ def processWayBackPage(url):
                                 writerr(
                                     colored(
                                         getSPACER(
-                                            "[ "
-                                            + str(resp.status_code)
-                                            + " ] Error for "
-                                            + url
+                                            "[ " + str(resp.status_code) + " ] Error for " + url
                                         ),
                                         "red",
                                     )
@@ -3562,10 +3389,7 @@ def processWayBackPage(url):
                     writerr(
                         colored(
                             getSPACER(
-                                "[ ERR ] Error getting response for page "
-                                + page
-                                + " - "
-                                + str(e)
+                                "[ ERR ] Error getting response for page " + page + " - " + str(e)
                             ),
                             "red",
                         )
@@ -3623,11 +3447,7 @@ def processWayBackPage(url):
                                 write(resp.text)
             except Exception:
                 if verbose():
-                    writerr(
-                        colored(
-                            getSPACER("ERROR processWayBackPage 4: " + str(line)), "red"
-                        )
-                    )
+                    writerr(colored(getSPACER("ERROR processWayBackPage 4: " + str(line)), "red"))
         else:
             pass
     except Exception as e:
@@ -3648,27 +3468,23 @@ def getWaybackUrls():
         if MATCH_MIME != "":
             filterMIME = "&filter=mimetype:" + re.escape(MATCH_MIME).replace(",", "|")
         else:
-            filterMIME = "&filter=!mimetype:warc/revisit|" + re.escape(
-                FILTER_MIME
-            ).replace(",", "|")
+            filterMIME = "&filter=!mimetype:warc/revisit|" + re.escape(FILTER_MIME).replace(
+                ",", "|"
+            )
         # If there any \+ in the MIME types, e.g. image/svg\+xml (the backslash is because it was previosuly escaped), then replace the \+ with a . otherwise the wayback API does not recognise it
         filterMIME = filterMIME.replace("\+", ".")
 
         if MATCH_CODE != "":
             filterCode = "&filter=statuscode:" + re.escape(MATCH_CODE).replace(",", "|")
         else:
-            filterCode = "&filter=!statuscode:" + re.escape(FILTER_CODE).replace(
-                ",", "|"
-            )
+            filterCode = "&filter=!statuscode:" + re.escape(FILTER_CODE).replace(",", "|")
 
         # Set keywords filter if -ko argument passed
         filterKeywords = ""
         if args.keywords_only:
             if args.keywords_only == "#CONFIG":
                 filterKeywords = (
-                    "&filter=original:.*("
-                    + re.escape(FILTER_KEYWORDS).replace(",", "|")
-                    + ").*"
+                    "&filter=original:.*(" + re.escape(FILTER_KEYWORDS).replace(",", "|") + ").*"
                 )
             else:
                 filterKeywords = "&filter=original:.*(" + args.keywords_only + ").*"
@@ -3706,9 +3522,7 @@ def getWaybackUrls():
             session = requests.Session()
             session.mount("https://", HTTP_ADAPTER)
             session.mount("http://", HTTP_ADAPTER)
-            resp = session.get(
-                url + "&showNumPages=True", headers={"User-Agent": userAgent}
-            )
+            resp = session.get(url + "&showNumPages=True", headers={"User-Agent": userAgent})
             # Try to get the total number of pages. If there is a problem, we'll return totalPages = 0 which means we'll get everything back in one request
             try:
                 totalPages = int(resp.text.strip())
@@ -3855,8 +3669,7 @@ def getWaybackUrls():
                 linkMimes.discard("warc/revisit")
                 write(
                     getSPACER(
-                        colored("MIME types found: ", "magenta")
-                        + colored(str(linkMimes), "white")
+                        colored("MIME types found: ", "magenta") + colored(str(linkMimes), "white")
                     )
                     + "\n"
                 )
@@ -3866,9 +3679,7 @@ def getWaybackUrls():
                 linkCount = len(linksFound)
                 write(
                     getSPACER(
-                        colored(
-                            "Links found on Wayback Machine (archive.org): ", "cyan"
-                        )
+                        colored("Links found on Wayback Machine (archive.org): ", "cyan")
                         + colored(str(linkCount), "white")
                     )
                     + "\n"
@@ -3902,31 +3713,21 @@ def processCommonCrawlCollection(cdxApiUrl):
             # Set status code filter
             filterCode = ""
             if MATCH_CODE.strip() != "":
-                filterCode = (
-                    "&filter=~status:(" + re.escape(MATCH_CODE).replace(",", "|") + ")"
-                )
+                filterCode = "&filter=~status:(" + re.escape(MATCH_CODE).replace(",", "|") + ")"
             else:
-                filterCode = (
-                    "&filter=!~status:("
-                    + re.escape(FILTER_CODE).replace(",", "|")
-                    + ")"
-                )
+                filterCode = "&filter=!~status:(" + re.escape(FILTER_CODE).replace(",", "|") + ")"
 
             # Set keywords filter if -ko argument passed
             filterKeywords = ""
             if args.keywords_only:
                 if args.keywords_only == "#CONFIG":
                     filterKeywords = (
-                        "&filter=~url:.*("
-                        + re.escape(FILTER_KEYWORDS).replace(",", "|")
-                        + ").*"
+                        "&filter=~url:.*(" + re.escape(FILTER_KEYWORDS).replace(",", "|") + ").*"
                     )
                 else:
                     filterKeywords = "&filter=~url:.*(" + args.keywords_only + ").*"
 
-            commonCrawlUrl = (
-                cdxApiUrl + "?output=json&fl=timestamp,url,mime,status,digest&url="
-            )
+            commonCrawlUrl = cdxApiUrl + "?output=json&fl=timestamp,url,mime,status,digest&url="
 
             if args.filter_responses_only:
                 url = commonCrawlUrl + subs + quote(argsInput) + path
@@ -3951,21 +3752,14 @@ def processCommonCrawlCollection(cdxApiUrl):
             except ConnectionError:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ ERR ] Common Crawl connection error for index "
-                            + cdxApiUrl
-                        ),
+                        getSPACER("[ ERR ] Common Crawl connection error for index " + cdxApiUrl),
                         "red",
                     )
                 )
                 resp = None
                 return
             except Exception as e:
-                writerr(
-                    colored(
-                        getSPACER("[ ERR ] Error getting response - " + str(e)), "red"
-                    )
-                )
+                writerr(colored(getSPACER("[ ERR ] Error getting response - " + str(e)), "red"))
                 resp = None
                 return
             finally:
@@ -3992,11 +3786,7 @@ def processCommonCrawlCollection(cdxApiUrl):
                             if verbose():
                                 writerr(
                                     colored(
-                                        getSPACER(
-                                            "[ ERR ] "
-                                            + url
-                                            + " gave an empty response."
-                                        ),
+                                        getSPACER("[ ERR ] " + url + " gave an empty response."),
                                         "red",
                                     )
                                 )
@@ -4081,7 +3871,7 @@ def getCommonCrawlIndexes():
         if not createFile:
             # Read the indexes from the local file
             try:
-                with open(collinfoPath, "r") as file:
+                with open(collinfoPath) as file:
                     jsonResp = file.read()
                 file.close()
             except Exception as e:
@@ -4104,15 +3894,11 @@ def getCommonCrawlIndexes():
                 session = requests.Session()
                 session.mount("https://", HTTP_ADAPTER_CC)
                 session.mount("http://", HTTP_ADAPTER_CC)
-                indexes = session.get(
-                    CCRAWL_INDEX_URL, headers={"User-Agent": userAgent}
-                )
+                indexes = session.get(CCRAWL_INDEX_URL, headers={"User-Agent": userAgent})
             except ConnectionError:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ ERR ] Common Crawl connection error getting Index file"
-                        ),
+                        getSPACER("[ ERR ] Common Crawl connection error getting Index file"),
                         "red",
                     )
                 )
@@ -4121,8 +3907,7 @@ def getCommonCrawlIndexes():
                 writerr(
                     colored(
                         getSPACER(
-                            "[ ERR ] Error getting Common Crawl index collection - "
-                            + str(e)
+                            "[ ERR ] Error getting Common Crawl index collection - " + str(e)
                         ),
                         "red",
                     )
@@ -4240,13 +4025,9 @@ def getCommonCrawlUrls():
         # Set status code filter
         filterCode = ""
         if MATCH_CODE.strip() != "":
-            filterCode = (
-                "&filter=~status:(" + re.escape(MATCH_CODE).replace(",", "|") + ")"
-            )
+            filterCode = "&filter=~status:(" + re.escape(MATCH_CODE).replace(",", "|") + ")"
         else:
-            filterCode = (
-                "&filter=!~status:(" + re.escape(FILTER_CODE).replace(",", "|") + ")"
-            )
+            filterCode = "&filter=!~status:(" + re.escape(FILTER_CODE).replace(",", "|") + ")"
 
         if verbose():
             if args.filter_responses_only:
@@ -4276,9 +4057,7 @@ def getCommonCrawlUrls():
             )
 
         if not args.check_only:
-            write(
-                colored("\rGetting commoncrawl.org index collections list...\r", "cyan")
-            )
+            write(colored("\rGetting commoncrawl.org index collections list...\r", "cyan"))
 
         # Get the Common Crawl index collections
         cdxApiUrls = getCommonCrawlIndexes()
@@ -4394,9 +4173,7 @@ def processVirusTotalUrl(url):
                             flags=re.IGNORECASE,
                         )
                     else:
-                        match = re.search(
-                            r"(" + args.keywords_only + ")", url, flags=re.IGNORECASE
-                        )
+                        match = re.search(r"(" + args.keywords_only + ")", url, flags=re.IGNORECASE)
                     if match is None:
                         addLink = False
 
@@ -4462,9 +4239,7 @@ def getVirusTotalUrls():
         except Exception as e:
             write(
                 colored(
-                    getSPACER(
-                        "[ ERR ] Unable to get links from virustotal.com: " + str(e)
-                    ),
+                    getSPACER("[ ERR ] Unable to get links from virustotal.com: " + str(e)),
                     "red",
                 )
             )
@@ -4474,9 +4249,7 @@ def getVirusTotalUrls():
         if resp.status_code == 429:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ 429 ] VirusTotal rate limit reached so unable to get links."
-                    ),
+                    getSPACER("[ 429 ] VirusTotal rate limit reached so unable to get links."),
                     "red",
                 )
             )
@@ -4495,9 +4268,7 @@ def getVirusTotalUrls():
             writerr(
                 colored(
                     getSPACER(
-                        "[ "
-                        + str(resp.status_code)
-                        + " ] Unable to get links from virustotal.com"
+                        "[ " + str(resp.status_code) + " ] Unable to get links from virustotal.com"
                     ),
                     "red",
                 )
@@ -4517,15 +4288,11 @@ def getVirusTotalUrls():
                 except Exception:
                     subDomains = []
             try:
-                detectedUrls = [
-                    entry["url"] for entry in jsonResp.get("detected_urls", [])
-                ]
+                detectedUrls = [entry["url"] for entry in jsonResp.get("detected_urls", [])]
             except Exception:
                 detectedUrls = []
             try:
-                undetectedUrls = [
-                    entry[0] for entry in jsonResp.get("undetected_urls", [])
-                ]
+                undetectedUrls = [entry[0] for entry in jsonResp.get("undetected_urls", [])]
             except Exception:
                 undetectedUrls = []
             try:
@@ -4535,19 +4302,14 @@ def getVirusTotalUrls():
         except Exception:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ ERR ] There was an unexpected response from the VirusTotal API"
-                    ),
+                    getSPACER("[ ERR ] There was an unexpected response from the VirusTotal API"),
                     "red",
                 )
             )
             totalUrls = []
 
         if args.check_only:
-            write(
-                colored("Get URLs from VirusTotal: ", "cyan")
-                + colored("1 request", "white")
-            )
+            write(colored("Get URLs from VirusTotal: ", "cyan") + colored("1 request", "white"))
             checkVirusTotal = 1
         else:
             # Carry on if something was found
@@ -4634,9 +4396,7 @@ def processIntelxUrl(url):
                             flags=re.IGNORECASE,
                         )
                     else:
-                        match = re.search(
-                            r"(" + args.keywords_only + ")", url, flags=re.IGNORECASE
-                        )
+                        match = re.search(r"(" + args.keywords_only + ")", url, flags=re.IGNORECASE)
                     if match is None:
                         addLink = False
 
@@ -4665,11 +4425,7 @@ def processIntelxType(target, credits):
             # Pass the API key in the X-Key header too.
             resp = session.post(
                 INTELX_SEARCH_URL,
-                data='{"term":"'
-                + quote(argsInputHostname)
-                + '","target":'
-                + str(target)
-                + "}",
+                data='{"term":"' + quote(argsInputHostname) + '","target":' + str(target) + "}",
                 headers={"User-Agent": userAgent, "X-Key": INTELX_API_KEY},
             )
             requestsMade = requestsMade + 1
@@ -4686,9 +4442,7 @@ def processIntelxType(target, credits):
         if resp.status_code == 429:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ 429 ] IntelX rate limit reached so unable to get links."
-                    ),
+                    getSPACER("[ 429 ] IntelX rate limit reached so unable to get links."),
                     "red",
                 )
             )
@@ -4728,9 +4482,7 @@ def processIntelxType(target, credits):
         elif resp.status_code == 403:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ 403 ] IntelX: Permission denied. Check your API key is correct."
-                    ),
+                    getSPACER("[ 403 ] IntelX: Permission denied. Check your API key is correct."),
                     "red",
                 )
             )
@@ -4739,9 +4491,7 @@ def processIntelxType(target, credits):
             writerr(
                 colored(
                     getSPACER(
-                        "[ "
-                        + str(resp.status_code)
-                        + " ] Unable to get links from intelx.io"
+                        "[ " + str(resp.status_code) + " ] Unable to get links from intelx.io"
                     ),
                     "red",
                 )
@@ -4755,9 +4505,7 @@ def processIntelxType(target, credits):
         except Exception:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ ERR ] There was an unexpected response from the Intelligence API"
-                    ),
+                    getSPACER("[ ERR ] There was an unexpected response from the Intelligence API"),
                     "red",
                 )
             )
@@ -4778,9 +4526,7 @@ def processIntelxType(target, credits):
             except Exception as e:
                 write(
                     colored(
-                        getSPACER(
-                            "[ ERR ] Unable to get links from intelx.io: " + str(e)
-                        ),
+                        getSPACER("[ ERR ] Unable to get links from intelx.io: " + str(e)),
                         "red",
                     )
                 )
@@ -4845,14 +4591,10 @@ def getIntelxAccountInfo() -> str:
         )
         jsonResp = json.loads(resp.text.strip())
         credits = str(
-            jsonResp.get("paths", {})
-            .get("/phonebook/search", {})
-            .get("Credit", "Unknown")
+            jsonResp.get("paths", {}).get("/phonebook/search", {}).get("Credit", "Unknown")
         )
         credits_max = str(
-            jsonResp.get("paths", {})
-            .get("/phonebook/search", {})
-            .get("CreditMax", "Unknown")
+            jsonResp.get("paths", {}).get("/phonebook/search", {}).get("CreditMax", "Unknown")
         )
         return credits + "/" + credits_max
     except Exception:
@@ -4881,9 +4623,7 @@ def getIntelxUrls():
         if verbose():
             write(
                 colored(
-                    "The Intelligence X URL requested to get links (Credits: "
-                    + credits
-                    + "): ",
+                    "The Intelligence X URL requested to get links (Credits: " + credits + "): ",
                     "magenta",
                 )
                 + colored(INTELX_SEARCH_URL + "\n", "white")
@@ -4903,8 +4643,7 @@ def getIntelxUrls():
         if args.xwm and args.xcc and args.xav and args.xus and args.xvt:
             write(
                 getSPACER(
-                    colored("Links found on intelx.io: ", "cyan")
-                    + colored(str(linkCount), "white")
+                    colored("Links found on intelx.io: ", "cyan") + colored(str(linkCount), "white")
                 )
                 + "\n"
             )
@@ -4968,9 +4707,7 @@ def processResponsesURLScan():
                 indexPath = responseOutputDirectory + "waymore_index.txt"
             except Exception as e:
                 if verbose():
-                    writerr(
-                        colored("ERROR processResponsesURLScan 4: " + str(e), "red")
-                    )
+                    writerr(colored("ERROR processResponsesURLScan 4: " + str(e), "red"))
 
         # Get URLs from URLScan.io if the DOM ID's haven't been retrieved yet
         if args.mode == "R" and stopProgram is None and not args.check_only:
@@ -4984,11 +4721,7 @@ def processResponsesURLScan():
 
         # Check if a continueResp.URLScan.tmp and responses.URLScan.tmp files exists
         runPrevious = "n"
-        if (
-            not args.check_only
-            and os.path.exists(continuePath)
-            and os.path.exists(responsesPath)
-        ):
+        if not args.check_only and os.path.exists(continuePath) and os.path.exists(responsesPath):
 
             # Load the links into the set
             with open(responsesPath, "rb") as fl:
@@ -4997,7 +4730,7 @@ def processResponsesURLScan():
 
             # Get the previous end position to start again at this point
             try:
-                with open(continuePath, "r") as fc:
+                with open(continuePath) as fc:
                     successCount = int(fc.readline().strip())
             except Exception:
                 successCount = 0
@@ -5177,10 +4910,7 @@ def processResponsesURLScan():
                     else:
                         write(
                             colored(
-                                "\nURLScan responses saved for "
-                                + subs
-                                + argsInput
-                                + ": ",
+                                "\nURLScan responses saved for " + subs + argsInput + ": ",
                                 "cyan",
                             )
                             + colored(
@@ -5209,10 +4939,7 @@ def processResponsesURLScan():
                     else:
                         write(
                             colored(
-                                "\nURLScan responses saved for "
-                                + subs
-                                + argsInput
-                                + ": ",
+                                "\nURLScan responses saved for " + subs + argsInput + ": ",
                                 "cyan",
                             )
                             + colored(
@@ -5225,9 +4952,7 @@ def processResponsesURLScan():
                         )
             except Exception as e:
                 if verbose():
-                    writerr(
-                        colored("ERROR processResponsesURLScan 5: " + str(e), "red")
-                    )
+                    writerr(colored("ERROR processResponsesURLScan 5: " + str(e), "red"))
 
         totalFileCount = totalFileCount + fileCount
     except Exception as e:
@@ -5255,17 +4980,11 @@ def processResponsesWayback():
                 indexPath = responseOutputDirectory + "waymore_index.txt"
             except Exception as e:
                 if verbose():
-                    writerr(
-                        colored("ERROR processResponsesWayback 4: " + str(e), "red")
-                    )
+                    writerr(colored("ERROR processResponsesWayback 4: " + str(e), "red"))
 
         # Check if a continueResp.tmp and responses.tmp files exists
         runPrevious = "n"
-        if (
-            not args.check_only
-            and os.path.exists(continuePath)
-            and os.path.exists(responsesPath)
-        ):
+        if not args.check_only and os.path.exists(continuePath) and os.path.exists(responsesPath):
 
             # Load the links into the set
             with open(responsesPath, "rb") as fl:
@@ -5274,7 +4993,7 @@ def processResponsesWayback():
 
             # Get the previous end position to start again at this point
             try:
-                with open(continuePath, "r") as fc:
+                with open(continuePath) as fc:
                     successCount = int(fc.readline().strip())
             except Exception:
                 successCount = 0
@@ -5349,9 +5068,7 @@ def processResponsesWayback():
             # Set mime content type filter
             filterMIME = ""
             if MATCH_MIME.strip() != "":
-                filterMIME = "&filter=mimetype:" + re.escape(MATCH_MIME).replace(
-                    ",", "|"
-                )
+                filterMIME = "&filter=mimetype:" + re.escape(MATCH_MIME).replace(",", "|")
             else:
                 filterMIME = "&filter=!mimetype:warc/revisit"
                 filterMIME = filterMIME + "|" + re.escape(FILTER_MIME).replace(",", "|")
@@ -5359,13 +5076,9 @@ def processResponsesWayback():
             # Set status code filter
             filterCode = ""
             if MATCH_CODE.strip() != "":
-                filterCode = "&filter=statuscode:" + re.escape(MATCH_CODE).replace(
-                    ",", "|"
-                )
+                filterCode = "&filter=statuscode:" + re.escape(MATCH_CODE).replace(",", "|")
             else:
-                filterCode = "&filter=!statuscode:" + re.escape(FILTER_CODE).replace(
-                    ",", "|"
-                )
+                filterCode = "&filter=!statuscode:" + re.escape(FILTER_CODE).replace(",", "|")
 
             # Set the collapse parameter value in the archive.org URL. From the Wayback API docs:
             # "A new form of filtering is the option to 'collapse' results based on a field, or a substring of a field.
@@ -5377,9 +5090,7 @@ def processResponsesWayback():
                 collapse = "&collapse=timestamp:10"
             elif args.capture_interval == "d":  # get at most 1 capture per URL per day
                 collapse = "&collapse=timestamp:8"
-            elif (
-                args.capture_interval == "m"
-            ):  # get at most 1 capture per URL per month
+            elif args.capture_interval == "m":  # get at most 1 capture per URL per month
                 collapse = "&collapse=timestamp:6"
 
             url = (
@@ -5430,9 +5141,7 @@ def processResponsesWayback():
             except ConnectionError:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ ERR ] Wayback Machine (archive.org) connection error"
-                        ),
+                        getSPACER("[ ERR ] Wayback Machine (archive.org) connection error"),
                         "red",
                     )
                 )
@@ -5491,10 +5200,7 @@ def processResponsesWayback():
                                 writerr(
                                     colored(
                                         getSPACER(
-                                            "[ "
-                                            + str(resp.status_code)
-                                            + " ] Error for "
-                                            + url
+                                            "[ " + str(resp.status_code) + " ] Error for " + url
                                         ),
                                         "red",
                                     )
@@ -5574,8 +5280,7 @@ def processResponsesWayback():
                 # b) it does not match the URL exclusions
                 if (
                     args.regex_after is None
-                    or re.search(args.regex_after, link, flags=re.IGNORECASE)
-                    is not None
+                    or re.search(args.regex_after, link, flags=re.IGNORECASE) is not None
                 ) and exclusionRegex.search(link) is None:
                     linkRequests.append(link)
 
@@ -5763,10 +5468,7 @@ def processResponsesWayback():
                     else:
                         write(
                             colored(
-                                "\nWayback responses saved for "
-                                + subs
-                                + argsInput
-                                + ": ",
+                                "\nWayback responses saved for " + subs + argsInput + ": ",
                                 "cyan",
                             )
                             + colored(
@@ -5795,10 +5497,7 @@ def processResponsesWayback():
                     else:
                         write(
                             colored(
-                                "\nWayback responses saved for "
-                                + subs
-                                + argsInput
-                                + ": ",
+                                "\nWayback responses saved for " + subs + argsInput + ": ",
                                 "cyan",
                             )
                             + colored(
@@ -5811,9 +5510,7 @@ def processResponsesWayback():
                         )
             except Exception as e:
                 if verbose():
-                    writerr(
-                        colored("ERROR processResponsesWayback 5: " + str(e), "red")
-                    )
+                    writerr(colored("ERROR processResponsesWayback 5: " + str(e), "red"))
 
         totalFileCount = totalFileCount + fileCount
     except Exception as e:
@@ -5911,8 +5608,7 @@ def notifyDiscord():
                 writerr(
                     colored(
                         getSPACER(
-                            "WARNING: Failed to send notification to Discord - "
-                            + result.json()
+                            "WARNING: Failed to send notification to Discord - " + result.json()
                         ),
                         "yellow",
                     )
@@ -5920,9 +5616,7 @@ def notifyDiscord():
         except Exception as e:
             writerr(
                 colored(
-                    getSPACER(
-                        "WARNING: Failed to send notification to Discord - " + str(e)
-                    ),
+                    getSPACER("WARNING: Failed to send notification to Discord - " + str(e)),
                     "yellow",
                 )
             )
@@ -6037,9 +5731,7 @@ def combineInlineJS():
 
         totalSections = len(uniqueScripts)
         sectionCounter = 0  # Counter for inline JS sections
-        currentOutputFile = os.path.join(
-            responseOutputDirectory, outputFileTemplate.format(1)
-        )
+        currentOutputFile = os.path.join(responseOutputDirectory, outputFileTemplate.format(1))
         currentSectionsWritten = 0  # Counter for sections written in current file
 
         if totalSections > 0:
@@ -6075,9 +5767,7 @@ def combineInlineJS():
                         currentSectionsWritten = 1
 
                     # Insert comment line for the beginning of the section
-                    inlineJSFile.write(
-                        f"//****** INLINE JS SECTION {sectionCounter} ******//\n\n"
-                    )
+                    inlineJSFile.write(f"//****** INLINE JS SECTION {sectionCounter} ******//\n\n")
 
                     # Write comments indicating the files the script was found in
                     files = ""
@@ -6111,10 +5801,7 @@ def combineInlineJS():
                 write(
                     colored("Created files ", "cyan")
                     + colored(
-                        responseOutputDirectory
-                        + "combinedInline{1-"
-                        + str(fileNumber)
-                        + "}.js",
+                        responseOutputDirectory + "combinedInline{1-" + str(fileNumber) + "}.js",
                         "white",
                     )
                     + colored(" (contents of inline JS)\n", "cyan")
