@@ -277,6 +277,7 @@ If you come across any problems at all, or have ideas for improvements, please f
 
 ## TODO
 
+- Try to deal with Alien Vaults new throttling limit better.
 - Add an `-oos` argument that accepts a file of Out Of Scope subdomains/URLs that will not be returned in the output, or have any responses downloaded.
 - The `waymore_index.txt` isn't de-duplicated if run multiple times for the same input with `-mode R` or `-mode B`.
 - Rewrite to get from sources in parallel. Currently they are run consecutively sorry!
