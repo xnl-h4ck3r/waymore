@@ -6,7 +6,7 @@
 
     - The `-from`/`--from-date` and `-to`/`--to-date` arguments were not used for getting URLs from Wayback Archive, only for responses. These have been changed to apply to both mode `U` and mode `R` for Wayback. They will not be used for URLs if the `-f`/`--filter-responses-only` argument is passed.
     - The `-lcy` argument will be removed and the `-from`/`--from-date` and `-to`/`--to-date` arguments will now determine which Common Crawl indexes to get and which records from the files will be returned if filtering is required.
-    - The `-from`/`--from-date` and `-to`/`--to-date` arguments were all not used for getting URLs from Common Crawl, Alien Vault and Virus Total within the date limits. **IMPORTANT: There are some exceptions with sources unable to get URLs within date limits: Virus Total - all known sub domains will still be returned; Intelligence X - all URLs will still be returned.**
+    - The `-from`/`--from-date` and `-to`/`--to-date` arguments were also not used for getting URLs from Common Crawl, Alien Vault and Virus Total within the date limits. **IMPORTANT: There are some exceptions with sources unable to get URLs within date limits: Virus Total - all known sub domains will still be returned; Intelligence X - all URLs will still be returned.**
 
 - v6.5
 
