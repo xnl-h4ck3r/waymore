@@ -449,13 +449,13 @@ def showOptions():
         )
 
         if not args.xcc:
-            if args.lcc == 0 and args.lcy == 0:
+            if args.lcc == 0 and args.from_date is None and args.to_date is None:
                 write(
                     colored("-lcc: " + str(args.lcc), "magenta")
                     + colored(" Search ALL Common Crawl index collections.", "white")
                 )
             else:
-                if args.lcy == 0:
+                if args.from_date is None and args.to_date is None:
                     write(
                         colored("-lcc: " + str(args.lcc), "magenta")
                         + colored(
@@ -468,19 +468,10 @@ def showOptions():
                         write(
                             colored("-lcc: " + str(args.lcc), "magenta")
                             + colored(
-                                " The number of latest Common Crawl index collections to be searched.",
+                                " The number of latest Common Crawl index collections to be searched within the specified date range (-to and -from).",
                                 "white",
                             )
                         )
-                    write(
-                        colored("-lcy: " + str(args.lcy), "magenta")
-                        + colored(
-                            " Search all Common Crawl index collections with data from year "
-                            + str(args.lcy)
-                            + " and after.",
-                            "white",
-                        )
-                    )
 
         if URLSCAN_API_KEY == "":
             write(
@@ -568,17 +559,6 @@ def showOptions():
                         )
                     )
 
-            if args.from_date is not None:
-                write(
-                    colored("-from: " + str(args.from_date), "magenta")
-                    + colored(" The date/time to get responses from.", "white")
-                )
-            if args.to_date is not None:
-                write(
-                    colored("-to: " + str(args.to_date), "magenta")
-                    + colored(" The date/time to get responses up to.", "white")
-                )
-
             if args.capture_interval == "h":
                 write(
                     colored("-ci: " + args.capture_interval, "magenta")
@@ -626,6 +606,32 @@ def showOptions():
                 + colored(
                     " Whether the combined JS of all responses will be written to one or more files.",
                     "white",
+                )
+            )
+
+        if args.from_date is not None:
+            write(
+                colored("-from: " + str(args.from_date), "magenta")
+                + colored(
+                    " The date/time to get data from.",
+                    "white",
+                )
+                + colored(
+                    " NOTE: All results will still be returned from Intelligence X, and all sub domains from Virus Total, because these cannot be filtered by date.",
+                    "yellow",
+                )
+            )
+
+        if args.to_date is not None:
+            write(
+                colored("-to: " + str(args.to_date), "magenta")
+                + colored(
+                    " The date/time to get data up to.",
+                    "white",
+                )
+                + colored(
+                    " NOTE: All results will still be returned from Intelligence X, and all sub domains from Virus Total, because these cannot be filtered by date.",
+                    "yellow",
                 )
             )
 
@@ -2113,6 +2119,22 @@ def validateArgProviders(x):
     return x
 
 
+def parseDateArg(dateArg):
+    """
+    Parse a date argument from the command line into a datetime object
+    """
+    formats = {
+        4: "%Y",
+        6: "%Y%m",
+        8: "%Y%m%d",
+        10: "%Y%m%d%H",
+        12: "%Y%m%d%H%M",
+        14: "%Y%m%d%H%M%S",
+    }
+    fmt = formats.get(len(dateArg))
+    return datetime.strptime(dateArg, fmt)
+
+
 def processAlienVaultPage(url):
     """
     Get URLs from a specific page of otx.alienvault.org API for the input domain
@@ -2273,6 +2295,36 @@ def processAlienVaultPage(url):
                                     )
                                 if match is None:
                                     addLink = False
+
+                            # Check date is in range if required
+                            if args.from_date is not None or args.to_date is not None:
+                                try:
+                                    urlDateStr = urlSection["date"]
+
+                                    # Remove fractional seconds if present
+                                    urlDateStr = urlDateStr.split(".")[0]
+
+                                    urlDate = datetime.strptime(urlDateStr, "%Y-%m-%dT%H:%M:%S")
+
+                                    # If from date passed, check
+                                    if args.from_date is not None:
+                                        fromDate = parseDateArg(args.from_date)
+                                        if urlDate < fromDate:
+                                            addLink = False
+                                    # If to date passed, check
+                                    if args.to_date is not None:
+                                        toDate = parseDateArg(args.to_date)
+                                        if urlDate >= toDate:
+                                            addLink = False
+                                except Exception as e:
+                                    if verbose():
+                                        writerr(
+                                            colored(
+                                                "ERROR processLAlienVaultPage date check: "
+                                                + str(e),
+                                                "red",
+                                            )
+                                        )
 
                         # Add link if it passed filters
                         if addLink:
@@ -3489,6 +3541,16 @@ def getWaybackUrls():
             else:
                 filterKeywords = "&filter=original:.*(" + args.keywords_only + ").*"
 
+        # Add the date filters if they were passed
+        if args.from_date is None:
+            filterFrom = ""
+        else:
+            filterFrom = "&from=" + str(args.from_date)
+        if args.to_date is None:
+            filterTo = ""
+        else:
+            filterTo = "&to=" + str(args.to_date)
+
         if args.filter_responses_only:
             url = (
                 WAYBACK_URL.replace("{DOMAIN}", subs + quote(argsInput) + path).replace(
@@ -3504,6 +3566,8 @@ def getWaybackUrls():
                 + filterMIME
                 + filterCode
                 + filterKeywords
+                + filterFrom
+                + filterTo
                 + "&page="
             )
 
@@ -3821,6 +3885,42 @@ def processCommonCrawlCollection(cdxApiUrl):
                                 linkMimes.add(data["mime"])
                         except Exception:
                             pass
+                    # If -from or -to were passed, check the timestamp of the URL.
+                    # Only continue if the URL falls within the date range specified
+                    if args.from_date is not None or args.to_date is not None:
+                        try:
+                            ts = data["timestamp"]
+
+                            # Normalize helper: pad/truncate date string to 14 digits (YYYYMMDDhhmmss)
+                            def normalize_date(d, is_from):
+                                if d is None:
+                                    return None
+                                d = d.strip()
+                                # Pad to 14 digits: from_date pads with 0s, to_date with 9s
+                                if is_from:
+                                    return (d + "0" * (14 - len(d)))[:14]
+                                else:
+                                    return (d + "9" * (14 - len(d)))[:14]
+
+                            from_ts = normalize_date(args.from_date, True)
+                            to_ts = normalize_date(args.to_date, False)
+
+                            # Compare numerically
+                            if from_ts and ts < from_ts:
+                                continue
+                            if to_ts and ts > to_ts:
+                                continue
+
+                        except Exception as e:
+                            writerr(
+                                colored(
+                                    getSPACER(
+                                        f"ERROR processCommonCrawlCollection 3: Cannot get timestamp from line {line}: {str(e)}"
+                                    ),
+                                    "red",
+                                )
+                            )
+
                     linksFoundAdd(data["url"])
                 except Exception:
                     if verbose():
@@ -3972,11 +4072,25 @@ def getCommonCrawlIndexes():
         for values in json.loads(jsonResp):
             for key in values:
                 if key == "cdx-api":
-                    if args.lcy != 0:
+                    if args.from_date is not None or args.to_date is not None:
                         try:
                             indexYear = values[key].split("CC-MAIN-")[1][:4]
-                            if int(indexYear) >= args.lcy:
-                                cdxApiUrls.add(values[key])
+
+                            # Only get the indexes that fall within the date range specified
+                            if args.from_date is not None:
+                                fromYear = int(args.from_date[:4])
+                                # There are a few exceptions with the filename format at the start of Common Crawl indexes where it contains 2 years, so deal with those (e.g. CC-MAIN-2009-2010-index and CC-MAIN-2008-2009-index)
+                                if fromYear in (2009, 2010):
+                                    fromYear = fromYear - 1
+                                if int(indexYear) < fromYear:
+                                    continue
+                            if args.to_date is not None:
+                                toYear = int(args.to_date[:4])
+                                if int(indexYear) > toYear:
+                                    continue
+                            # If it passed the date range checks then add the index URL
+                            cdxApiUrls.add(values[key])
+                            collection = collection + 1
                         except Exception as e:
                             writerr(
                                 colored(
@@ -3991,7 +4105,9 @@ def getCommonCrawlIndexes():
                             )
                     else:
                         cdxApiUrls.add(values[key])
-            collection = collection + 1
+                        collection = collection + 1
+
+            # Only get the most recent number of indexes specified by -lcc argument
             if collection == args.lcc:
                 break
 
@@ -4202,18 +4318,17 @@ def processVirusTotalUrl(url):
 
 def getVirusTotalUrls():
     """
-    Get URLs from the VirusTotal API v2
+    Get URLs from the VirusTotal API v2 and process them.
+    Each URL is normalized as (url, scan_date) tuple. Dates are filtered according to args.from_date / args.to_date.
     """
     global VIRUSTOTAL_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSource, argsInput, checkVirusTotal, argsInputHostname
 
-    # Write the file of URL's for the passed domain/URL
     try:
-        requestsMade = 0
         stopSource = False
         linkMimes = set()
         originalLinkCount = len(linksFound)
 
-        # Just pass the hostname in the URL
+        # Build the VirusTotal API URL
         url = VIRUSTOTAL_URL.replace("{DOMAIN}", quote(argsInputHostname)).replace(
             "{APIKEY}", VIRUSTOTAL_API_KEY
         )
@@ -4227,25 +4342,23 @@ def getVirusTotalUrls():
         if not args.check_only:
             write(colored("\rGetting links from virustotal.com API...\r", "cyan"))
 
-        # Get the domain report from virustotal
+        # Make request
         try:
-            # Choose a random user agent string to use for any requests
             userAgent = random.choice(USER_AGENT)
             session = requests.Session()
             session.mount("https://", HTTP_ADAPTER)
             session.mount("http://", HTTP_ADAPTER)
             resp = session.get(url, headers={"User-Agent": userAgent})
-            requestsMade = requestsMade + 1
         except Exception as e:
-            write(
+            writerr(
                 colored(
-                    getSPACER("[ ERR ] Unable to get links from virustotal.com: " + str(e)),
+                    getSPACER(f"[ ERR ] Unable to get links from virustotal.com: {e}"),
                     "red",
                 )
             )
             return
 
-        # Deal with any errors
+        # Handle HTTP errors
         if resp.status_code == 429:
             writerr(
                 colored(
@@ -4267,63 +4380,72 @@ def getVirusTotalUrls():
         elif resp.status_code != 200:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ " + str(resp.status_code) + " ] Unable to get links from virustotal.com"
-                    ),
+                    getSPACER(f"[ {resp.status_code} ] Unable to get links from virustotal.com"),
                     "red",
                 )
             )
             return
 
-        # Get the JSON response
+        # Parse JSON
         try:
             jsonResp = json.loads(resp.text.strip())
 
-            # Get the different URLs
+            # Normalize arrays as (url, scan_date) tuples
             if args.no_subs:
-                subDomains = []
+                subdomains = []
             else:
-                try:
-                    subDomains = jsonResp["subdomains"]
-                except Exception:
-                    subDomains = []
-            try:
-                detectedUrls = [entry["url"] for entry in jsonResp.get("detected_urls", [])]
-            except Exception:
-                detectedUrls = []
-            try:
-                undetectedUrls = [entry[0] for entry in jsonResp.get("undetected_urls", [])]
-            except Exception:
-                undetectedUrls = []
-            try:
-                totalUrls = set(subDomains + detectedUrls + undetectedUrls)
-            except Exception:
-                totalUrls = []
-        except Exception:
+                subdomains = [(sd, None) for sd in jsonResp.get("subdomains", [])]
+
+            detected_urls = [
+                (entry.get("url"), entry.get("scan_date"))
+                for entry in jsonResp.get("detected_urls", [])
+            ]
+
+            undetected_urls = [
+                (entry[0], entry[4]) for entry in jsonResp.get("undetected_urls", [])
+            ]
+
+            # Combine all
+            all_urls = subdomains + detected_urls + undetected_urls
+
+        except Exception as e:
             writerr(
                 colored(
-                    getSPACER("[ ERR ] There was an unexpected response from the VirusTotal API"),
+                    getSPACER("[ ERR ] Unexpected response from the VirusTotal API: " + str(e)),
                     "red",
                 )
             )
-            totalUrls = []
+            all_urls = []
 
+        # Check only mode
         if args.check_only:
             write(colored("Get URLs from VirusTotal: ", "cyan") + colored("1 request", "white"))
             checkVirusTotal = 1
         else:
-            # Carry on if something was found
-            for vturl in totalUrls:
-
+            # Process each URL tuple
+            for url, scan_date in all_urls:
                 if stopSource:
                     break
-
-                # Get memory in case it exceeds threshold
                 getMemory()
 
-                # Work out whether to include it
-                processVirusTotalUrl(vturl)
+                # Filter by date if -from or -to was passed and we have a date for the url
+                if scan_date and (args.from_date is not None or args.to_date is not None):
+                    urlDate = datetime.strptime(scan_date, "%Y-%m-%d %H:%M:%S")
+                    # If from date passed, check
+                    if args.from_date is not None:
+                        fromDate = parseDateArg(args.from_date)
+                        if urlDate < fromDate:
+                            continue
+                    # If to date passed, check
+                    if args.to_date is not None:
+                        toDate = parseDateArg(args.to_date)
+                        if urlDate >= toDate:
+                            continue
 
+                # Process URL
+                processVirusTotalUrl(url)
+
+            # Count links found
             linkCount = len(linksFound) - originalLinkCount
             if args.xwm and args.xcc and args.xav and args.xus:
                 write(
@@ -4343,7 +4465,7 @@ def getVirusTotalUrls():
                 )
 
     except Exception as e:
-        writerr(colored("ERROR getVirusTotalUrls 1: " + str(e), "red"))
+        writerr(colored(f"ERROR getVirusTotalUrls: {e}", "red"))
 
 
 def processIntelxUrl(url):
@@ -5984,13 +6106,6 @@ def main():
         help="Limit the number of Common Crawl index collections searched, e.g. '-lcc 10' will just search the latest 10 collections (default: 1). As of November 2024 there are currently 106 collections. Setting to 0 (default) will search ALL collections. If you don't want to search Common Crawl at all, use the -xcc option.",
     )
     parser.add_argument(
-        "-lcy",
-        action="store",
-        type=int,
-        help="Limit the number of Common Crawl index collections searched by the year of the index data. The earliest index has data from 2008. Setting to 0 (default) will search collections or any year (but in conjuction with -lcc). For example, if you are only interested in data from 2015 and after, pass -lcy 2015. If you don't want to search Common Crawl at all, use the -xcc option.",
-        default=0,
-    )
-    parser.add_argument(
         "-t",
         "--timeout",
         help="This is for archived responses only! How many seconds to wait for the server to send data before giving up (default: "
@@ -6106,13 +6221,6 @@ def main():
     if args.version:
         showVersion()
         sys.exit()
-
-    # If -lcc wasn't passed then set to the default of 1 if -lcy is 0. This will make them work together
-    if args.lcc is None:
-        if args.lcy == 0:
-            args.lcc = 1
-        else:
-            args.lcc = 0
 
     # If --providers was passed, then manually set the exclude arguments;
     if args.providers:
