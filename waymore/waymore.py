@@ -5,6 +5,7 @@
 # Good luck and good hunting! If you really love the tool (or any others), or they helped you find an awesome bounty, consider BUYING ME A COFFEE! (https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)
 
 import argparse
+import asyncio
 import enum
 import json
 import math
@@ -14,6 +15,7 @@ import pickle
 import random
 import re
 import sys
+import threading
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -60,6 +62,12 @@ argsInput = ""
 isInputFile = False
 stopProgramCount = 0
 stopSource = False
+stopSourceWayback = False
+stopSourceCommonCrawl = False
+stopSourceAlienVault = False
+stopSourceURLScan = False
+stopSourceVirusTotal = False
+stopSourceIntelx = False
 successCount = 0
 failureCount = 0
 fileCount = 0
@@ -80,6 +88,10 @@ currentMemUsage = 0
 maxMemoryPercent = 0
 currentMemPercent = 0
 process = None
+current_response = None
+current_session = None
+# Event used to interrupt long sleeps (e.g., rate-limit waits) when SIGINT is received
+interrupt_event = threading.Event()
 HTTP_ADAPTER = None
 HTTP_ADAPTER_CC = None
 checkWayback = 0
@@ -91,6 +103,20 @@ checkIntelx = 0
 argsInputHostname = ""
 responseOutputDirectory = ""
 urlscanRequestLinks = set()
+intelxAPIIssue = False
+linkCountWayback = 0
+linkCountCommonCrawl = 0
+linkCountAlienVault = 0
+linkCountURLScan = 0
+linkCountVirusTotal = 0
+linkCountIntelx = 0
+
+# Thread lock for protecting shared state during concurrent operations
+links_lock = threading.Lock()
+
+# Shared state for link collection across all sources
+linksFound = set()
+linkMimes = set()
 
 # Source Provider URLs
 WAYBACK_URL = "https://web.archive.org/cdx/search/cdx?url={DOMAIN}{COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest"
@@ -329,7 +355,7 @@ def handler(signal_received, frame):
     This function is called if Ctrl-C is called by the user
     An attempt will be made to try and clean up properly
     """
-    global stopSource, stopProgram, stopProgramCount
+    global stopSource, stopProgram, stopProgramCount, stopSourceWayback, stopSourceCommonCrawl, stopSourceAlienVault, stopSourceURLScan, stopSourceVirusTotal, stopSourceIntelx, current_response, current_session
 
     if stopProgram is not None:
         stopProgramCount = stopProgramCount + 1
@@ -358,6 +384,34 @@ def handler(signal_received, frame):
     else:
         stopProgram = StopProgram.SIGINT
         stopSource = True
+        stopSourceWayback = True
+        stopSourceCommonCrawl = True
+        stopSourceAlienVault = True
+        stopSourceURLScan = True
+        stopSourceVirusTotal = True
+        stopSourceIntelx = True
+        # Try to close any active response or session to interrupt blocking network I/O
+        try:
+            if current_response is not None:
+                try:
+                    current_response.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        try:
+            if current_session is not None:
+                try:
+                    current_session.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # Signal any waits to stop early
+        try:
+            interrupt_event.set()
+        except Exception:
+            pass
         writerr(
             colored(
                 getSPACER('>>> "Oh my God, they killed Kenny... and waymore!" - Kyle'),
@@ -760,7 +814,7 @@ def showOptions():
         if args.mode in ["R", "B"] or (args.mode == "U" and not args.xcc):
             write(
                 colored("-p: " + str(args.processes), "magenta")
-                + colored(" The number of parallel requests made.", "white")
+                + colored(" The number of parallel requests made per source.", "white")
             )
         write(
             colored("-r: " + str(args.retries), "magenta")
@@ -1251,7 +1305,7 @@ def fixArchiveOrgUrl(url):
 
 # Add a link to the linksFound collection for archived responses (included timestamp preifx)
 def linksFoundResponseAdd(link):
-    global linksFound, argsInput, argsInputHostname
+    global linksFound, argsInput, argsInputHostname, links_lock
 
     try:
         if inputIsDomainANDPath:
@@ -1272,20 +1326,22 @@ def linksFoundResponseAdd(link):
 
         # Don't write it if the link does not contain the requested domain (this can sometimes happen)
         if parsed_url.lower().find(checkInput.lower()) >= 0:
-            linksFound.add(link)
+            with links_lock:
+                linksFound.add(link)
             # If streaming is enabled and mode is 'U', print the link to stdout
             if args.stream and args.mode == "U":
                 write(link, pipe=True)
     except Exception:
-        linksFound.add(link)
+        with links_lock:
+            linksFound.add(link)
         # If streaming is enabled and mode is 'U', print the link to stdout
         if args.stream and args.mode == "U":
             write(link, pipe=True)
 
 
 # Add a link to the linksFound collection
-def linksFoundAdd(link):
-    global linksFound, argsInput, argsInputHostname
+def linksFoundAdd(link, source_set=None):
+    global linksFound, argsInput, argsInputHostname, links_lock
 
     try:
         if inputIsDomainANDPath:
@@ -1303,12 +1359,20 @@ def linksFoundAdd(link):
 
         # Don't write it if the link does not contain the requested domain (this can sometimes happen)
         if parsed_url.find(checkInput) >= 0:
-            linksFound.add(link)
+            with links_lock:
+                if source_set is not None:
+                    source_set.add(link)
+                else:
+                    linksFound.add(link)
             # If streaming is enabled and mode is 'U', print the link to stdout
             if args.stream and args.mode == "U":
                 write(link, pipe=True)
     except Exception:
-        linksFound.add(link)
+        with links_lock:
+            if source_set is not None:
+                source_set.add(link)
+            else:
+                linksFound.add(link)
         # If streaming is enabled and mode is 'U', print the link to stdout
         if args.stream and args.mode == "U":
             write(link, pipe=True)
@@ -1567,12 +1631,10 @@ def processArchiveUrl(url):
                             except Exception as e:
                                 writerr(
                                     colored(
-                                        getSPACER(
-                                            "[ ERR ] Failed to write file "
-                                            + filePath
-                                            + ": "
-                                            + str(e)
-                                        ),
+                                        "Wayback - [ ERR ] Failed to write file "
+                                        + filePath
+                                        + ": "
+                                        + str(e),
                                         "red",
                                     )
                                 )
@@ -1588,12 +1650,10 @@ def processArchiveUrl(url):
                                 except Exception as e:
                                     writerr(
                                         colored(
-                                            getSPACER(
-                                                '[ ERR ] Failed to write to waymore_index.txt for "'
-                                                + archiveUrl
-                                                + '": '
-                                                + str(e)
-                                            ),
+                                            'Wayback - [ ERR ] Failed to write to waymore_index.txt for "'
+                                            + archiveUrl
+                                            + '": '
+                                            + str(e),
                                             "red",
                                         )
                                     )
@@ -1631,11 +1691,7 @@ def processArchiveUrl(url):
                     if verbose():
                         writerr(
                             colored(
-                                getSPACER(
-                                    '[ ERR ] Wayback Machine (archive.org) returned a problem for "'
-                                    + archiveUrl
-                                    + '"'
-                                ),
+                                'Wayback - [ ERR ] returned a problem for "' + archiveUrl + '"',
                                 "red",
                             )
                         )
@@ -1644,11 +1700,7 @@ def processArchiveUrl(url):
                     if verbose():
                         writerr(
                             colored(
-                                getSPACER(
-                                    '[ ERR ] Wayback Machine (archive.org) connection error for "'
-                                    + archiveUrl
-                                    + '"'
-                                ),
+                                'Wayback - [ ERR ] connection error for "' + archiveUrl + '"',
                                 "red",
                             )
                         )
@@ -1658,25 +1710,21 @@ def processArchiveUrl(url):
                         try:
                             writerr(
                                 colored(
-                                    getSPACER(
-                                        "[ "
-                                        + str(resp.status_code)
-                                        + ' ] Failed to get response for "'
-                                        + archiveUrl
-                                        + '"'
-                                    ),
+                                    "Wayback - [ "
+                                    + str(resp.status_code)
+                                    + ' ] Failed to get response for "'
+                                    + archiveUrl
+                                    + '"',
                                     "red",
                                 )
                             )
                         except Exception:
                             writerr(
                                 colored(
-                                    getSPACER(
-                                        '[ ERR ] Failed to get response for "'
-                                        + archiveUrl
-                                        + '": '
-                                        + str(e)
-                                    ),
+                                    'Wayback - [ ERR ] Failed to get response for "'
+                                    + archiveUrl
+                                    + '": '
+                                    + str(e),
                                     "red",
                                 )
                             )
@@ -1728,7 +1776,7 @@ def processArchiveUrl(url):
 
             except Exception as e:
                 if verbose():
-                    writerr(colored(getSPACER('Error for "' + url + '": ' + str(e)), "red"))
+                    writerr(colored('Wayback - [ ERR ] Error for "' + url + '": ' + str(e), "red"))
 
     except Exception as e:
         writerr(colored("ERROR processArchiveUrl 1:  " + str(e), "red"))
@@ -1813,7 +1861,7 @@ def processURLOutput():
             linkCount = len(linksFound)
             write(
                 getSPACER(
-                    colored("Links found for " + subs + argsInput + ": ", "cyan")
+                    colored("\nTotal unique links found for " + subs + argsInput + ": ", "cyan")
                     + colored(str(linkCount) + " 🤘", "white")
                 )
                 + "\n"
@@ -2139,12 +2187,12 @@ def processAlienVaultPage(url):
     """
     Get URLs from a specific page of otx.alienvault.org API for the input domain
     """
-    global totalPages, linkMimes, linksFound, stopSource, argsInput
+    global totalPages, linkMimes, linksFound, stopSourceAlienVault, argsInput, linkCountAlienVault
     try:
         # Get memory in case it exceeds threshold
         getMemory()
 
-        if not stopSource:
+        if not stopSourceAlienVault:
             try:
                 # Choose a random user agent string to use for any requests
                 userAgent = random.choice(USER_AGENT)
@@ -2156,7 +2204,7 @@ def processAlienVaultPage(url):
             except ConnectionError:
                 writerr(
                     colored(
-                        getSPACER("[ ERR ] alienvault.org connection error for page " + page),
+                        getSPACER("AlienVault - [ ERR ] Connection error for page " + page),
                         "red",
                     )
                 )
@@ -2165,9 +2213,10 @@ def processAlienVaultPage(url):
             except Exception as e:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ ERR ] Error getting response for page " + page + " - " + str(e)
-                        ),
+                        "AlienVault -[ ERR ] Error getting response for page "
+                        + page
+                        + " - "
+                        + str(e),
                         "red",
                     )
                 )
@@ -2178,22 +2227,21 @@ def processAlienVaultPage(url):
                     if resp is not None:
                         # If a status other of 429, then stop processing Alien Vault
                         if resp.status_code == 429:
-                            writerr(
-                                colored(
-                                    getSPACER(
-                                        "[ 429 ] Alien Vault rate limit reached, so stopping. Links that have already been retrieved will be saved."
-                                    ),
-                                    "red",
+                            if not stopSourceAlienVault:  # Only print message once
+                                writerr(
+                                    colored(
+                                        "AlienVault - [ 429 ] Rate limit reached, so stopping. Links that have already been retrieved will be saved.",
+                                        "red",
+                                    )
                                 )
-                            )
-                            stopSource = True
+                            stopSourceAlienVault = True
                             return
                         # If the response from alienvault.com is empty then skip
                         if resp.text == "" and totalPages == 0:
                             if verbose():
                                 writerr(
                                     colored(
-                                        getSPACER("[ ERR ] " + url + " gave an empty response."),
+                                        "AlienVault - [ ERR ] " + url + " gave an empty response.",
                                         "red",
                                     )
                                 )
@@ -2203,9 +2251,10 @@ def processAlienVaultPage(url):
                             if verbose():
                                 writerr(
                                     colored(
-                                        getSPACER(
-                                            "[ " + str(resp.status_code) + " ] Error for " + url
-                                        ),
+                                        "AlienVauilt - [ "
+                                        + str(resp.status_code)
+                                        + " ] Error for "
+                                        + url,
                                         "red",
                                     )
                                 )
@@ -2228,6 +2277,7 @@ def processAlienVaultPage(url):
                 if foundUrl != "":
                     # If filters are not required and subs are wanted then just add the URL to the list
                     if args.filter_responses_only and not args.no_subs:
+                        linkCountAlienVault = linkCountAlienVault + 1
                         linksFoundAdd(foundUrl)
                     else:
                         addLink = True
@@ -2328,7 +2378,7 @@ def processAlienVaultPage(url):
 
                         # Add link if it passed filters
                         if addLink:
-                            linksFoundAdd(foundUrl)
+                            linksFoundAdd(foundUrl, linksFoundAlienVault)
         else:
             pass
     except Exception as e:
@@ -2340,12 +2390,12 @@ def getAlienVaultUrls():
     """
     Get URLs from the Alien Vault OTX, otx.alienvault.com
     """
-    global linksFound, waymorePath, subs, path, stopProgram, totalPages, stopSource, argsInput, checkAlienVault, inputIsSubDomain, argsInputHostname
+    global linksFound, waymorePath, subs, path, stopProgram, totalPages, stopSourceAlienVault, argsInput, checkAlienVault, inputIsSubDomain, argsInputHostname, linkCountAlienVault, linksFoundAlienVault
 
     # Write the file of URL's for the passed domain/URL
     try:
-        stopSource = False
-        originalLinkCount = len(linksFound)
+        stopSourceAlienVault = False
+        linksFoundAlienVault = set()
 
         # Set the Alien Vault API indicator types of domain or hostname (has subdomain)
         if inputIsSubDomain:
@@ -2362,11 +2412,12 @@ def getAlienVaultUrls():
 
         # Get the number of pages (i.e. separate requests) that are going to be made to alienvault.com
         totalPages = 0
+        resp = None
         try:
             if not args.check_only:
                 write(
                     colored(
-                        "\rGetting the number of alienvault.com pages to search...\r",
+                        "AlienVault - [ INFO ] Getting the number of alienvault.com pages to search...",
                         "cyan",
                     )
                 )
@@ -2379,33 +2430,35 @@ def getAlienVaultUrls():
         except Exception as e:
             writerr(
                 colored(
-                    getSPACER("[ ERR ] Unable to get links from alienvault.com: " + str(e)),
+                    "AlienVault - [ ERR ] Unable to get links from alienvault.com: " + str(e),
                     "red",
                 )
             )
-            return
+            # Don't return - continue to show link count at the end
 
         # If the rate limit was reached end now
-        if resp.status_code == 429:
+        if resp is not None and resp.status_code == 429:
             writerr(
                 colored(
-                    getSPACER("[ 429 ] Alien Vault rate limit reached so unable to get links."),
+                    "AlienVault - [ 429 ] Rate limit reached so unable to get links.",
                     "red",
                 )
             )
-            return
+            # Don't return - continue to show link count at the end
 
-        if verbose():
+        if resp is not None and verbose():
             write(
-                getSPACER(
-                    colored("The Alien Vault URL requested to get links: ", "magenta")
-                    + colored(url, "white")
-                )
+                colored("AlienVault - [ INFO ] The URL requested to get links: ", "magenta")
+                + colored(url, "white")
                 + "\n"
             )
 
         # Carry on if something was found
-        if resp.text.lower().find('"error": "') < 0:
+        if (
+            resp is not None
+            and resp.status_code != 429
+            and resp.text.lower().find('"error": "') < 0
+        ):
 
             try:
                 # Get the JSON response
@@ -2416,9 +2469,7 @@ def getAlienVaultUrls():
             except Exception:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ ERR ] There was an unexpected response from the Alien Vault API"
-                        ),
+                        "AlienVault - [ ERR ] There was an unexpected response from the API",
                         "red",
                     )
                 )
@@ -2440,16 +2491,16 @@ def getAlienVaultUrls():
                     else:
                         checkAlienVault = totalPages
                     write(
-                        colored("Get URLs from Alien Vault: ", "cyan")
+                        colored("AlienVault - [ INFO ] Getting URLs from Alien Vault: ", "cyan")
                         + colored(str(checkAlienVault) + " requests", "white")
                     )
                 else:
                     # if the page number was found then display it, but otherwise we will just try to increment until we have everything
                     write(
                         colored(
-                            "\rGetting links from "
+                            "AlienVault - [ INFO ] Getting links from "
                             + str(totalPages)
-                            + " alienvault.com API requests (this can take a while for some domains)...\r",
+                            + " alienvault.com API requests (this can take a while for some domains)...",
                             "cyan",
                         )
                     )
@@ -2469,30 +2520,19 @@ def getAlienVaultUrls():
             if verbose():
                 writerr(
                     colored(
-                        getSPACER("[ ERR ] An error was returned in the alienvault.com response.")
-                        + "\n",
+                        "AlienVault - [ ERR ] An error was returned in the response." + "\n",
                         "red",
                     )
                 )
 
         if not args.check_only:
-            linkCount = len(linksFound) - originalLinkCount
-            if args.xwm and args.xcc:
-                write(
-                    getSPACER(
-                        colored("Links found on alienvault.com: ", "cyan")
-                        + colored(str(linkCount), "white")
-                    )
-                    + "\n"
-                )
-            else:
-                write(
-                    getSPACER(
-                        colored("Extra links found on alienvault.com: ", "cyan")
-                        + colored(str(linkCount), "white")
-                    )
-                    + "\n"
-                )
+            linkCountAlienVault = len(linksFoundAlienVault)
+            write(
+                colored("AlienVault - [ INFO ] Links found on alienvault.com: ", "cyan")
+                + colored(str(linkCountAlienVault), "white")
+            )
+            linksFound.update(linksFoundAlienVault)
+            linksFoundAlienVault.clear()
 
     except Exception as e:
         writerr(colored("ERROR getAlienVaultUrls 1: " + str(e), "red"))
@@ -2502,7 +2542,7 @@ def processURLScanUrl(url, httpCode, mimeType, urlscanID=""):
     """
     Process a specific URL from urlscan.io to determine whether to save the link
     """
-    global argsInput, argsInputHostname, urlscanRequestLinks
+    global argsInput, argsInputHostname, urlscanRequestLinks, links_lock, linkCountURLScan, linksFoundURLScan
 
     addLink = True
 
@@ -2591,7 +2631,8 @@ def processURLScanUrl(url, httpCode, mimeType, urlscanID=""):
                 # Add MIME Types if --verbose option was selected
                 if verbose():
                     if mimeType.strip() != "":
-                        linkMimes.add(mimeType)
+                        with links_lock:
+                            linkMimes.add(mimeType)
 
         # Add link if it passed filters
         if addLink:
@@ -2611,11 +2652,12 @@ def processURLScanUrl(url, httpCode, mimeType, urlscanID=""):
             )
             if match is not None:
                 if args.mode in ("U", "B"):
-                    linksFoundAdd(url)
+                    linksFoundAdd(url, linksFoundURLScan)
                 # If Response mode is requested then add the DOM ID to try later, for the number of responses wanted
                 if urlscanID != "" and args.mode in ("R", "B"):
                     if args.limit == 0 or len(urlscanRequestLinks) < args.limit:
-                        urlscanRequestLinks.add((url, URLSCAN_DOM_URL + urlscanID))
+                        with links_lock:
+                            urlscanRequestLinks.add((url, URLSCAN_DOM_URL + urlscanID))
 
     except Exception as e:
         writerr(colored("ERROR processURLScanUrl 1: " + str(e), "red"))
@@ -2721,9 +2763,10 @@ def getURLScanDOM(originalUrl, domUrl):
                         except Exception as e:
                             writerr(
                                 colored(
-                                    getSPACER(
-                                        "[ ERR ] Failed to write file " + filePath + ": " + str(e)
-                                    ),
+                                    "URLScan - [ ERR ] Failed to write file "
+                                    + filePath
+                                    + ": "
+                                    + str(e),
                                     "red",
                                 )
                             )
@@ -2746,12 +2789,10 @@ def getURLScanDOM(originalUrl, domUrl):
                             except Exception as e:
                                 writerr(
                                     colored(
-                                        getSPACER(
-                                            '[ ERR ] Failed to write to waymore_index.txt for "'
-                                            + domUrl
-                                            + '": '
-                                            + str(e)
-                                        ),
+                                        'URLScan - [ ERR ] Failed to write to waymore_index.txt for "'
+                                        + domUrl
+                                        + '": '
+                                        + str(e),
                                         "red",
                                     )
                                 )
@@ -2767,25 +2808,21 @@ def getURLScanDOM(originalUrl, domUrl):
                         try:
                             writerr(
                                 colored(
-                                    getSPACER(
-                                        "[ "
-                                        + str(resp.status_code)
-                                        + ' ] Failed to get response for "'
-                                        + domUrl
-                                        + '"'
-                                    ),
+                                    "URLScan - [ "
+                                    + str(resp.status_code)
+                                    + ' ] Failed to get response for "'
+                                    + domUrl
+                                    + '"',
                                     "red",
                                 )
                             )
                         except Exception:
                             writerr(
                                 colored(
-                                    getSPACER(
-                                        '[ ERR ] Failed to get response for "'
-                                        + domUrl
-                                        + '": '
-                                        + str(e)
-                                    ),
+                                    'URLScan - [ ERR ] Failed to get response for "'
+                                    + domUrl
+                                    + '": '
+                                    + str(e),
                                     "red",
                                 )
                             )
@@ -2832,7 +2869,9 @@ def getURLScanDOM(originalUrl, domUrl):
 
             except Exception as e:
                 if verbose():
-                    writerr(colored(getSPACER('Error for "' + domUrl + '": ' + str(e)), "red"))
+                    writerr(
+                        colored('URLScan - [ ERR ] Error for "' + domUrl + '": ' + str(e), "red")
+                    )
 
     except Exception as e:
         writerr(colored("ERROR getURLScanDOM 1:  " + str(e), "red"))
@@ -2857,14 +2896,15 @@ def getURLScanUrls():
     """
     Get URLs from the URLSCan API, urlscan.io
     """
-    global URLSCAN_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSource, argsInput, checkURLScan, argsInputHostname
+    global URLSCAN_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSourceURLScan, argsInput, checkURLScan, argsInputHostname, linkCountURLScan, linksFoundURLScan
 
     # Write the file of URL's for the passed domain/URL
     try:
         requestsMade = 0
-        stopSource = False
-        linkMimes = set()
-        originalLinkCount = len(linksFound)
+        stopSourceURLScan = False
+        linksFoundURLScan = set()
+        totalUrls = 0
+        checkResponse = True
 
         # Set the URL to just the hostname
         url = URLSCAN_URL.replace("{DOMAIN}", quote(argsInputHostname))
@@ -2887,21 +2927,23 @@ def getURLScanUrls():
             if args.mode == "R":
                 write(
                     colored(
-                        "The URLScan URL requested to get links for responses: ",
+                        "URLScan - [ INFO ] The URLScan URL requested to get links for responses: ",
                         "magenta",
                     )
                     + colored(url + "\n", "white")
                 )
             else:
                 write(
-                    colored("The URLScan URL requested to get links: ", "magenta")
+                    colored(
+                        "URLScan - [ INFO ] The URLScan URL requested to get links: ", "magenta"
+                    )
                     + colored(url + "\n", "white")
                 )
 
-        if not args.check_only:
+        if args.mode in ("U", "B") and not args.check_only:
             write(
                 colored(
-                    "\rGetting links from urlscan.io API (this can take a while for some domains)...\r",
+                    "URLScan - [ INFO ] Getting links from urlscan.io API (this can take a while for some domains)...",
                     "cyan",
                 )
             )
@@ -2922,7 +2964,7 @@ def getURLScanUrls():
         except Exception as e:
             write(
                 colored(
-                    getSPACER("[ ERR ] Unable to get links from urlscan.io: " + str(e)),
+                    "URLScan - [ ERR ] Unable to get links from urlscan.io: " + str(e),
                     "red",
                 )
             )
@@ -2937,15 +2979,17 @@ def getURLScanUrls():
                 if seconds <= args.urlscan_rate_limit_retry * 60:
                     writerr(
                         colored(
-                            getSPACER(
-                                "[ 429 ] URLScan rate limit reached, so waiting for another "
-                                + str(seconds)
-                                + " seconds before continuing..."
-                            ),
+                            "URLScan - [ 429 ] Rate limit reached, so waiting for another "
+                            + str(seconds)
+                            + " seconds before continuing...",
                             "yellow",
                         )
                     )
-                    time.sleep(seconds + 1)
+                    # Wait can be interrupted by SIGINT via interrupt_event
+                    interrupt_event.clear()
+                    if interrupt_event.wait(seconds + 1):
+                        # Interrupted by SIGINT
+                        return
                     try:
                         resp = session.get(
                             url,
@@ -2958,7 +3002,7 @@ def getURLScanUrls():
                     except Exception as e:
                         write(
                             colored(
-                                getSPACER("[ ERR ] Unable to get links from urlscan.io: " + str(e)),
+                                "URLScan - [ ERR ] Unable to get links from urlscan.io: " + str(e),
                                 "red",
                             )
                         )
@@ -2971,18 +3015,14 @@ def getURLScanUrls():
                     if resp.status_code == 429:
                         writerr(
                             colored(
-                                getSPACER(
-                                    "[ 429 ] URLScan rate limit reached so trying without API Key..."
-                                ),
+                                "URLScan - [ 429 ] Rate limit reached so trying without API Key...",
                                 "red",
                             )
                         )
                     else:
                         writerr(
                             colored(
-                                getSPACER(
-                                    "The URLScan API Key is invalid so trying without API Key..."
-                                ),
+                                "URLScan - [ INF ] The API Key is invalid so trying without API Key...",
                                 "red",
                             )
                         )
@@ -2992,56 +3032,54 @@ def getURLScanUrls():
                 except Exception as e:
                     writerr(
                         colored(
-                            getSPACER("[ ERR ] Unable to get links from urlscan.io: " + str(e)),
+                            "URLScan - [ ERR ] Unable to get links from urlscan.io: " + str(e),
                             "red",
                         )
                     )
-                    return
+                    checkResponse = False
 
                 # If the rate limit was reached end now
                 if resp.status_code == 429:
                     writerr(
                         colored(
-                            getSPACER(
-                                "[ 429 ] URLScan rate limit reached without API Key so unable to get links."
-                            ),
+                            "URLScan - [ 429 ] Rate limit reached without API Key so unable to get links.",
                             "red",
                         )
                     )
-                    return
+                    checkResponse = False
             else:
                 writerr(
                     colored(
-                        getSPACER("[ 429 ] URLScan rate limit reached so unable to get links."),
+                        "URLScan - [ 429 ] Rate limit reached so unable to get links.",
                         "red",
                     )
                 )
-                return
+                checkResponse = False
         elif resp.status_code != 200:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ " + str(resp.status_code) + " ] Unable to get links from urlscan.io"
-                    ),
+                    "URLScan - [ "
+                    + str(resp.status_code)
+                    + " ] Unable to get links from urlscan.io",
                     "red",
                 )
             )
-            return
+            checkResponse = False
 
         try:
-            # Get the JSON response
-            jsonResp = json.loads(resp.text.strip())
+            if checkResponse:
+                # Get the JSON response
+                jsonResp = json.loads(resp.text.strip())
 
-            # Get the number of results
-            totalUrls = int(jsonResp["total"])
+                # Get the number of results
+                totalUrls = int(jsonResp["total"])
         except Exception:
             writerr(
                 colored(
-                    getSPACER("[ ERR ] There was an unexpected response from the URLScan API"),
+                    "URLScan - [ ERR ] There was an unexpected response from the API",
                     "red",
                 )
             )
-            totalUrls = 0
 
         # Carry on if something was found
         if args.check_only and args.mode != "R":
@@ -3049,12 +3087,13 @@ def getURLScanUrls():
                 hasMore = jsonResp["has_more"]
                 if hasMore:
                     write(
-                        colored("Get URLs from URLScan: ", "cyan")
+                        colored("URLScan - [ INFO ] Get URLs from URLScan: ", "cyan")
                         + colored("UNKNOWN requests", "white")
                     )
                 else:
                     write(
-                        colored("Get URLs from URLScan: ", "cyan") + colored("1 request", "white")
+                        colored("URLScan - [ INFO ] Get URLs from URLScan: ", "cyan")
+                        + colored("1 request", "white")
                     )
             except Exception:
                 pass
@@ -3064,7 +3103,7 @@ def getURLScanUrls():
             # Carry on if something was found
             if int(totalUrls) > 0:
 
-                while not stopSource:
+                while not stopSourceURLScan:
 
                     searchAfter = ""
 
@@ -3139,7 +3178,7 @@ def getURLScanUrls():
                     if searchAfter != "":
 
                         keepTrying = True
-                        while not stopSource and keepTrying:
+                        while not stopSourceURLScan and keepTrying:
                             keepTrying = False
                             # Get the next page from urlscan.io
                             try:
@@ -3159,9 +3198,8 @@ def getURLScanUrls():
                             except Exception as e:
                                 writerr(
                                     colored(
-                                        getSPACER(
-                                            "[ ERR ] Unable to get links from urlscan.io: " + str(e)
-                                        ),
+                                        "URLScan - [ ERR ] Unable to get links from urlscan.io: "
+                                        + str(e),
                                         "red",
                                     )
                                 )
@@ -3180,56 +3218,53 @@ def getURLScanUrls():
                                     if seconds <= args.urlscan_rate_limit_retry * 60:
                                         writerr(
                                             colored(
-                                                getSPACER(
-                                                    "[ 429 ] URLScan rate limit reached, so waiting for another "
-                                                    + str(seconds)
-                                                    + " seconds before continuing..."
-                                                ),
+                                                "URLScan - [ 429 ] Rate limit reached, so waiting for another "
+                                                + str(seconds)
+                                                + " seconds before continuing...",
                                                 "yellow",
                                             )
                                         )
-                                        time.sleep(seconds + 1)
+                                        # Wait can be interrupted by SIGINT via interrupt_event
+                                        interrupt_event.clear()
+                                        if interrupt_event.wait(seconds + 1):
+                                            # Interrupted by SIGINT
+                                            keepTrying = False
+                                            break
                                         keepTrying = True
                                         continue
                                     else:
                                         writerr(
                                             colored(
-                                                getSPACER(
-                                                    "[ 429 ] URLScan rate limit reached (waiting time of "
-                                                    + str(seconds)
-                                                    + "), so stopping. Links that have already been retrieved will be saved."
-                                                ),
+                                                "URLScan - [ 429 ] Rate limit reached (waiting time of "
+                                                + str(seconds)
+                                                + "), so stopping. Links that have already been retrieved will be saved.",
                                                 "red",
                                             )
                                         )
-                                        stopSource = True
+                                        stopSourceURLScan = True
                                         pass
                                 else:
                                     writerr(
                                         colored(
-                                            getSPACER(
-                                                "[ 429 ] URLScan rate limit reached, so stopping. Links that have already been retrieved will be saved."
-                                            ),
+                                            "URLScan - [ 429 ] Rate limit reached, so stopping. Links that have already been retrieved will be saved.",
                                             "red",
                                         )
                                     )
-                                    stopSource = True
+                                    stopSourceURLScan = True
                                     pass
                             elif resp.status_code != 200:
                                 writerr(
                                     colored(
-                                        getSPACER(
-                                            "[ "
-                                            + str(resp.status_code)
-                                            + " ] Unable to get links from urlscan.io"
-                                        ),
+                                        "URLScan - [ "
+                                        + str(resp.status_code)
+                                        + " ] Unable to get links from urlscan.io",
                                         "red",
                                     )
                                 )
-                                stopSource = True
+                                stopSourceURLScan = True
                                 pass
 
-                        if not stopSource:
+                        if not stopSourceURLScan:
                             # Get the JSON response
                             jsonResp = json.loads(resp.text.strip())
 
@@ -3244,36 +3279,25 @@ def getURLScanUrls():
                                     and requestsMade > args.limit
                                 )
                             ):
-                                stopSource = True
+                                stopSourceURLScan = True
 
             # Show the MIME types found (in case user wants to exclude more)
             if verbose() and len(linkMimes) > 0 and args.mode != "R":
                 linkMimes.discard("warc/revisit")
                 write(
-                    getSPACER(
-                        colored("MIME types found: ", "magenta") + colored(str(linkMimes), "white")
-                    )
+                    colored("URLScan - [ INFO ] MIME types found: ", "magenta")
+                    + colored(str(linkMimes), "white")
                     + "\n"
                 )
 
-            linkCount = len(linksFound) - originalLinkCount
             if args.mode != "R":
-                if args.xwm and args.xcc and args.xav:
-                    write(
-                        getSPACER(
-                            colored("Links found on urlscan.io: ", "cyan")
-                            + colored(str(linkCount), "white")
-                        )
-                        + "\n"
-                    )
-                else:
-                    write(
-                        getSPACER(
-                            colored("Extra links found on urlscan.io: ", "cyan")
-                            + colored(str(linkCount), "white")
-                        )
-                        + "\n"
-                    )
+                linkCountURLScan = len(linksFoundURLScan)
+                write(
+                    colored("URLScan - [ INFO ] Links found on urlscan.io: ", "cyan")
+                    + colored(str(linkCountURLScan), "white")
+                )
+                linksFound.update(linksFoundURLScan)
+                linksFoundURLScan.clear()
 
     except Exception as e:
         writerr(colored("ERROR getURLScanUrls 1: " + str(e), "red"))
@@ -3283,12 +3307,11 @@ def processWayBackPage(url):
     """
     Get URLs from a specific page of archive.org CDX API for the input domain
     """
-    global totalPages, linkMimes, linksFound, stopSource
+    global totalPages, linkMimes, linksFound, stopSourceWayback, linkCountWayback, linksFoundWayback, current_response
     try:
         # Get memory in case it exceeds threshold
         getMemory()
-
-        if not stopSource:
+        if not stopSourceWayback:
             try:
                 # Choose a random user agent string to use for any requests
                 resp = None
@@ -3297,210 +3320,231 @@ def processWayBackPage(url):
                 session = requests.Session()
                 session.mount("https://", HTTP_ADAPTER)
                 session.mount("http://", HTTP_ADAPTER)
-                resp = session.get(url, headers={"User-Agent": userAgent})
-            except ConnectionError:
-                writerr(
-                    colored(
-                        getSPACER(
-                            "[ ERR ] Wayback Machine (archive.org) connection error for page "
-                            + page
-                        ),
-                        "red",
-                    )
-                )
-                resp = None
-                return
-            except Exception as e:
-                writerr(
-                    colored(
-                        getSPACER(
-                            "[ ERR ] Error getting response for page " + page + " - " + str(e)
-                        ),
-                        "red",
-                    )
-                )
-                resp = None
-                return
-            finally:
+                # expose session so SIGINT handler can close it to interrupt blocking network I/O
                 try:
-                    if resp is not None:
-                        # If a status other of 429, then stop processing Wayback Machine
-                        if resp.status_code == 429:
-                            if args.wayback_rate_limit_retry > 0:
-                                seconds = args.wayback_rate_limit_retry * 60
-                                if args.processes == 1:
-                                    writerr(
-                                        colored(
-                                            "\r[ 429 ] Wayback Machine (archive.org) rate limit reached on page "
-                                            + str(page)
-                                            + " of "
-                                            + str(totalPages)
-                                            + ", so waiting for "
-                                            + str(seconds)
-                                            + " seconds before continuing...\r",
-                                            "yellow",
-                                        )
-                                    )
-                                else:
-                                    writerr(
-                                        colored(
-                                            "\r[ 429 ] Wayback Machine (archive.org) rate limit reached, so waiting for "
-                                            + str(seconds)
-                                            + " seconds before continuing...\r",
-                                            "yellow",
-                                        )
-                                    )
-                                time.sleep(seconds)
-                                try:
-                                    resp = session.get(url, headers={"User-Agent": userAgent})
-                                except ConnectionError:
-                                    writerr(
-                                        colored(
-                                            getSPACER(
-                                                "[ ERR ] Wayback Machine (archive.org) connection error for page "
-                                                + page
-                                            ),
-                                            "red",
-                                        )
-                                    )
-                                    resp = None
-                                    return
-                                except Exception as e:
-                                    writerr(
-                                        colored(
-                                            getSPACER(
-                                                "[ ERR ] Error getting response for page "
-                                                + page
-                                                + " - "
-                                                + str(e)
-                                            ),
-                                            "red",
-                                        )
-                                    )
-                                    resp = None
-                                    return
+                    current_session = session
+                except Exception:
+                    pass
 
-                        if resp.status_code == 429:
-                            writerr(
-                                colored(
-                                    getSPACER(
-                                        "[ 429 ] Wayback Machine (archive.org) rate limit reached, so stopping. Links that have already been retrieved will be saved."
-                                    ),
-                                    "red",
-                                )
-                            )
-                            stopSource = True
-                            return
-                        # If a status other of 503, then the site is unavailable
-                        if resp.status_code == 503:
-                            writerr(
-                                colored(
-                                    getSPACER(
-                                        "[ 503 ] Wayback Machine (archive.org) is currently unavailable. It may be down for maintenance. You can check https://web.archive.org/cdx/ to verify."
-                                    ),
-                                    "red",
-                                )
-                            )
-                            stopSource = True
-                            return
-                        # If the response from archive.org is empty then skip
-                        if resp.text == "" and totalPages == 0:
-                            if verbose():
+                resp = session.get(
+                    url, headers={"User-Agent": userAgent}, stream=True, timeout=args.timeout
+                )
+                # expose live response so SIGINT handler can close it to interrupt blocking I/O
+                try:
+                    current_response = resp
+                except Exception:
+                    pass
+                # Check response status in the finally block
+                if resp is not None:
+                    # If a status other of 429, then stop processing Wayback Machine
+                    if resp.status_code == 429:
+                        if args.wayback_rate_limit_retry > 0:
+                            seconds = args.wayback_rate_limit_retry * 60
+                            if args.processes == 1:
                                 writerr(
                                     colored(
-                                        getSPACER("[ ERR ] " + url + " gave an empty response."),
-                                        "red",
+                                        "Wayback - [ 429 ] Rate limit reached on page "
+                                        + str(page)
+                                        + " of "
+                                        + str(totalPages)
+                                        + ", so waiting for "
+                                        + str(seconds)
+                                        + " seconds before continuing...",
+                                        "yellow",
                                     )
                                 )
-                            return
-                        # If a status other than 200, then stop
-                        if resp.status_code != 200:
-                            if verbose():
+                            else:
                                 writerr(
                                     colored(
-                                        getSPACER(
-                                            "[ " + str(resp.status_code) + " ] Error for " + url
-                                        ),
-                                        "red",
+                                        "Wayback - [ 429 ] Rate limit reached, so waiting for "
+                                        + str(seconds)
+                                        + " seconds before continuing...",
+                                        "yellow",
                                     )
                                 )
-                            return
-                except ConnectionError:
-                    writerr(
-                        colored(
-                            getSPACER(
-                                "[ ERR ] Wayback Machine (archive.org) connection error for page "
-                                + page
-                            ),
-                            "red",
-                        )
-                    )
-                    resp = None
-                    return
-                except Exception as e:
-                    writerr(
-                        colored(
-                            getSPACER(
-                                "[ ERR ] Error getting response for page " + page + " - " + str(e)
-                            ),
-                            "red",
-                        )
-                    )
-                    resp = None
-                    return
-
-            # Get the URLs and MIME types. Each line is a separate JSON string
-            try:
-                for line in resp.iter_lines():
-                    results = line.decode("utf-8")
-                    foundUrl = fixArchiveOrgUrl(str(results).split(" ")[1])
-
-                    # If --filter-responses-only wasn't used, then check the URL exclusions
-                    if args.filter_responses_only:
-                        match = None
-                    else:
-                        match = re.search(
-                            r"(" + re.escape(FILTER_URL).replace(",", "|") + ")",
-                            foundUrl,
-                            flags=re.IGNORECASE,
-                        )
-                    if match is None:
-                        # Only get MIME Types if --verbose option was selected
-                        if verbose():
+                            # Wait can be interrupted by SIGINT via interrupt_event
+                            interrupt_event.clear()
+                            if interrupt_event.wait(seconds):
+                                return
                             try:
-                                mimeType = str(results).split(" ")[2]
-                                if mimeType != "":
-                                    linkMimes.add(mimeType)
+                                resp = session.get(
+                                    url,
+                                    headers={"User-Agent": userAgent},
+                                    stream=True,
+                                    timeout=args.timeout,
+                                )
+                                try:
+                                    current_response = resp
+                                except Exception:
+                                    pass
+                            except ConnectionError:
+                                writerr(
+                                    colored(
+                                        "Wayback - [ ERR ] Connection error for page " + page,
+                                        "red",
+                                    )
+                                )
+                                resp = None
+                                return
+                            except Exception as e:
+                                writerr(
+                                    colored(
+                                        "Wayback - [ ERR ] Error getting response for page "
+                                        + page
+                                        + " - "
+                                        + str(e),
+                                        "red",
+                                    )
+                                )
+                                resp = None
+                                return
+
+                    if resp.status_code == 429:
+                        writerr(
+                            colored(
+                                "Wayback - [ 429 ] Rate limit reached, so stopping. Links that have already been retrieved will be saved.",
+                                "red",
+                            )
+                        )
+                        stopSourceWayback = True
+                        return
+                    # If a status other of 503, then the site is unavailable
+                    if resp.status_code == 503:
+                        writerr(
+                            colored(
+                                "Wayback - [ 503 ] The Wayback Machine (archive.org) is currently unavailable. It may be down for maintenance. You can check https://web.archive.org/cdx/ to verify.",
+                                "red",
+                            )
+                        )
+                        stopSourceWayback = True
+                        return
+                    # If a status other than 200, then stop
+                    if resp.status_code != 200:
+                        if verbose():
+                            writerr(
+                                colored(
+                                    "Wayback - [ " + str(resp.status_code) + " ] Error for " + url,
+                                    "red",
+                                )
+                            )
+                        try:
+                            current_response = None
+                        except Exception:
+                            pass
+                        try:
+                            current_session = None
+                        except Exception:
+                            pass
+                        return
+
+                # Get the URLs and MIME types. Each line is a separate JSON string
+                # Process lines as they arrive - if connection drops, we keep what we've already processed
+                for line in resp.iter_lines():
+                    try:
+                        results = line.decode("utf-8")
+                        foundUrl = fixArchiveOrgUrl(str(results).split(" ")[1])
+
+                        # If --filter-responses-only wasn't used, then check the URL exclusions
+                        if args.filter_responses_only:
+                            match = None
+                        else:
+                            match = re.search(
+                                r"(" + re.escape(FILTER_URL).replace(",", "|") + ")",
+                                foundUrl,
+                                flags=re.IGNORECASE,
+                            )
+                        if match is None:
+                            # Only get MIME Types if --verbose option was selected
+                            if verbose():
+                                try:
+                                    mimeType = str(results).split(" ")[2]
+                                    if mimeType != "":
+                                        linkMimes.add(mimeType)
+                                except Exception:
+                                    if verbose():
+                                        writerr(
+                                            colored(
+                                                getSPACER(
+                                                    "ERROR processWayBackPage 2: Cannot get MIME type from line: "
+                                                    + str(line)
+                                                ),
+                                                "red",
+                                            )
+                                        )
+                            try:
+                                linksFoundAdd(foundUrl, linksFoundWayback)
+
                             except Exception:
                                 if verbose():
                                     writerr(
                                         colored(
                                             getSPACER(
-                                                "ERROR processWayBackPage 2: Cannot get MIME type from line: "
+                                                "ERROR processWayBackPage 3: Cannot get link from line: "
                                                 + str(line)
                                             ),
                                             "red",
                                         )
                                     )
-                                    write(resp.text)
-                        try:
-                            linksFoundAdd(foundUrl)
-                        except Exception:
-                            if verbose():
-                                writerr(
-                                    colored(
-                                        getSPACER(
-                                            "ERROR processWayBackPage 3: Cannot get link from line: "
-                                            + str(line)
-                                        ),
-                                        "red",
-                                    )
+                    except Exception:
+                        if verbose():
+                            writerr(
+                                colored(
+                                    getSPACER("ERROR processWayBackPage 4: " + str(line)), "red"
                                 )
-                                write(resp.text)
-            except Exception:
-                if verbose():
-                    writerr(colored(getSPACER("ERROR processWayBackPage 4: " + str(line)), "red"))
+                            )
+
+            except ConnectionError:
+                writerr(
+                    colored(
+                        "Wayback - [ ERR ] Connection error for page "
+                        + page
+                        + (
+                            f" (saved {len(linksFoundWayback)} URLs before error)"
+                            if len(linksFoundWayback) > 0
+                            else ""
+                        ),
+                        "red",
+                    )
+                )
+                try:
+                    current_response = None
+                except Exception:
+                    pass
+                try:
+                    current_session = None
+                except Exception:
+                    pass
+                return
+            except Exception as e:
+                # Even if connection drops, we've already saved the URLs processed so far
+                if len(linksFoundWayback) > 0:
+                    writerr(
+                        colored(
+                            f"Wayback - [ WARN ] Error getting response for page {page} - {str(e)} (saved {len(linksFoundWayback)} URLs before error)",
+                            "yellow",
+                        )
+                    )
+                else:
+                    writerr(
+                        colored(
+                            "Wayback - [ ERR ] Error getting response for page "
+                            + page
+                            + " - "
+                            + str(e),
+                            "red",
+                        )
+                    )
+                try:
+                    current_response = None
+                except Exception:
+                    pass
+                try:
+                    current_session = None
+                except Exception:
+                    pass
+                return
         else:
+            print("DEBUG: HERE END!")  # DEBUG
             pass
     except Exception as e:
         if verbose():
@@ -3511,11 +3555,12 @@ def getWaybackUrls():
     """
     Get URLs from the Wayback Machine, archive.org
     """
-    global linksFound, linkMimes, waymorePath, subs, path, stopProgram, totalPages, stopSource, argsInput, checkWayback
+    global linksFound, linkMimes, waymorePath, subs, path, stopProgram, totalPages, stopSourceWayback, argsInput, checkWayback, linkCountWayback, linksFoundWayback
 
     # Write the file of URL's for the passed domain/URL
     try:
-        stopSource = False
+        stopSourceWayback = False
+        linksFoundWayback = set()
 
         if MATCH_MIME != "":
             filterMIME = "&filter=mimetype:" + re.escape(MATCH_MIME).replace(",", "|")
@@ -3577,7 +3622,7 @@ def getWaybackUrls():
             if not args.check_only:
                 write(
                     colored(
-                        "\rGetting the number of Wayback Machine (archive.org) pages to search...\r",
+                        "Wayback - [ INFO ] Getting the number of pages to search...",
                         "cyan",
                     )
                 )
@@ -3602,9 +3647,7 @@ def getWaybackUrls():
                 if resp.status_code == 429:
                     writerr(
                         colored(
-                            getSPACER(
-                                "[ 429 ] Wayback Machine (Archive.org) rate limit reached so unable to get links."
-                            ),
+                            "Wayback - [ 429 ] Rate limit reached so unable to get links.",
                             "red",
                         )
                     )
@@ -3614,9 +3657,7 @@ def getWaybackUrls():
                 if resp.status_code == 503:
                     writerr(
                         colored(
-                            getSPACER(
-                                "[ 503 ] Wayback Machine (Archive.org) is currently unavailable. It may be down for maintenance. You can check https://web.archive.org/cdx/ to verify."
-                            ),
+                            "Wayback - [ 503 ] The Wayback Machine (Archive.org) is currently unavailable. It may be down for maintenance. You can check https://web.archive.org/cdx/ to verify.",
                             "red",
                         )
                     )
@@ -3625,19 +3666,15 @@ def getWaybackUrls():
                 if resp.text.lower().find("blocked site error") > 0:
                     writerr(
                         colored(
-                            getSPACER(
-                                "[ ERR ] Unable to get links from Wayback Machine (archive.org): Blocked Site Error (they block the target site)"
-                            ),
+                            "Wayback - [ ERR ] Unable to get links from Wayback Machine (archive.org): Blocked Site Error (they block the target site)",
                             "red",
                         )
                     )
                 else:
                     writerr(
                         colored(
-                            getSPACER(
-                                "[ ERR ] Unable to get links from Wayback Machine (archive.org): "
-                                + str(resp.text.strip())
-                            ),
+                            "Wayback - [ ERR ] Unable to get links from Wayback Machine (archive.org): "
+                            + str(resp.text.strip()),
                             "red",
                         )
                     )
@@ -3645,28 +3682,22 @@ def getWaybackUrls():
                 if str(e).lower().find("alert access denied"):
                     writerr(
                         colored(
-                            getSPACER(
-                                "[ ERR ] Unable to get links from Wayback Machine (archive.org): Access Denied. Are you able to manually visit https://web.archive.org/? Your ISP may be blocking you, e.g. your adult content filter is on (why it triggers that filter I don't know, but it has happened!)"
-                            ),
+                            "Wayback - [ ERR ] Unable to get links from Wayback Machine (archive.org): Access Denied. Are you able to manually visit https://web.archive.org/? Your ISP may be blocking you, e.g. your adult content filter is on (why it triggers that filter I don't know, but it has happened!)",
                             "red",
                         )
                     )
                 elif str(e).lower().find("connection refused"):
                     writerr(
                         colored(
-                            getSPACER(
-                                "[ ERR ] Unable to get links from Wayback Machine (archive.org): Connection Refused. Are you able to manually visit https://web.archive.org/? Your ISP may be blocking your IP)"
-                            ),
+                            "Wayback - [ ERR ] Unable to get links from Wayback Machine (archive.org): Connection Refused. Are you able to manually visit https://web.archive.org/? Your ISP may be blocking your IP)",
                             "red",
                         )
                     )
                 else:
                     writerr(
                         colored(
-                            getSPACER(
-                                "[ ERR ] Unable to get links from Wayback Machine (archive.org): "
-                                + str(e)
-                            ),
+                            "Wayback - [ ERR ] Unable to get links from Wayback Machine (archive.org): "
+                            + str(e),
                             "red",
                         )
                     )
@@ -3676,27 +3707,29 @@ def getWaybackUrls():
             if totalPages < 0:
                 write(
                     colored(
-                        "Due to a change in Wayback Machine API, all URLs will be retrieved in one request and it is not possible to determine how long it will take, so please ignore this.",
+                        "Wayback - [ INFO ] Due to a change in Wayback Machine API, all URLs will be retrieved in one request and it is not possible to determine how long it will take, so please ignore this.",
                         "cyan",
                     )
                 )
             else:
                 checkWayback = totalPages
                 write(
-                    colored("Get URLs from Wayback Machine: ", "cyan")
+                    colored("Wayback - [ INFO ] Get URLs from Wayback Machine: ", "cyan")
                     + colored(str(checkWayback) + " requests", "white")
                 )
         else:
             if verbose():
                 write(
-                    colored("The archive URL requested to get links: ", "magenta")
+                    colored(
+                        "Wayback - [ INFO ] The archive URL requested to get links: ", "magenta"
+                    )
                     + colored(url + "\n", "white")
                 )
 
             if totalPages < 0:
                 write(
                     colored(
-                        "\rGetting links from Wayback Machine (archive.org) with one request (this can take a while for some domains)...\r",
+                        "Wayback - [ INFO ] Getting links from Wayback Machine (archive.org) with one request (this can take a while for some domains)...",
                         "cyan",
                     )
                 )
@@ -3706,9 +3739,9 @@ def getWaybackUrls():
                 # if the page number was found then display it, but otherwise we will just try to increment until we have everything
                 write(
                     colored(
-                        "\rGetting links from "
+                        "Wayback - [ INFO ] Getting links from "
                         + str(totalPages)
-                        + " Wayback Machine (archive.org) API requests (this can take a while for some domains)...\r",
+                        + " Wayback Machine (archive.org) API requests (this can take a while for some domains)...",
                         "cyan",
                     )
                 )
@@ -3732,22 +3765,22 @@ def getWaybackUrls():
             if verbose() and len(linkMimes) > 0:
                 linkMimes.discard("warc/revisit")
                 write(
-                    getSPACER(
-                        colored("MIME types found: ", "magenta") + colored(str(linkMimes), "white")
-                    )
+                    colored("Wayback - [ INFO ] MIME types found: ", "magenta")
+                    + colored(str(linkMimes), "white")
                     + "\n"
                 )
                 linkMimes = None
 
             if not args.xwm:
-                linkCount = len(linksFound)
+                linkCountWayback = len(linksFoundWayback)
                 write(
-                    getSPACER(
-                        colored("Links found on Wayback Machine (archive.org): ", "cyan")
-                        + colored(str(linkCount), "white")
+                    colored(
+                        "Wayback - [ INFO ] Links found on Wayback Machine (archive.org): ", "cyan"
                     )
-                    + "\n"
+                    + colored(str(linkCountWayback), "white")
                 )
+                linksFound.update(linksFoundWayback)
+                linksFoundWayback.clear()
 
     except Exception as e:
         writerr(colored("ERROR getWaybackUrls 1: " + str(e), "red"))
@@ -3757,13 +3790,13 @@ def processCommonCrawlCollection(cdxApiUrl):
     """
     Get URLs from a given Common Crawl index collection
     """
-    global subs, path, linksFound, linkMimes, stopSource, argsInput
+    global subs, path, linksFound, linkMimes, stopSourceCommonCrawl, argsInput, linkCountCommonCrawl, linksFoundCommonCrawl
 
     try:
         # Get memory in case it exceeds threshold
         getMemory()
 
-        if not stopSource:
+        if not stopSourceCommonCrawl:
             # Set mime content type filter
             if MATCH_MIME.strip() != "":
                 filterMIME = "&filter=~mime:("
@@ -3812,18 +3845,26 @@ def processCommonCrawlCollection(cdxApiUrl):
                 session = requests.Session()
                 session.mount("https://", HTTP_ADAPTER_CC)
                 session.mount("http://", HTTP_ADAPTER_CC)
+                try:
+                    current_session = session
+                except Exception:
+                    pass
                 resp = session.get(url, stream=True, headers={"User-Agent": userAgent})
+                try:
+                    current_response = resp
+                except Exception:
+                    pass
             except ConnectionError:
                 writerr(
                     colored(
-                        getSPACER("[ ERR ] Common Crawl connection error for index " + cdxApiUrl),
+                        "CommonCrawl - [ ERR ] Connection error for index " + cdxApiUrl,
                         "red",
                     )
                 )
                 resp = None
                 return
             except Exception as e:
-                writerr(colored(getSPACER("[ ERR ] Error getting response - " + str(e)), "red"))
+                writerr(colored("CommonCrawl - [ ERR ] Error getting response - " + str(e), "red"))
                 resp = None
                 return
             finally:
@@ -3833,13 +3874,11 @@ def processCommonCrawlCollection(cdxApiUrl):
                         if resp.status_code == 429:
                             writerr(
                                 colored(
-                                    getSPACER(
-                                        "[ 429 ] Common Crawl rate limit reached, so stopping. Links that have already been retrieved will be saved."
-                                    ),
+                                    "CommonCrawl - [ 429 ] Rate limit reached, so stopping. Links that have already been retrieved will be saved.",
                                     "red",
                                 )
                             )
-                            stopSource = True
+                            stopSourceCommonCrawl = True
                             return
                         # If the response from commoncrawl.org says nothing was found...
                         if resp.text.lower().find("no captures found") > 0:
@@ -3850,7 +3889,7 @@ def processCommonCrawlCollection(cdxApiUrl):
                             if verbose():
                                 writerr(
                                     colored(
-                                        getSPACER("[ ERR ] " + url + " gave an empty response."),
+                                        "CommonCrawl - [ ERR ] " + url + " gave an empty response.",
                                         "red",
                                     )
                                 )
@@ -3860,12 +3899,10 @@ def processCommonCrawlCollection(cdxApiUrl):
                             if verbose():
                                 writerr(
                                     colored(
-                                        getSPACER(
-                                            "[ "
-                                            + str(resp.status_code)
-                                            + " ] Error for "
-                                            + cdxApiUrl
-                                        ),
+                                        "CommonCrawl - [ "
+                                        + str(resp.status_code)
+                                        + " ] Error for "
+                                        + cdxApiUrl,
                                         "red",
                                     )
                                 )
@@ -3874,63 +3911,71 @@ def processCommonCrawlCollection(cdxApiUrl):
                     pass
 
             # Get the URLs and MIME types
-            for line in resp.iter_lines():
-                results = line.decode("utf-8")
-                try:
-                    data = json.loads(results)
-                    # Get MIME Types if --verbose option was seletced
-                    if verbose():
-                        try:
-                            if data["mime"] != "":
-                                linkMimes.add(data["mime"])
-                        except Exception:
-                            pass
-                    # If -from or -to were passed, check the timestamp of the URL.
-                    # Only continue if the URL falls within the date range specified
-                    if args.from_date is not None or args.to_date is not None:
-                        try:
-                            ts = data["timestamp"]
+            try:
+                for line in resp.iter_lines():
+                    results = line.decode("utf-8")
+                    try:
+                        data = json.loads(results)
+                        # Get MIME Types if --verbose option was seletced
+                        if verbose():
+                            try:
+                                if data["mime"] != "":
+                                    linkMimes.add(data["mime"])
+                            except Exception:
+                                pass
+                        # If -from or -to were passed, check the timestamp of the URL.
+                        # Only continue if the URL falls within the date range specified
+                        if args.from_date is not None or args.to_date is not None:
+                            try:
+                                ts = data["timestamp"]
 
-                            # Normalize helper: pad/truncate date string to 14 digits (YYYYMMDDhhmmss)
-                            def normalize_date(d, is_from):
-                                if d is None:
-                                    return None
-                                d = d.strip()
-                                # Pad to 14 digits: from_date pads with 0s, to_date with 9s
-                                if is_from:
-                                    return (d + "0" * (14 - len(d)))[:14]
-                                else:
-                                    return (d + "9" * (14 - len(d)))[:14]
+                                # Normalize helper: pad/truncate date string to 14 digits (YYYYMMDDhhmmss)
+                                def normalize_date(d, is_from):
+                                    if d is None:
+                                        return None
+                                    d = d.strip()
+                                    # Pad to 14 digits: from_date pads with 0s, to_date with 9s
+                                    if is_from:
+                                        return (d + "0" * (14 - len(d)))[:14]
+                                    else:
+                                        return (d + "9" * (14 - len(d)))[:14]
 
-                            from_ts = normalize_date(args.from_date, True)
-                            to_ts = normalize_date(args.to_date, False)
+                                from_ts = normalize_date(args.from_date, True)
+                                to_ts = normalize_date(args.to_date, False)
 
-                            # Compare numerically
-                            if from_ts and ts < from_ts:
-                                continue
-                            if to_ts and ts > to_ts:
-                                continue
+                                # Compare numerically
+                                if from_ts and ts < from_ts:
+                                    continue
+                                if to_ts and ts > to_ts:
+                                    continue
 
-                        except Exception as e:
+                            except Exception:
+                                writerr(
+                                    colored(
+                                        "ERROR processCommonCrawlCollection 3: Cannot get timestamp from line {line}: {str(e)}",
+                                        "red",
+                                    )
+                                )
+
+                        linksFoundAdd(data["url"], linksFoundCommonCrawl)
+                    except Exception:
+                        if verbose():
                             writerr(
                                 colored(
-                                    getSPACER(
-                                        f"ERROR processCommonCrawlCollection 3: Cannot get timestamp from line {line}: {str(e)}"
-                                    ),
+                                    "ERROR processCommonCrawlCollection 2: Cannot get URL and MIME type from line: "
+                                    + str(line),
                                     "red",
                                 )
                             )
-
-                    linksFoundAdd(data["url"])
+            finally:
+                try:
+                    current_response = None
                 except Exception:
-                    if verbose():
-                        writerr(
-                            colored(
-                                "ERROR processCommonCrawlCollection 2: Cannot get URL and MIME type from line: "
-                                + str(line),
-                                "red",
-                            )
-                        )
+                    pass
+                try:
+                    current_session = None
+                except Exception:
+                    pass
         else:
             pass
     except Exception as e:
@@ -3957,10 +4002,8 @@ def getCommonCrawlIndexes():
                 except Exception as e:
                     writerr(
                         colored(
-                            getSPACER(
-                                "[ ERR ] Couldn't delete local version of Common Crawl index file: "
-                                + str(e)
-                            ),
+                            "CommonCrawl - [ ERR ] Couldn't delete local version of Common Crawl index file: "
+                            + str(e),
                             "red",
                         )
                     )
@@ -3978,10 +4021,8 @@ def getCommonCrawlIndexes():
                 createFile = True
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ ERR ] Couldn't read local version of Common Crawl index file: "
-                            + str(e)
-                        ),
+                        "CommonCrawl - [ ERR ] Couldn't read local version of Common Crawl index file: "
+                        + str(e),
                         "red",
                     )
                 )
@@ -3998,7 +4039,7 @@ def getCommonCrawlIndexes():
             except ConnectionError:
                 writerr(
                     colored(
-                        getSPACER("[ ERR ] Common Crawl connection error getting Index file"),
+                        "CommonCrawl - [ ERR ] Connection error getting Index file",
                         "red",
                     )
                 )
@@ -4006,9 +4047,8 @@ def getCommonCrawlIndexes():
             except Exception as e:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ ERR ] Error getting Common Crawl index collection - " + str(e)
-                        ),
+                        "CommonCrawl - [ ERR ] Error getting Common Crawl index collection - "
+                        + str(e),
                         "red",
                     )
                 )
@@ -4018,9 +4058,7 @@ def getCommonCrawlIndexes():
             if indexes.status_code == 429:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ 429 ] Common Crawl rate limit reached so unable to get links."
-                        ),
+                        "CommonCrawl - [ 429 ] Rate limit reached so unable to get links.",
                         "red",
                     )
                 )
@@ -4029,7 +4067,7 @@ def getCommonCrawlIndexes():
             elif indexes.status_code == 503:
                 writerr(
                     colored(
-                        getSPACER("[ 503 ] Common Crawl seems to be unavailable."),
+                        "CommonCrawl - [ 503 ] Common Crawl seems to be unavailable.",
                         "red",
                     )
                 )
@@ -4037,11 +4075,9 @@ def getCommonCrawlIndexes():
             elif indexes.status_code != 200:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ "
-                            + str(indexes.status_code)
-                            + " ] Common Crawl did not retrun the indexes file."
-                        ),
+                        "CommonCrawl - [ "
+                        + str(indexes.status_code)
+                        + " ] Common Crawl did not retrun the indexes file.",
                         "red",
                     )
                 )
@@ -4058,10 +4094,8 @@ def getCommonCrawlIndexes():
             except Exception as e:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ ERR ] Couldn't create local version of Common Crawl index file: "
-                            + str(e)
-                        ),
+                        "CommonCrawl - [ ERR ] Couldn't create local version of Common Crawl index file: "
+                        + str(e),
                         "red",
                     )
                 )
@@ -4094,12 +4128,10 @@ def getCommonCrawlIndexes():
                         except Exception as e:
                             writerr(
                                 colored(
-                                    getSPACER(
-                                        "[ ERR ] Failed to get the year from index name "
-                                        + values[key]
-                                        + " - "
-                                        + str(e)
-                                    ),
+                                    "CommonCrawl - [ ERR ] Failed to get the year from index name "
+                                    + values[key]
+                                    + " - "
+                                    + str(e),
                                     "red",
                                 )
                             )
@@ -4121,12 +4153,11 @@ def getCommonCrawlUrls():
     """
     Get all Common Crawl index collections to get all URLs from each one
     """
-    global linksFound, linkMimes, waymorePath, subs, path, stopSource, argsInput, checkCommonCrawl
+    global linksFound, linkMimes, waymorePath, subs, path, stopSourceCommonCrawl, argsInput, checkCommonCrawl, linkCountCommonCrawl, linksFoundCommonCrawl
 
     try:
-        stopSource = False
-        linkMimes = set()
-        originalLinkCount = len(linksFound)
+        stopSourceCommonCrawl = False
+        linksFoundCommonCrawl = set()
 
         # Set mime content type filter
         if MATCH_MIME.strip() != "":
@@ -4164,7 +4195,7 @@ def getCommonCrawlUrls():
                 )
             write(
                 colored(
-                    "The commoncrawl index URL requested to get links (where {CDX-API-URL} is from "
+                    "CommonCrawl - [ INFO ] The index URL requested to get links (where {CDX-API-URL} is from "
                     + CCRAWL_INDEX_URL
                     + "): ",
                     "magenta",
@@ -4173,7 +4204,7 @@ def getCommonCrawlUrls():
             )
 
         if not args.check_only:
-            write(colored("\rGetting commoncrawl.org index collections list...\r", "cyan"))
+            write(colored("CommonCrawl - [ INFO ] Getting index collections list...", "cyan"))
 
         # Get the Common Crawl index collections
         cdxApiUrls = getCommonCrawlIndexes()
@@ -4186,15 +4217,15 @@ def getCommonCrawlUrls():
                 else:
                     checkCommonCrawl = len(cdxApiUrls) + 1
                 write(
-                    colored("Get URLs from Common Crawl: ", "cyan")
+                    colored("CommonCrawl - [ INFO ] Get URLs from Common Crawl: ", "cyan")
                     + colored(str(checkCommonCrawl) + " requests", "white")
                 )
             else:
                 write(
                     colored(
-                        "\rGetting links from the latest "
+                        "CommonCrawl - [ INFO ] Getting links from the latest "
                         + str(len(cdxApiUrls))
-                        + " commoncrawl.org index collections (this can take a while for some domains)...\r",
+                        + " commoncrawl.org index collections (this can take a while for some domains)...",
                         "cyan",
                     )
                 )
@@ -4210,30 +4241,18 @@ def getCommonCrawlUrls():
                 if verbose() and len(linkMimes) > 0:
                     linkMimes.discard("warc/revisit")
                     write(
-                        getSPACER(
-                            colored("MIME types found: ", "magenta")
-                            + colored(str(linkMimes), "white")
-                        )
+                        colored("CommonCrawl - [ INFO ] MIME types found: ", "magenta")
+                        + colored(str(linkMimes), "white")
                         + "\n"
                     )
 
-                linkCount = len(linksFound) - originalLinkCount
-                if args.xwm:
-                    write(
-                        getSPACER(
-                            colored("Links found on commoncrawl.org: ", "cyan")
-                            + colored(str(linkCount), "white")
-                        )
-                        + "\n"
-                    )
-                else:
-                    write(
-                        getSPACER(
-                            colored("Extra links found on commoncrawl.org: ", "cyan")
-                            + colored(str(linkCount), "white")
-                        )
-                        + "\n"
-                    )
+                linkCountCommonCrawl = len(linksFoundCommonCrawl)
+                write(
+                    colored("CommonCrawl - [ INFO ] Links found on commoncrawl.org: ", "cyan")
+                    + colored(str(linkCountCommonCrawl), "white")
+                )
+                linksFound.update(linksFoundCommonCrawl)
+                linksFoundCommonCrawl.clear()
 
     except Exception as e:
         writerr(colored("ERROR getCommonCrawlUrls 1: " + str(e), "red"))
@@ -4243,7 +4262,7 @@ def processVirusTotalUrl(url):
     """
     Process a specific URL from virustotal.com to determine whether to save the link
     """
-    global argsInput, argsInputHostname
+    global argsInput, argsInputHostname, linkCountVirusTotal, linksFoundVirusTotal
 
     addLink = True
 
@@ -4310,7 +4329,7 @@ def processVirusTotalUrl(url):
                 flags=re.IGNORECASE,
             )
             if match is not None:
-                linksFoundAdd(url)
+                linksFoundAdd(url, linksFoundVirusTotal)
 
     except Exception as e:
         writerr(colored("ERROR processVirusTotalUrl 1: " + str(e), "red"))
@@ -4321,12 +4340,11 @@ def getVirusTotalUrls():
     Get URLs from the VirusTotal API v2 and process them.
     Each URL is normalized as (url, scan_date) tuple. Dates are filtered according to args.from_date / args.to_date.
     """
-    global VIRUSTOTAL_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSource, argsInput, checkVirusTotal, argsInputHostname
+    global VIRUSTOTAL_API_KEY, linksFound, linkMimes, waymorePath, subs, stopProgram, stopSourceVirusTotal, argsInput, checkVirusTotal, argsInputHostname, linkCountVirusTotal, linksFoundVirusTotal
 
     try:
-        stopSource = False
-        linkMimes = set()
-        originalLinkCount = len(linksFound)
+        stopSourceVirusTotal = False
+        linksFoundVirusTotal = set()
 
         # Build the VirusTotal API URL
         url = VIRUSTOTAL_URL.replace("{DOMAIN}", quote(argsInputHostname)).replace(
@@ -4335,12 +4353,12 @@ def getVirusTotalUrls():
 
         if verbose():
             write(
-                colored("The VirusTotal URL requested to get links: ", "magenta")
+                colored("VirusTotal - [ INFO ] The URL requested to get links: ", "magenta")
                 + colored(url + "\n", "white")
             )
 
         if not args.check_only:
-            write(colored("\rGetting links from virustotal.com API...\r", "cyan"))
+            write(colored("VirusTotal - [ INFO ] Getting links from virustotal.com API...", "cyan"))
 
         # Make request
         try:
@@ -4352,7 +4370,7 @@ def getVirusTotalUrls():
         except Exception as e:
             writerr(
                 colored(
-                    getSPACER(f"[ ERR ] Unable to get links from virustotal.com: {e}"),
+                    "VirusTotal - [ ERR ] Unable to get links from virustotal.com: " + str(e),
                     "red",
                 )
             )
@@ -4362,7 +4380,7 @@ def getVirusTotalUrls():
         if resp.status_code == 429:
             writerr(
                 colored(
-                    getSPACER("[ 429 ] VirusTotal rate limit reached so unable to get links."),
+                    "VirusTotal - [ 429 ] Rate limit reached so unable to get links.",
                     "red",
                 )
             )
@@ -4370,9 +4388,7 @@ def getVirusTotalUrls():
         elif resp.status_code == 403:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ 403 ] VirusTotal: Permission denied. Check your API key is correct."
-                    ),
+                    "VirusTotal - [ 403 ] Permission denied. Check your API key is correct.",
                     "red",
                 )
             )
@@ -4380,7 +4396,9 @@ def getVirusTotalUrls():
         elif resp.status_code != 200:
             writerr(
                 colored(
-                    getSPACER(f"[ {resp.status_code} ] Unable to get links from virustotal.com"),
+                    "VirusTotal - [ ERR ] [ "
+                    + str(resp.status_code)
+                    + " ] Unable to get links from virustotal.com",
                     "red",
                 )
             )
@@ -4411,7 +4429,7 @@ def getVirusTotalUrls():
         except Exception as e:
             writerr(
                 colored(
-                    getSPACER("[ ERR ] Unexpected response from the VirusTotal API: " + str(e)),
+                    "VirusTotal - [ ERR ] Unexpected response from the VirusTotal API: " + str(e),
                     "red",
                 )
             )
@@ -4419,12 +4437,15 @@ def getVirusTotalUrls():
 
         # Check only mode
         if args.check_only:
-            write(colored("Get URLs from VirusTotal: ", "cyan") + colored("1 request", "white"))
+            write(
+                colored("VirusTotal - [ INFO ] Get URLs from VirusTotal: ", "cyan")
+                + colored("1 request", "white")
+            )
             checkVirusTotal = 1
         else:
             # Process each URL tuple
             for url, scan_date in all_urls:
-                if stopSource:
+                if stopSourceVirusTotal:
                     break
                 getMemory()
 
@@ -4445,24 +4466,14 @@ def getVirusTotalUrls():
                 # Process URL
                 processVirusTotalUrl(url)
 
-            # Count links found
-            linkCount = len(linksFound) - originalLinkCount
-            if args.xwm and args.xcc and args.xav and args.xus:
-                write(
-                    getSPACER(
-                        colored("Links found on virustotal.com: ", "cyan")
-                        + colored(str(linkCount), "white")
-                    )
-                    + "\n"
-                )
-            else:
-                write(
-                    getSPACER(
-                        colored("Extra links found on virustotal.com: ", "cyan")
-                        + colored(str(linkCount), "white")
-                    )
-                    + "\n"
-                )
+            # Show links found
+            linkCountVirusTotal = len(linksFoundVirusTotal)
+            write(
+                colored("VirusTotal - [ INFO ] Links found on virustotal.com: ", "cyan")
+                + colored(str(linkCountVirusTotal), "white")
+            )
+            linksFound.update(linksFoundVirusTotal)
+            linksFoundVirusTotal.clear()
 
     except Exception as e:
         writerr(colored(f"ERROR getVirusTotalUrls: {e}", "red"))
@@ -4472,7 +4483,7 @@ def processIntelxUrl(url):
     """
     Process a specific URL from intelx.io to determine whether to save the link
     """
-    global argsInput, argsInputHostname
+    global argsInput, argsInputHostname, linkCountIntelx, linksFoundIntelx
 
     addLink = True
 
@@ -4524,7 +4535,7 @@ def processIntelxUrl(url):
 
         # Add link if it passed filters
         if addLink:
-            linksFoundAdd(url)
+            linksFoundAdd(url, linksFoundIntelx)
 
     except Exception as e:
         writerr(colored("ERROR processIntelxUrl 1: " + str(e), "red"))
@@ -4535,6 +4546,7 @@ def processIntelxType(target, credits):
     target: 1 - Domains
     target: 3 - URLs
     """
+    global intelxAPIIssue
     try:
         try:
             requestsMade = 0
@@ -4554,7 +4566,7 @@ def processIntelxType(target, credits):
         except Exception as e:
             write(
                 colored(
-                    getSPACER("[ ERR ] Unable to get links from intelx.io: " + str(e)),
+                    "IntelX - [ ERR ] Unable to get links from intelx.io: " + str(e),
                     "red",
                 )
             )
@@ -4562,49 +4574,47 @@ def processIntelxType(target, credits):
 
         # Deal with any errors
         if resp.status_code == 429:
+            intelxAPIIssue = True
             writerr(
                 colored(
-                    getSPACER("[ 429 ] IntelX rate limit reached so unable to get links."),
+                    "IntelX - [ 429 ] Rate limit reached so unable to get links.",
                     "red",
                 )
             )
             return
         elif resp.status_code == 401:
+            intelxAPIIssue = True
             writerr(
                 colored(
-                    getSPACER(
-                        "[ 401 ] IntelX: Not authorized. The source requires a paid API key. Check your API key is correct."
-                    ),
+                    "IntelX - [ 401 ] Not authorized. The source requires a paid API key. Check your API key is correct.",
                     "red",
                 )
             )
             return
         elif resp.status_code == 402:
+            intelxAPIIssue = True
             if credits.startswith("0/"):
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ 402 ] IntelX: You have run out of daily credits on Intelx ("
-                            + credits
-                            + ")."
-                        ),
+                        "IntelX - [ 402 ] You have run out of daily credits on Intelx ("
+                        + credits
+                        + ").",
                         "red",
                     )
                 )
             else:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ 402 ] IntelX: It appears you have run out of daily credits on Intelx."
-                        ),
+                        "IntelX - [ 402 ] It appears you have run out of daily credits on Intelx.",
                         "red",
                     )
                 )
             return
         elif resp.status_code == 403:
+            intelxAPIIssue = True
             writerr(
                 colored(
-                    getSPACER("[ 403 ] IntelX: Permission denied. Check your API key is correct."),
+                    "IntelX - [ 403 ] Permission denied. Check your API key is correct.",
                     "red",
                 )
             )
@@ -4612,9 +4622,7 @@ def processIntelxType(target, credits):
         elif resp.status_code != 200:
             writerr(
                 colored(
-                    getSPACER(
-                        "[ " + str(resp.status_code) + " ] Unable to get links from intelx.io"
-                    ),
+                    "IntelX - [ " + str(resp.status_code) + " ] Unable to get links from intelx.io",
                     "red",
                 )
             )
@@ -4627,7 +4635,7 @@ def processIntelxType(target, credits):
         except Exception:
             writerr(
                 colored(
-                    getSPACER("[ ERR ] There was an unexpected response from the Intelligence API"),
+                    "IntelX - [ ERR ] There was an unexpected response from the Intelligence API",
                     "red",
                 )
             )
@@ -4637,7 +4645,7 @@ def processIntelxType(target, credits):
         moreResults = True
         status = 0
         while moreResults:
-            if stopSource:
+            if stopSourceIntelx:
                 break
             try:
                 resp = session.get(
@@ -4648,7 +4656,7 @@ def processIntelxType(target, credits):
             except Exception as e:
                 write(
                     colored(
-                        getSPACER("[ ERR ] Unable to get links from intelx.io: " + str(e)),
+                        "IntelX - [ ERR ] Unable to get links from intelx.io: " + str(e),
                         "red",
                     )
                 )
@@ -4661,9 +4669,7 @@ def processIntelxType(target, credits):
             except Exception:
                 writerr(
                     colored(
-                        getSPACER(
-                            "[ ERR ] There was an unexpected response from the Intelligence API"
-                        ),
+                        "IntelX - [ ERR ] There was an unexpected response from the Intelligence API",
                         "red",
                     )
                 )
@@ -4685,7 +4691,7 @@ def processIntelxType(target, credits):
             # Work out whether to include each url
             unique_values = list(set(selector_values + selector_valuesh))
             for ixurl in unique_values:
-                if stopSource:
+                if stopSourceIntelx:
                     break
                 processIntelxUrl(ixurl)
 
@@ -4727,56 +4733,51 @@ def getIntelxUrls():
     """
     Get URLs from the Intelligence X Phonebook search
     """
-    global INTELX_API_KEY, linksFound, waymorePath, subs, stopProgram, stopSource, argsInput, checkIntelx, argsInputHostname
+    global INTELX_API_KEY, linksFound, waymorePath, subs, stopProgram, stopSourceIntelx, argsInput, checkIntelx, argsInputHostname, intelxAPIIssue, linkCountIntelx
 
     # Write the file of URL's for the passed domain/URL
     try:
         if args.check_only:
             write(
-                colored("Get URLs from Intelligence X: ", "cyan")
+                colored("IntelX - [ INFO ] Get URLs from Intelligence X: ", "cyan")
                 + colored("minimum 4 requests", "white")
             )
             checkIntelx = 4
             return
 
-        stopSource = False
-        originalLinkCount = len(linksFound)
+        stopSourceIntelx = False
+        linksFoundIntelx = set()
+
         credits = getIntelxAccountInfo()
         if verbose():
             write(
                 colored(
-                    "The Intelligence X URL requested to get links (Credits: " + credits + "): ",
+                    "IntelX - [ INFO ] The Intelligence X URL requested to get links (Credits: "
+                    + credits
+                    + "): ",
                     "magenta",
                 )
                 + colored(INTELX_SEARCH_URL + "\n", "white")
             )
 
         if not args.check_only:
-            write(colored("\rGetting links from intelx.io API...\r", "cyan"))
+            write(colored("IntelX - [ INFO ] Getting links from intelx.io API...", "cyan"))
 
         # Get the domains from Intelligence X if the --no-subs wasn't passed
         if not args.no_subs:
             processIntelxType(1, credits)
 
         # Get the URLs from Intelligence X
-        processIntelxType(3, credits)
+        if not intelxAPIIssue:
+            processIntelxType(3, credits)
 
-        linkCount = len(linksFound) - originalLinkCount
-        if args.xwm and args.xcc and args.xav and args.xus and args.xvt:
-            write(
-                getSPACER(
-                    colored("Links found on intelx.io: ", "cyan") + colored(str(linkCount), "white")
-                )
-                + "\n"
-            )
-        else:
-            write(
-                getSPACER(
-                    colored("Extra links found on intelx.io: ", "cyan")
-                    + colored(str(linkCount), "white")
-                )
-                + "\n"
-            )
+        linkCountIntelx = len(linksFoundIntelx)
+        write(
+            colored("IntelX - [ INFO ] Links found on intelx.io: ", "cyan")
+            + colored(str(linkCountIntelx), "white")
+        )
+        linksFound.update(linksFoundIntelx)
+        linksFoundIntelx.clear()
 
     except Exception as e:
         writerr(colored("ERROR getIntelxUrls 1: " + str(e), "red"))
@@ -4832,14 +4833,16 @@ def processResponsesURLScan():
                     writerr(colored("ERROR processResponsesURLScan 4: " + str(e), "red"))
 
         # Get URLs from URLScan.io if the DOM ID's haven't been retrieved yet
-        if args.mode == "R" and stopProgram is None and not args.check_only:
-            write(
-                colored(
-                    "\rGetting list of response links (this can take a while for some domains)...\r",
-                    "cyan",
+        if stopProgram is None and not args.check_only:
+            if args.mode in ("R", "B"):
+                write(
+                    colored(
+                        "URLScan - [ INFO ] Getting list of response links (this can take a while for some domains)...",
+                        "cyan",
+                    )
                 )
-            )
-            getURLScanUrls()
+            if args.mode == "R":
+                getURLScanUrls()
 
         # Check if a continueResp.URLScan.tmp and responses.URLScan.tmp files exists
         runPrevious = "n"
@@ -4937,25 +4940,6 @@ def processResponsesURLScan():
                     "green",
                 )
             )
-            # if args.limit == 5000 and totalResponses == 5000:
-            #     writerr(colored('Downloading archived responses: ','cyan')+colored(str(totalResponses+1)+' requests (the --limit argument defaults to '+str(DEFAULT_LIMIT)+')','cyan'))
-            # else:
-            #     writerr(colored('Downloading archived responses: ','cyan')+colored(str(totalResponses+1)+' requests','white'))
-            # minutes = round(totalResponses*2.5 // 60)
-            # hours = minutes // 60
-            # days = hours // 24
-            # if minutes < 5:
-            #     write(colored('\n-> Downloading the responses (depending on their size) should be quite quick!','green'))
-            # elif hours < 2:
-            #     write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(minutes)+' minutes.','green'))
-            # elif hours < 6:
-            #     write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(hours)+' hours.','green'))
-            # elif hours < 24:
-            #     write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(hours)+' hours.','yellow'))
-            # elif days < 7:
-            #     write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(days)+' days. Consider using arguments -ko, -l, -ci, -from and -to wisely! ','red'))
-            # else:
-            #     write(colored('\n-> Downloading the responses (depending on their size) could take more than '+str(days)+' days!!! Consider using arguments -ko, -l, -ci, -from and -to wisely!','red'))
             write("")
         else:
             # If the limit has been set over the default, give a warning that this could take a long time!
@@ -5017,7 +5001,7 @@ def processResponsesURLScan():
                 if failureCount > 0:
                     if verbose():
                         write(
-                            colored("\nURLScan responses saved to ", "cyan")
+                            colored("URLScan - [ INFO ] Responses saved to ", "cyan")
                             + colored(responseOutputDirectory, "white")
                             + colored(" for " + subs + argsInput + ": ", "cyan")
                             + colored(
@@ -5032,7 +5016,7 @@ def processResponsesURLScan():
                     else:
                         write(
                             colored(
-                                "\nURLScan responses saved for " + subs + argsInput + ": ",
+                                "URLScan - [ INFO ] Responses saved for " + subs + argsInput + ": ",
                                 "cyan",
                             )
                             + colored(
@@ -5047,7 +5031,10 @@ def processResponsesURLScan():
                 else:
                     if verbose():
                         write(
-                            colored("\nURLScan responses saved to ", "cyan")
+                            colored(
+                                "URLScan - [ INFO ] Responses saved for " + subs + argsInput + ": ",
+                                "cyan",
+                            )
                             + colored(responseOutputDirectory, "white")
                             + colored(" for " + subs + argsInput + ": ", "cyan")
                             + colored(
@@ -5061,7 +5048,7 @@ def processResponsesURLScan():
                     else:
                         write(
                             colored(
-                                "\nURLScan responses saved for " + subs + argsInput + ": ",
+                                "URLScan - [ INFO ] Responses saved for " + subs + argsInput + ": ",
                                 "cyan",
                             )
                             + colored(
@@ -5087,7 +5074,7 @@ def processResponsesWayback():
     """
     Get archived responses from Wayback Machine (archive.org)
     """
-    global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput, continueRespFile, successCount, fileCount, DEFAULT_OUTPUT_DIR, responseOutputDirectory, failureCount, totalFileCount
+    global linksFound, subs, path, indexFile, totalResponses, stopProgram, argsInput, continueRespFile, successCount, fileCount, DEFAULT_OUTPUT_DIR, responseOutputDirectory, failureCount, totalFileCount, current_response, current_session
     try:
         fileCount = 0
         failureCount = 0
@@ -5230,18 +5217,18 @@ def processResponsesWayback():
             if verbose():
                 write(
                     colored(
-                        "The Wayback Machine URL requested to get responses: ",
+                        "Wayback - [ INFO ] The URL requested to get responses: ",
                         "magenta",
                     )
                     + colored(url + "\n", "white")
                 )
 
             if args.check_only:
-                write(colored("\rChecking archived response requests...\r", "cyan"))
+                write(colored("Wayback - [ INFO ] Checking archived response requests...", "cyan"))
             else:
                 write(
                     colored(
-                        "\rGetting list of response links (this can take a while for some domains)...\r",
+                        "Wayback - [ INFO ] Getting list of response links (this can take a while for some domains)...",
                         "cyan",
                     )
                 )
@@ -5254,16 +5241,24 @@ def processResponsesWayback():
                 session = requests.Session()
                 session.mount("https://", HTTP_ADAPTER)
                 session.mount("http://", HTTP_ADAPTER)
+                try:
+                    current_session = session
+                except Exception:
+                    pass
                 resp = session.get(
                     url,
                     stream=True,
                     headers={"User-Agent": userAgent},
                     timeout=args.timeout,
                 )
+                try:
+                    current_response = resp
+                except Exception:
+                    pass
             except ConnectionError:
                 writerr(
                     colored(
-                        getSPACER("[ ERR ] Wayback Machine (archive.org) connection error"),
+                        getSPACER("Wayback - [ ERR ] Connection error"),
                         "red",
                     )
                 )
@@ -5273,7 +5268,7 @@ def processResponsesWayback():
             except Exception as e:
                 writerr(
                     colored(
-                        getSPACER("[ ERR ] Couldn't get list of responses: " + str(e)),
+                        getSPACER("Wayback - [ ERR ] Couldn't get list of responses: " + str(e)),
                         "red",
                     )
                 )
@@ -5288,7 +5283,7 @@ def processResponsesWayback():
                             writerr(
                                 colored(
                                     getSPACER(
-                                        "No archived responses were found on Wayback Machine (archive.org) for the given search parameters."
+                                        "Wayback - [ ERR ] No archived responses were found on Wayback Machine (archive.org) for the given search parameters."
                                     ),
                                     "red",
                                 )
@@ -5299,7 +5294,7 @@ def processResponsesWayback():
                             writerr(
                                 colored(
                                     getSPACER(
-                                        "[ 429 ] Wayback Machine (archive.org) rate limit reached, so stopping. Links that have already been retrieved will be saved."
+                                        "Wayback - [ 429 ] Wayback Machine (archive.org) rate limit reached, so stopping. Links that have already been retrieved will be saved."
                                     ),
                                     "red",
                                 )
@@ -5310,7 +5305,7 @@ def processResponsesWayback():
                             writerr(
                                 colored(
                                     getSPACER(
-                                        "[ 503 ] Wayback Machine (archive.org) is currently unavailable. It may be down for maintenance. You can check https://web.archive.org/cdx/ to verify."
+                                        "Wayback - [ 503 ] Wayback Machine (archive.org) is currently unavailable. It may be down for maintenance. You can check https://web.archive.org/cdx/ to verify."
                                     ),
                                     "red",
                                 )
@@ -5322,7 +5317,10 @@ def processResponsesWayback():
                                 writerr(
                                     colored(
                                         getSPACER(
-                                            "[ " + str(resp.status_code) + " ] Error for " + url
+                                            "Wayback - [ "
+                                            + str(resp.status_code)
+                                            + " ] Error for "
+                                            + url
                                         ),
                                         "red",
                                     )
@@ -5334,7 +5332,7 @@ def processResponsesWayback():
                                 writerr(
                                     colored(
                                         getSPACER(
-                                            "Failed to get links from Wayback Machine (archive.org) - consider removing -ko / --keywords-only argument, or changing FILTER_KEYWORDS in config.yml"
+                                            "Wayback - [ ERR ] Failed to get links from Wayback Machine (archive.org) - consider removing -ko / --keywords-only argument, or changing FILTER_KEYWORDS in config.yml"
                                         ),
                                         "red",
                                     )
@@ -5343,7 +5341,7 @@ def processResponsesWayback():
                                 writerr(
                                     colored(
                                         getSPACER(
-                                            "Failed to get links from Wayback Machine (archive.org) - consider removing -ko / --keywords-only argument, or changing the Regex value you passed"
+                                            "Wayback - [ ERR ] Failed to get links from Wayback Machine (archive.org) - consider removing -ko / --keywords-only argument, or changing the Regex value you passed"
                                         ),
                                         "red",
                                     )
@@ -5353,7 +5351,7 @@ def processResponsesWayback():
                                 writerr(
                                     colored(
                                         getSPACER(
-                                            "Failed to get links from Wayback Machine (archive.org) - Blocked Site Error (they block the target site)"
+                                            "Wayback - [ ERR ] Failed to get links from Wayback Machine (archive.org) - Blocked Site Error (they block the target site)"
                                         ),
                                         "red",
                                     )
@@ -5362,7 +5360,7 @@ def processResponsesWayback():
                                 writerr(
                                     colored(
                                         getSPACER(
-                                            "Failed to get links from Wayback Machine (archive.org) - check input domain and try again."
+                                            "Wayback - [ ERR ] Failed to get links from Wayback Machine (archive.org) - check input domain and try again."
                                         ),
                                         "red",
                                     )
@@ -5372,23 +5370,43 @@ def processResponsesWayback():
                     pass
 
             # Go through the response to save the links found
-            for line in resp.iter_lines():
-                try:
-                    results = line.decode("utf-8")
-                    parts = results.split(" ", 2)
-                    timestamp = parts[0]
-                    originalUrl = parts[1]
-                    linksFoundResponseAdd(timestamp + "/" + originalUrl)
-                except Exception:
-                    writerr(
-                        colored(
-                            getSPACER(
-                                "ERROR processResponsesWayback 3: Cannot to get link from line: "
-                                + str(line)
-                            ),
-                            "red",
+            try:
+                for line in resp.iter_lines():
+                    try:
+                        results = line.decode("utf-8")
+                        parts = results.split(" ", 2)
+                        timestamp = parts[0]
+                        originalUrl = parts[1]
+                        linksFoundResponseAdd(timestamp + "/" + originalUrl)
+                    except Exception:
+                        writerr(
+                            colored(
+                                getSPACER(
+                                    "ERROR processResponsesWayback 3: Cannot to get link from line: "
+                                    + str(line)
+                                ),
+                                "red",
+                            )
                         )
-                    )
+            finally:
+                try:
+                    current_response = None
+                except Exception:
+                    pass
+                try:
+                    current_session = None
+                except Exception:
+                    pass
+
+            # Cleanup shared response/session references now the response has been processed
+            try:
+                current_response = None
+            except Exception:
+                pass
+            try:
+                current_session = None
+            except Exception:
+                pass
 
             # Remove any links that have URL exclusions
             linkRequests = []
@@ -5421,7 +5439,7 @@ def processResponsesWayback():
                     writerr(
                         colored(
                             getSPACER(
-                                'Failed to get links from Wayback Machine (archive.org) - there were results (e.g. "'
+                                'Wayback - [ ERR ] Failed to get links from Wayback Machine (archive.org) - there were results (e.g. "'
                                 + originalUrl
                                 + "\") but they didn't match the input you gave. Check input and try again."
                             ),
@@ -5432,7 +5450,7 @@ def processResponsesWayback():
                 writerr(
                     colored(
                         getSPACER(
-                            "Failed to get links from Wayback Machine (archive.org) - check input and try again."
+                            "Wayback - [ ERR ] Failed to get links from Wayback Machine (archive.org) - check input and try again."
                         ),
                         "red",
                     )
@@ -5575,7 +5593,7 @@ def processResponsesWayback():
                 if failureCount > 0:
                     if verbose():
                         write(
-                            colored("\nWayback responses saved to ", "cyan")
+                            colored("Wayback - [ INFO ] Responses saved to ", "cyan")
                             + colored(responseOutputDirectory, "white")
                             + colored(" for " + subs + argsInput + ": ", "cyan")
                             + colored(
@@ -5590,7 +5608,7 @@ def processResponsesWayback():
                     else:
                         write(
                             colored(
-                                "\nWayback responses saved for " + subs + argsInput + ": ",
+                                "Wayback - [ INFO ] Responses saved for " + subs + argsInput + ": ",
                                 "cyan",
                             )
                             + colored(
@@ -5605,7 +5623,7 @@ def processResponsesWayback():
                 else:
                     if verbose():
                         write(
-                            colored("\nWayback responses saved to ", "cyan")
+                            colored("Wayback - [ INFO ] Responses saved to ", "cyan")
                             + colored(responseOutputDirectory, "white")
                             + colored(" for " + subs + argsInput + ": ", "cyan")
                             + colored(
@@ -5619,7 +5637,7 @@ def processResponsesWayback():
                     else:
                         write(
                             colored(
-                                "\nWayback responses saved for " + subs + argsInput + ": ",
+                                "Wayback - [ INFO ] Responses saved for " + subs + argsInput + ": ",
                                 "cyan",
                             )
                             + colored(
@@ -5933,9 +5951,91 @@ def combineInlineJS():
         writerr(colored("ERROR combineInlineJS 1: " + str(e), "red"))
 
 
+# Async wrapper functions for concurrent source fetching
+async def fetch_wayback_async():
+    """Async wrapper for getWaybackUrls - runs in thread pool"""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, getWaybackUrls)
+
+
+async def fetch_commoncrawl_async():
+    """Async wrapper for getCommonCrawlUrls - runs in thread pool"""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, getCommonCrawlUrls)
+
+
+async def fetch_alienvault_async():
+    """Async wrapper for getAlienVaultUrls - runs in thread pool"""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, getAlienVaultUrls)
+
+
+async def fetch_urlscan_async():
+    """Async wrapper for getURLScanUrls - runs in thread pool"""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, getURLScanUrls)
+
+
+async def fetch_virustotal_async():
+    """Async wrapper for getVirusTotalUrls - runs in thread pool"""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, getVirusTotalUrls)
+
+
+async def fetch_intelx_async():
+    """Async wrapper for getIntelxUrls - runs in thread pool"""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, getIntelxUrls)
+
+
+async def fetch_all_sources_async():
+    """
+    Orchestrator function to fetch from all enabled sources concurrently.
+    Each source runs in its own thread pool executor while orchestration happens async.
+    """
+    global args, stopProgram, VIRUSTOTAL_API_KEY, INTELX_API_KEY, argsInput
+
+    tasks = []
+
+    # Build list of tasks for enabled sources
+    if not args.xwm and stopProgram is None:
+        tasks.append(("Wayback Machine", fetch_wayback_async()))
+    if not args.xcc and stopProgram is None:
+        tasks.append(("Common Crawl", fetch_commoncrawl_async()))
+    if not args.xav and stopProgram is None and not argsInput.startswith("."):
+        tasks.append(("AlienVault OTX", fetch_alienvault_async()))
+    if not args.xus and stopProgram is None:
+        tasks.append(("URLScan", fetch_urlscan_async()))
+    if not args.xvt and VIRUSTOTAL_API_KEY != "" and stopProgram is None:
+        tasks.append(("VirusTotal", fetch_virustotal_async()))
+    if not args.xix and INTELX_API_KEY != "" and stopProgram is None:
+        tasks.append(("Intelligence X", fetch_intelx_async()))
+
+    if not tasks:
+        return
+
+    # Extract just the coroutines for gather
+    task_coros = [task[1] for task in tasks]
+
+    # Fetch all concurrently, capturing exceptions so one failure doesn't stop others
+    results = await asyncio.gather(*task_coros, return_exceptions=True)
+
+    # Check for any exceptions that occurred
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            source_name = tasks[i][0]
+            if verbose():
+                writerr(
+                    colored(
+                        getSPACER(f"ERROR in {source_name} during concurrent fetch: {str(result)}"),
+                        "red",
+                    )
+                )
+
+
 # Run waymore
 def main():
-    global args, DEFAULT_TIMEOUT, inputValues, argsInput, linksFound, linkMimes, successCount, failureCount, fileCount, totalResponses, totalPages, indexFile, path, stopSource, stopProgram, VIRUSTOTAL_API_KEY, inputIsSubDomain, argsInputHostname, WEBHOOK_DISCORD, responseOutputDirectory, fileCount, INTELX_API_KEY
+    global args, DEFAULT_TIMEOUT, inputValues, argsInput, linksFound, linkMimes, successCount, failureCount, fileCount, totalResponses, totalPages, indexFile, path, stopSource, stopProgram, VIRUSTOTAL_API_KEY, inputIsSubDomain, argsInputHostname, WEBHOOK_DISCORD, responseOutputDirectory, fileCount, INTELX_API_KEY, stopSourceAlienVault, stopSourceCommonCrawl, stopSourceWayback, stopSourceURLScan, stopSourceVirusTotal, stopSourceIntelx
 
     # Tell Python to run the handler() function when SIGINT is received
     signal(SIGINT, handler)
@@ -6104,6 +6204,7 @@ def main():
         action="store",
         type=int,
         help="Limit the number of Common Crawl index collections searched, e.g. '-lcc 10' will just search the latest 10 collections (default: 1). As of November 2024 there are currently 106 collections. Setting to 0 (default) will search ALL collections. If you don't want to search Common Crawl at all, use the -xcc option.",
+        default=1,
     )
     parser.add_argument(
         "-t",
@@ -6118,10 +6219,10 @@ def main():
     parser.add_argument(
         "-p",
         "--processes",
-        help="Basic multithreading is done when getting requests for a file of URLs. This argument determines the number of processes (threads) used (default: 1)",
+        help="Basic multithreading is done when getting requests for a file of URLs. This argument determines the number of processes (threads) used (default: 2)",
         action="store",
         type=validateArgProcesses,
-        default=1,
+        default=2,
         metavar="<integer>",
     )
     parser.add_argument(
@@ -6326,6 +6427,12 @@ def main():
             indexFile = None
             path = ""
             stopSource = False
+            stopSourceWayback = False
+            stopSourceCommonCrawl = False
+            stopSourceAlienVault = False
+            stopSourceURLScan = False
+            stopSourceVirusTotal = False
+            stopSourceIntelx = False
 
             # Get the config settings from the config.yml file
             getConfig()
@@ -6343,29 +6450,17 @@ def main():
             # If the mode is U (URLs retrieved) or B (URLs retrieved AND Responses downloaded)
             if args.mode in ["U", "B"]:
 
-                # If not requested to exclude, get URLs from the Wayback Machine (archive.org)
-                if not args.xwm and stopProgram is None:
-                    getWaybackUrls()
-
-                # If not requested to exclude, get URLs from commoncrawl.org
-                if not args.xcc and stopProgram is None:
-                    getCommonCrawlUrls()
-
-                # If not requested to exclude and a TLD wasn't passed, get URLs from alienvault.com
-                if not args.xav and stopProgram is None and not inpt.startswith("."):
-                    getAlienVaultUrls()
-
-                # If not requested to exclude, get URLs from urlscan.io
-                if not args.xus and stopProgram is None:
-                    getURLScanUrls()
-
-                # If not requested to exclude, get URLs from virustotal.com if we have an API key
-                if not args.xvt and VIRUSTOTAL_API_KEY != "" and stopProgram is None:
-                    getVirusTotalUrls()
-
-                # If not requested to exclude, get URLs from intelx.io if we have an API key
-                if not args.xix and INTELX_API_KEY != "" and stopProgram is None:
-                    getIntelxUrls()
+                # Fetch from all sources concurrently using async/await
+                try:
+                    asyncio.run(fetch_all_sources_async())
+                except Exception as e:
+                    if verbose():
+                        writerr(
+                            colored(
+                                getSPACER(f"ERROR during concurrent source fetching: {str(e)}"),
+                                "red",
+                            )
+                        )
 
                 # Output results of all searches
                 processURLOutput()

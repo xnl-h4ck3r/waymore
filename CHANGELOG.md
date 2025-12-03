@@ -1,5 +1,35 @@
 ## Changelog
 
+- v7.0
+
+  - New
+
+    - **Async Concurrent Source Fetching**: Implemented asynchronous concurrent fetching from all URL sources (Wayback Machine, Common Crawl, AlienVault OTX, URLScan, VirusTotal, Intelligence X) for **significantly improved performance (2-4x faster** for multi-source runs).
+    - Added `asyncio` orchestration layer to manage concurrent execution while maintaining backward compatibility with existing synchronous code.
+    - Added `aiohttp` dependency to requirements for async HTTP support.
+    - Added thread-safe locks (`threading.Lock`) to protect shared global state (`linksFound`, `linkMimes`, `urlscanRequestLinks`) from race conditions during concurrent operations.
+
+  - Changed
+
+    - Sources are now fetched **concurrently** instead of sequentially, with proper error handling to ensure one source failure doesn't stop others.
+    - Properly initialized `linksFound` and `linkMimes` as global variables to prevent `NoneType` errors during concurrent access.
+    - Removed local reassignments of global variables in source functions (`getURLScanUrls`, `getCommonCrawlUrls`, `getVirusTotalUrls`) that were causing race conditions.
+    - All `.add()` operations on shared sets are now protected with locks for thread safety.
+    - **Minimum Python version**: Now requires **Python 3.7+** for `async/await` support.
+    - Ensure the default value for `-lcc`/`--limit-common-crawl` is set to 1.
+    - Set the default value for `-p`/`--processes` to 2. This will speed things if people don't specify a value, and shouldn't cause any issues.
+    - Fixed duplicate rate limit messages from AlienVault when using parallel processes by checking `stopSource` before printing the 429 error message.
+    - Fixed issue where AlienVault would show an "Unexpected response" error after a "Rate limit reached" error.
+    - **Wayback streaming improvements**: Wayback Machine requests now use `stream=True` to retrieve results as they arrive. If the connection is interrupted (`Response ended prematurely` error), all URLs processed before the error are still saved instead of losing everything. Error messages now show how many URLs were saved before the connection failed.
+    - **Ctrl-C interrupt for streaming requests (2025-12-03)**: Fix SIGINT handling so a live streaming response is closed when Ctrl-C is pressed, allowing blocking `session.get(..., stream=True)` requests to be interrupted and stop faster. This exposes the active response to the SIGINT handler and closes it to cancel blocking network I/O.
+    - **Session-level interrupt fix (2025-12-03T11:36:18.961Z)**: Also expose and close the active requests.Session when SIGINT is received to more reliably abort blocking streaming requests on some platforms/environments.
+    - **Interruptible rate-limit waits (2025-12-03T12:04:37.195Z)**: Replaced blocking time.sleep() calls used when rate-limited with an interruptible wait driven by a global threading.Event (interrupt_event). The SIGINT handler now sets interrupt_event so rate-limit waits wake early when Ctrl-C is pressed.
+    - **Unique Link Counting**: The link count displayed for each source (Wayback, Common Crawl, etc.) now represents the number of **unique** URLs found from that source, rather than the total number of URLs found (which included duplicates). The final total still shows the unique URLs found across all sources.
+    - **Memory Optimization**: Significant reduction in memory usage by preventing duplicate storage of links. Links are now stored only in source-specific sets during processing and merged into the main set at the end, with source sets being cleared immediately to free up memory.
+    - **Link Counting Consistency**: Fixed a discrepancy where source-specific link counts could be higher than the final total. All link counting now uses the same normalization (removing ports 80/443) and filtering logic to ensure consistency.
+    - **Source-Specific Link Counting**: Added separate link counts for each source (Wayback, Common Crawl, etc.) to provide more detailed information about the number of unique links found from each source.
+    
+    
 - v6.6
 
   - Changed
