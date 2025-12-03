@@ -16,7 +16,6 @@ import random
 import re
 import sys
 import threading
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from signal import SIGINT, signal
@@ -3307,7 +3306,7 @@ def processWayBackPage(url):
     """
     Get URLs from a specific page of archive.org CDX API for the input domain
     """
-    global totalPages, linkMimes, linksFound, stopSourceWayback, linkCountWayback, linksFoundWayback, current_response
+    global totalPages, linkMimes, linksFound, stopSourceWayback, linkCountWayback, linksFoundWayback, current_response, current_session
     try:
         # Get memory in case it exceeds threshold
         getMemory()
@@ -3790,7 +3789,7 @@ def processCommonCrawlCollection(cdxApiUrl):
     """
     Get URLs from a given Common Crawl index collection
     """
-    global subs, path, linksFound, linkMimes, stopSourceCommonCrawl, argsInput, linkCountCommonCrawl, linksFoundCommonCrawl
+    global subs, path, linksFound, linkMimes, stopSourceCommonCrawl, argsInput, linkCountCommonCrawl, linksFoundCommonCrawl, current_response, current_session
 
     try:
         # Get memory in case it exceeds threshold
