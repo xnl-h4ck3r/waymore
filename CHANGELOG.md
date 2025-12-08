@@ -1,5 +1,11 @@
 ## Changelog
 
+- v7.1
+
+  - New
+
+    - Add `/_incapsula_resource` to `FILTER_URL` in `config.yml` (and the default constant if the config file is not found) to exclude this common response that is not part of the original target. The response also causes regex "catastrophic backtracking" in `xnLinkFinder` so I am excluding here aswell as looking into solving that problem.
+     
 - v7.0
 
   - New
