@@ -1148,7 +1148,6 @@ def getConfig():
                     )
                     WEBHOOK_TELEGRAM = ""
 
-
             try:
                 DEFAULT_OUTPUT_DIR = config.get("DEFAULT_OUTPUT_DIR")
                 if str(DEFAULT_OUTPUT_DIR) == "None" or str(DEFAULT_OUTPUT_DIR) == "":
@@ -5802,11 +5801,7 @@ def notifyTelegram():
     global WEBHOOK_TELEGRAM, args
     try:
         data = {
-            "text": "waymore has finished for `-i "
-            + args.input
-            + " -mode "
-            + args.mode
-            + "` ! 🤘",
+            "text": "waymore has finished for `-i " + args.input + " -mode " + args.mode + "` ! 🤘",
         }
         try:
             result = requests.post(WEBHOOK_TELEGRAM, json=data)
