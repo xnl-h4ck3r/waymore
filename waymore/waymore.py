@@ -182,6 +182,7 @@ FILTER_KEYWORDS = ""
 URLSCAN_API_KEY = ""
 CONTINUE_RESPONSES_IF_PIPED = True
 WEBHOOK_DISCORD = ""
+WEBHOOK_TELEGRAM = ""
 DEFAULT_OUTPUT_DIR = ""
 INTELX_API_KEY = ""
 
@@ -792,6 +793,18 @@ def showOptions():
             else:
                 write(colored("Discord Webhook: ", "magenta") + colored(WEBHOOK_DISCORD))
 
+        if args.notify_telegram:
+            if WEBHOOK_TELEGRAM == "" or WEBHOOK_TELEGRAM == "YOUR_WEBHOOK":
+                write(
+                    colored("Telegram Webhook: ", "magenta")
+                    + colored(
+                        "It looks like no Telegram webhook has been set in config.yml file.",
+                        "red",
+                    )
+                )
+            else:
+                write(colored("Telegram Webhook: ", "magenta") + colored(WEBHOOK_TELEGRAM))
+
         write(colored("Default Output Directory: ", "magenta") + colored(str(DEFAULT_OUTPUT_DIR)))
 
         if args.regex_after is not None:
@@ -850,7 +863,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD, DEFAULT_OUTPUT_DIR, MATCH_MIME, INTELX_API_KEY
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD, DEFAULT_OUTPUT_DIR, MATCH_MIME, INTELX_API_KEY, WEBHOOK_TELEGRAM
     try:
 
         # Set terminal width
@@ -1115,6 +1128,27 @@ def getConfig():
                     )
                     WEBHOOK_DISCORD = ""
 
+            if args.notify_telegram:
+                try:
+                    WEBHOOK_TELEGRAM = config.get("WEBHOOK_TELEGRAM")
+                    if str(WEBHOOK_TELEGRAM) == "None" or str(WEBHOOK_TELEGRAM) == "YOUR_WEBHOOK":
+                        writerr(
+                            colored(
+                                'No value for "WEBHOOK_TELEGRAM" in config.yml - default set',
+                                "yellow",
+                            )
+                        )
+                        WEBHOOK_TELEGRAM = ""
+                except Exception:
+                    writerr(
+                        colored(
+                            'Unable to read "WEBHOOK_TELEGRAM" from config.yml - default set',
+                            "red",
+                        )
+                    )
+                    WEBHOOK_TELEGRAM = ""
+
+
             try:
                 DEFAULT_OUTPUT_DIR = config.get("DEFAULT_OUTPUT_DIR")
                 if str(DEFAULT_OUTPUT_DIR) == "None" or str(DEFAULT_OUTPUT_DIR) == "":
@@ -1214,6 +1248,7 @@ def getConfig():
             FILTER_KEYWORDS = ""
             CONTINUE_RESPONSES_IF_PIPED = True
             WEBHOOK_DISCORD = ""
+            WEBHOOK_TELEGRAM = ""
             DEFAULT_OUTPUT_DIR = os.path.expanduser("~/.config/waymore")
 
     except Exception as e:
@@ -5763,6 +5798,38 @@ def notifyDiscord():
         writerr(colored("ERROR notifyDiscord 1: " + str(e), "red"))
 
 
+def notifyTelegram():
+    global WEBHOOK_TELEGRAM, args
+    try:
+        data = {
+            "text": "waymore has finished for `-i "
+            + args.input
+            + " -mode "
+            + args.mode
+            + "` ! 🤘",
+        }
+        try:
+            result = requests.post(WEBHOOK_TELEGRAM, json=data)
+            if 300 <= result.status_code < 200:
+                writerr(
+                    colored(
+                        getSPACER(
+                            "WARNING: Failed to send notification to Telegram - " + result.json()
+                        ),
+                        "yellow",
+                    )
+                )
+        except Exception as e:
+            writerr(
+                colored(
+                    getSPACER("WARNING: Failed to send notification to Telegram - " + str(e)),
+                    "yellow",
+                )
+            )
+    except Exception as e:
+        writerr(colored("ERROR notifyTelegram 1: " + str(e), "red"))
+
+
 def checkScript(script):
     try:
         if script.replace("\n", "").strip() != "":
@@ -6308,6 +6375,12 @@ def main():
         help="Whether to send a notification to Discord when waymore completes. It requires WEBHOOK_DISCORD to be provided in the config.yml file.",
     )
     parser.add_argument(
+        "-nt",
+        "--notify-telegram",
+        action="store_true",
+        help="Whether to send a notification to Telegram when waymore completes. It requires WEBHOOK_TELEGRAM to be provided in the config.yml file.",
+    )
+    parser.add_argument(
         "-oijs",
         "--output-inline-js",
         action="store_true",
@@ -6526,10 +6599,15 @@ def main():
         writerr(colored("ERROR main 1: " + str(e), "red"))
 
     finally:
-        # Send a notification to discord if requested
+        # Send a notification to discord or telegram if requested
         try:
             if args.notify_discord and WEBHOOK_DISCORD != "":
                 notifyDiscord()
+        except Exception:
+            pass
+        try:
+            if args.notify_telegram and WEBHOOK_TELEGRAM != "":
+                notifyTelegram()
         except Exception:
             pass
         try:
