@@ -182,7 +182,8 @@ FILTER_KEYWORDS = ""
 URLSCAN_API_KEY = ""
 CONTINUE_RESPONSES_IF_PIPED = True
 WEBHOOK_DISCORD = ""
-WEBHOOK_TELEGRAM = ""
+TELEGRAM_BOT_TOKEN = ""
+TELEGRAM_CHAT_ID = ""
 DEFAULT_OUTPUT_DIR = ""
 INTELX_API_KEY = ""
 
@@ -794,16 +795,22 @@ def showOptions():
                 write(colored("Discord Webhook: ", "magenta") + colored(WEBHOOK_DISCORD))
 
         if args.notify_telegram:
-            if WEBHOOK_TELEGRAM == "" or WEBHOOK_TELEGRAM == "YOUR_WEBHOOK":
+            if (
+                TELEGRAM_BOT_TOKEN == ""
+                or TELEGRAM_BOT_TOKEN == "YOUR_TOKEN"
+                or TELEGRAM_CHAT_ID == ""
+                or TELEGRAM_CHAT_ID == "YOUR_CHAT_ID"
+            ):
                 write(
-                    colored("Telegram Webhook: ", "magenta")
+                    colored("Telegram: ", "magenta")
                     + colored(
-                        "It looks like no Telegram webhook has been set in config.yml file.",
+                        "It looks like Telegram Bot Token or Chat ID has not been set in config.yml file.",
                         "red",
                     )
                 )
             else:
-                write(colored("Telegram Webhook: ", "magenta") + colored(WEBHOOK_TELEGRAM))
+                write(colored("Telegram Bot Token: ", "magenta") + colored(TELEGRAM_BOT_TOKEN))
+                write(colored("Telegram Chat ID: ", "magenta") + colored(TELEGRAM_CHAT_ID))
 
         write(colored("Default Output Directory: ", "magenta") + colored(str(DEFAULT_OUTPUT_DIR)))
 
@@ -863,7 +870,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD, DEFAULT_OUTPUT_DIR, MATCH_MIME, INTELX_API_KEY, WEBHOOK_TELEGRAM
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, DEFAULT_OUTPUT_DIR, MATCH_MIME, INTELX_API_KEY
     try:
 
         # Set terminal width
@@ -1130,23 +1137,42 @@ def getConfig():
 
             if args.notify_telegram:
                 try:
-                    WEBHOOK_TELEGRAM = config.get("WEBHOOK_TELEGRAM")
-                    if str(WEBHOOK_TELEGRAM) == "None" or str(WEBHOOK_TELEGRAM) == "YOUR_WEBHOOK":
+                    TELEGRAM_BOT_TOKEN = config.get("TELEGRAM_BOT_TOKEN")
+                    if str(TELEGRAM_BOT_TOKEN) == "None" or str(TELEGRAM_BOT_TOKEN) == "YOUR_TOKEN":
                         writerr(
                             colored(
-                                'No value for "WEBHOOK_TELEGRAM" in config.yml - default set',
+                                'No value for "TELEGRAM_BOT_TOKEN" in config.yml - default set',
                                 "yellow",
                             )
                         )
-                        WEBHOOK_TELEGRAM = ""
+                        TELEGRAM_BOT_TOKEN = ""
                 except Exception:
                     writerr(
                         colored(
-                            'Unable to read "WEBHOOK_TELEGRAM" from config.yml - default set',
+                            'Unable to read "TELEGRAM_BOT_TOKEN" from config.yml - default set',
                             "red",
                         )
                     )
-                    WEBHOOK_TELEGRAM = ""
+                    TELEGRAM_BOT_TOKEN = ""
+
+                try:
+                    TELEGRAM_CHAT_ID = config.get("TELEGRAM_CHAT_ID")
+                    if str(TELEGRAM_CHAT_ID) == "None" or str(TELEGRAM_CHAT_ID) == "YOUR_CHAT_ID":
+                        writerr(
+                            colored(
+                                'No value for "TELEGRAM_CHAT_ID" in config.yml - default set',
+                                "yellow",
+                            )
+                        )
+                        TELEGRAM_CHAT_ID = ""
+                except Exception:
+                    writerr(
+                        colored(
+                            'Unable to read "TELEGRAM_CHAT_ID" from config.yml - default set',
+                            "red",
+                        )
+                    )
+                    TELEGRAM_CHAT_ID = ""
 
             try:
                 DEFAULT_OUTPUT_DIR = config.get("DEFAULT_OUTPUT_DIR")
@@ -1247,7 +1273,8 @@ def getConfig():
             FILTER_KEYWORDS = ""
             CONTINUE_RESPONSES_IF_PIPED = True
             WEBHOOK_DISCORD = ""
-            WEBHOOK_TELEGRAM = ""
+            TELEGRAM_BOT_TOKEN = ""
+            TELEGRAM_CHAT_ID = ""
             DEFAULT_OUTPUT_DIR = os.path.expanduser("~/.config/waymore")
 
     except Exception as e:
@@ -5798,13 +5825,15 @@ def notifyDiscord():
 
 
 def notifyTelegram():
-    global WEBHOOK_TELEGRAM, args
+    global TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, args
     try:
+        url = "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendMessage"
         data = {
+            "chat_id": TELEGRAM_CHAT_ID,
             "text": "waymore has finished for `-i " + args.input + " -mode " + args.mode + "` ! 🤘",
         }
         try:
-            result = requests.post(WEBHOOK_TELEGRAM, json=data)
+            result = requests.post(url, json=data)
             if 300 <= result.status_code < 200:
                 writerr(
                     colored(
@@ -6373,7 +6402,7 @@ def main():
         "-nt",
         "--notify-telegram",
         action="store_true",
-        help="Whether to send a notification to Telegram when waymore completes. It requires WEBHOOK_TELEGRAM to be provided in the config.yml file.",
+        help="Whether to send a notification to Telegram when waymore completes. It requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to be provided in the config.yml file.",
     )
     parser.add_argument(
         "-oijs",
@@ -6601,7 +6630,7 @@ def main():
         except Exception:
             pass
         try:
-            if args.notify_telegram and WEBHOOK_TELEGRAM != "":
+            if args.notify_telegram and TELEGRAM_BOT_TOKEN != "" and TELEGRAM_CHAT_ID != "":
                 notifyTelegram()
         except Exception:
             pass

@@ -1,5 +1,11 @@
 ## Changelog
 
+- v7.3
+
+- Changed
+
+  - The v7.2 changes were not correct to provide support for Telegram notifications. A new optional argument `-nt`/`--notify-telegram` can be used to send a notification to a Telegram webhook when waymore completes. This requires `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` to be provided in the `config.yml` file.
+
 - v7.2
 
   - New
