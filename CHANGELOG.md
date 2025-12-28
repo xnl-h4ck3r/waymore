@@ -1,5 +1,9 @@
 ## Changelog
 
+- v7.4
+
+  - BUG FIX: The source specific totals were showing as 0 when running `-mode U` and the error `ERROR processIntelxUrl 1: name 'linksFoundIntelx' is not defined` was shown. This has been fixed.
+
 - v7.3
 
 - Changed

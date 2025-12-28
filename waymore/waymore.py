@@ -109,6 +109,11 @@ linkCountAlienVault = 0
 linkCountURLScan = 0
 linkCountVirusTotal = 0
 linkCountIntelx = 0
+linksFoundCommonCrawl = set()
+linksFoundAlienVault = set()
+linksFoundURLScan = set()
+linksFoundVirusTotal = set()
+linksFoundIntelx = set()
 
 # Thread lock for protecting shared state during concurrent operations
 links_lock = threading.Lock()
@@ -4793,7 +4798,7 @@ def getIntelxUrls():
     """
     Get URLs from the Intelligence X Phonebook search
     """
-    global INTELX_API_KEY, linksFound, waymorePath, subs, stopProgram, stopSourceIntelx, argsInput, checkIntelx, argsInputHostname, intelxAPIIssue, linkCountIntelx
+    global INTELX_API_KEY, linksFound, waymorePath, subs, stopProgram, stopSourceIntelx, argsInput, checkIntelx, argsInputHostname, intelxAPIIssue, linkCountIntelx, linksFoundIntelx
 
     # Write the file of URL's for the passed domain/URL
     try:
