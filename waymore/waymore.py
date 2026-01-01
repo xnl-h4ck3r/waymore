@@ -129,9 +129,52 @@ ALIENVAULT_URL = "https://otx.alienvault.com/api/v1/indicators/{TYPE}/{DOMAIN}/u
 URLSCAN_URL = "https://urlscan.io/api/v1/search/?q=domain:{DOMAIN}{DATERANGE}&size=10000"
 URLSCAN_DOM_URL = "https://urlscan.io/dom/"
 VIRUSTOTAL_URL = "https://www.virustotal.com/vtapi/v2/domain/report?apikey={APIKEY}&domain={DOMAIN}"
-INTELX_SEARCH_URL = "https://2.intelx.io/phonebook/search"
-INTELX_RESULTS_URL = "https://2.intelx.io/phonebook/search/result?id="
-INTELX_ACCOUNT_URL = "https://2.intelx.io/authenticate/info"
+# Paid endpoint first, free endpoint as fallback
+INTELX_BASES = ["https://2.intelx.io", "https://free.intelx.io"]
+INTELX_BASE = INTELX_BASES[0]
+INTELX_SEARCH_URL = f"{INTELX_BASE}/phonebook/search"
+INTELX_RESULTS_URL = f"{INTELX_BASE}/phonebook/search/result?id="
+INTELX_ACCOUNT_URL = f"{INTELX_BASE}/authenticate/info"
+
+
+def setIntelxBase(base: str):
+    """Update IntelX URLs to use the provided base."""
+    global INTELX_BASE, INTELX_SEARCH_URL, INTELX_RESULTS_URL, INTELX_ACCOUNT_URL
+    INTELX_BASE = base
+    INTELX_SEARCH_URL = f"{INTELX_BASE}/phonebook/search"
+    INTELX_RESULTS_URL = f"{INTELX_BASE}/phonebook/search/result?id="
+    INTELX_ACCOUNT_URL = f"{INTELX_BASE}/authenticate/info"
+
+
+def chooseIntelxBase(api_key: str) -> requests.Response | None:
+    """
+    Probe IntelX endpoints in order (paid, then free) and set the first that works.
+    Returns the last response (or None) so callers can inspect status/JSON.
+    """
+    try:
+        session = requests.Session()
+        session.mount("https://", HTTP_ADAPTER)
+        session.mount("http://", HTTP_ADAPTER)
+        last_resp = None
+        for base in INTELX_BASES:
+            userAgent = random.choice(USER_AGENT)
+            resp = session.get(
+                f"{base}/authenticate/info",
+                headers={"User-Agent": userAgent, "X-Key": api_key},
+            )
+            last_resp = resp
+            if resp.status_code == 200:
+                setIntelxBase(base)
+                return resp
+            if resp.status_code in [401, 403]:
+                # Try next base
+                continue
+            # For other codes, stop probing and let caller handle
+            break
+        return last_resp
+    except Exception:
+        return None
+
 
 # User Agents to use when making requests, chosen at random
 USER_AGENT = [
@@ -4613,85 +4656,98 @@ def processIntelxType(target, credits):
     """
     global intelxAPIIssue
     try:
-        try:
-            requestsMade = 0
+        attempts = 0
+        resp = None
+        while attempts < 2:
+            try:
+                requestsMade = 0
 
-            # Choose a random user agent string to use for any requests
-            userAgent = random.choice(USER_AGENT)
-            session = requests.Session()
-            session.mount("https://", HTTP_ADAPTER)
-            session.mount("http://", HTTP_ADAPTER)
-            # Pass the API key in the X-Key header too.
-            resp = session.post(
-                INTELX_SEARCH_URL,
-                data='{"term":"' + quote(argsInputHostname) + '","target":' + str(target) + "}",
-                headers={"User-Agent": userAgent, "X-Key": INTELX_API_KEY},
-            )
-            requestsMade = requestsMade + 1
-        except Exception as e:
-            write(
-                colored(
-                    "IntelX - [ ERR ] Unable to get links from intelx.io: " + str(e),
-                    "red",
+                # Choose a random user agent string to use for any requests
+                userAgent = random.choice(USER_AGENT)
+                session = requests.Session()
+                session.mount("https://", HTTP_ADAPTER)
+                session.mount("http://", HTTP_ADAPTER)
+                # Pass the API key in the X-Key header too.
+                resp = session.post(
+                    INTELX_SEARCH_URL,
+                    data='{"term":"' + quote(argsInputHostname) + '","target":' + str(target) + "}",
+                    headers={"User-Agent": userAgent, "X-Key": INTELX_API_KEY},
                 )
-            )
-            return
-
-        # Deal with any errors
-        if resp.status_code == 429:
-            intelxAPIIssue = True
-            writerr(
-                colored(
-                    "IntelX - [ 429 ] Rate limit reached so unable to get links.",
-                    "red",
-                )
-            )
-            return
-        elif resp.status_code == 401:
-            intelxAPIIssue = True
-            writerr(
-                colored(
-                    "IntelX - [ 401 ] Not authorized. The source requires a paid API key. Check your API key is correct.",
-                    "red",
-                )
-            )
-            return
-        elif resp.status_code == 402:
-            intelxAPIIssue = True
-            if credits.startswith("0/"):
-                writerr(
+                requestsMade = requestsMade + 1
+            except Exception as e:
+                write(
                     colored(
-                        "IntelX - [ 402 ] You have run out of daily credits on Intelx ("
-                        + credits
-                        + ").",
+                        "IntelX - [ ERR ] Unable to get links from intelx.io: " + str(e),
                         "red",
                     )
                 )
-            else:
+                return
+
+            # Deal with any errors
+            if resp.status_code == 429:
+                intelxAPIIssue = True
                 writerr(
                     colored(
-                        "IntelX - [ 402 ] It appears you have run out of daily credits on Intelx.",
+                        "IntelX - [ 429 ] Rate limit reached so unable to get links.",
                         "red",
                     )
                 )
-            return
-        elif resp.status_code == 403:
-            intelxAPIIssue = True
-            writerr(
-                colored(
-                    "IntelX - [ 403 ] Permission denied. Check your API key is correct.",
-                    "red",
+                return
+            elif resp.status_code == 401:
+                # Retry with free endpoint if paid endpoint was used and auth failed
+                if INTELX_BASE != INTELX_BASES[-1]:
+                    setIntelxBase(INTELX_BASES[-1])
+                    attempts += 1
+                    continue
+                intelxAPIIssue = True
+                writerr(
+                    colored(
+                        "IntelX - [ 401 ] Not authorized. The source requires a paid API key. Check your API key is correct.",
+                        "red",
+                    )
                 )
-            )
-            return
-        elif resp.status_code != 200:
-            writerr(
-                colored(
-                    "IntelX - [ " + str(resp.status_code) + " ] Unable to get links from intelx.io",
-                    "red",
+                return
+            elif resp.status_code == 402:
+                # If we were on paid, fall back to free and retry once
+                if INTELX_BASE != INTELX_BASES[-1]:
+                    setIntelxBase(INTELX_BASES[-1])
+                    attempts += 1
+                    continue
+                intelxAPIIssue = True
+                if credits.startswith("0/"):
+                    writerr(
+                        colored(
+                            "IntelX - [ 402 ] You have run out of daily credits on Intelx ("
+                            + credits
+                            + ").",
+                            "red",
+                        )
+                    )
+                else:
+                    writerr(
+                        colored(
+                            "IntelX - [ 402 ] It appears you have run out of daily credits on Intelx.",
+                            "red",
+                        )
+                    )
+                return
+            elif resp.status_code == 403:
+                intelxAPIIssue = True
+                writerr(
+                    colored(
+                        "IntelX - [ 403 ] Permission denied. Check your API key is correct.",
+                        "red",
+                    )
                 )
-            )
-            return
+                return
+            elif resp.status_code != 200:
+                writerr(
+                    colored(
+                        "IntelX - [ " + str(resp.status_code) + " ] Unable to get links from intelx.io",
+                        "red",
+                    )
+                )
+                return
 
         # Get the JSON response
         try:
@@ -4741,15 +4797,11 @@ def processIntelxType(target, credits):
                 moreResults = False
 
             try:
-                selector_values = [
-                    entry["selectorvalue"] for entry in jsonResp.get("selectors", [])
-                ]
+                selector_values = [entry["selectorvalue"] for entry in jsonResp.get("selectors", [])]
             except Exception:
                 selector_values = []
             try:
-                selector_valuesh = [
-                    entry["selectorvalueh"] for entry in jsonResp.get("selectors", [])
-                ]
+                selector_valuesh = [entry["selectorvalueh"] for entry in jsonResp.get("selectors", [])]
             except Exception:
                 selector_valuesh = []
 
@@ -4772,16 +4824,9 @@ def getIntelxAccountInfo() -> str:
     Get the account info and return the number of Credits remainiing from the /phonebook/search
     """
     try:
-        # Choose a random user agent string to use for any requests
-        userAgent = random.choice(USER_AGENT)
-        session = requests.Session()
-        session.mount("https://", HTTP_ADAPTER)
-        session.mount("http://", HTTP_ADAPTER)
-        # Pass the API key in the X-Key header too.
-        resp = session.get(
-            INTELX_ACCOUNT_URL,
-            headers={"User-Agent": userAgent, "X-Key": INTELX_API_KEY},
-        )
+        resp = chooseIntelxBase(INTELX_API_KEY)
+        if resp is None or resp.status_code != 200:
+            return "Unknown"
         jsonResp = json.loads(resp.text.strip())
         credits = str(
             jsonResp.get("paths", {}).get("/phonebook/search", {}).get("Credit", "Unknown")
