@@ -4672,7 +4672,6 @@ def processIntelxType(target, credits):
     try:
         attempts = 0
         resp = None
-
         # Choose a random user agent string to use for any requests and reuse session
         userAgent = random.choice(USER_AGENT)
         session = requests.Session()
