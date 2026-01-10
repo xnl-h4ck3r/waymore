@@ -16,10 +16,10 @@ import random
 import re
 import sys
 import threading
-from typing import Optional, Union
 from datetime import datetime, timedelta
 from pathlib import Path
 from signal import SIGINT, signal
+from typing import Optional
 from urllib.parse import urlparse
 
 import requests
@@ -615,7 +615,7 @@ def showOptions():
             write(
                 colored("Intelligence X API Key:", "magenta")
                 + colored(
-                    " {none} - You require a paid API Key from https://intelx.io/product",
+                    " {none} - You require a Academia or Paid API Key from https://intelx.io/product",
                     "white",
                 )
             )
@@ -4656,7 +4656,10 @@ def processIntelxUrl(url):
 
         # Add link if it passed filters
         if addLink:
-            linksFoundAdd(url, linksFoundIntelx)
+            # Clean the link to remove any █ (\u2588) characters from the link. These can be present in the IntelX results when the Academia plan is used
+            url = url.replace("\u2588", "").strip()
+            if url != "":
+                linksFoundAdd(url, linksFoundIntelx)
 
     except Exception as e:
         writerr(colored("ERROR processIntelxUrl 1: " + str(e), "red"))
@@ -4758,7 +4761,9 @@ def processIntelxType(target, credits):
             else:
                 writerr(
                     colored(
-                        "IntelX - [ " + str(resp.status_code) + " ] Unable to get links from intelx.io",
+                        "IntelX - [ "
+                        + str(resp.status_code)
+                        + " ] Unable to get links from intelx.io",
                         "red",
                     )
                 )
@@ -4816,11 +4821,15 @@ def processIntelxType(target, credits):
                 moreResults = False
 
             try:
-                selector_values = [entry["selectorvalue"] for entry in jsonResp.get("selectors", [])]
+                selector_values = [
+                    entry["selectorvalue"] for entry in jsonResp.get("selectors", [])
+                ]
             except Exception:
                 selector_values = []
             try:
-                selector_valuesh = [entry["selectorvalueh"] for entry in jsonResp.get("selectors", [])]
+                selector_valuesh = [
+                    entry["selectorvalueh"] for entry in jsonResp.get("selectors", [])
+                ]
             except Exception:
                 selector_valuesh = []
 

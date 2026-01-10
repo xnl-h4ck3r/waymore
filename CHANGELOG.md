@@ -1,5 +1,14 @@
 ## Changelog
 
+- v7.5
+
+  - New
+
+    - **IntelX Fallback Mechanism**: Added automatic fallback between paid (`2.intelx.io`) and free (`free.intelx.io`) Intelligence X endpoints. The tool now probes endpoints in order and automatically switches to the free endpoint if the paid one returns 401/402/403 errors, improving reliability for users with different API key types.
+    - Added thread-local storage for IntelX URL configuration to support concurrent operations.
+    - Change the README to note that Intelligence X is now an academia or paid tier only source, not just paid.
+    - Thanks to the [aleister1102](https://github.com/aleister1102) for PR [#78](https://github.com/xnl-h4ck3r/waymore/pull/78) for this improvement.
+
 - v7.4
 
   - BUG FIX: The source specific totals were showing as 0 when running `-mode U` and the error `ERROR processIntelxUrl 1: name 'linksFoundIntelx' is not defined` was shown. This has been fixed.

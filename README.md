@@ -1,11 +1,11 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
-## About - v7.4
+## About - v7.5
 
-The idea behind **waymore** is to find even more links from the Wayback Machine than other existing tools.
+The idea behind **waymore** is to find even more links from the Wayback Machine (plus other sources) than other existing tools.
 
-👉 The biggest difference between **waymore** and other tools is that it can also **download the archived responses** for URLs on wayback machine so that you can then search these for even more links, developer comments, extra parameters, etc. etc.
-👉 Also, other tools do not currenrtly deal with the rate limiting now in place by the sources, and will often just stop with incomplete results and not let you know they are incomplete.
+👉 The biggest difference between **waymore** and other tools is that it can also **download the archived responses** for URLs on wayback machine (and URLScan) so that you can then search these for even more links, developer comments, extra parameters, etc. etc.
+👉 Also, other tools do not currently deal with the rate limiting now in place by the sources, and will often just stop with incomplete results and not let you know they are incomplete.
 
 Anyone who does bug bounty will have likely used the amazing [waybackurls](https://github.com/tomnomnom/waybackurls) by @TomNomNoms. This tool gets URLs from [web.archive.org](https://web.archive.org) and additional links (if any) from one of the index collections on [index.commoncrawl.org](http://index.commoncrawl.org/).
 You would have also likely used the amazing [gau](https://github.com/lc/gau) by @hacker\_ which also finds URL's from wayback archive, Common Crawl, but also from Alien Vault, URLScan, Virus Total and Intelligence X.
@@ -16,7 +16,7 @@ Now **waymore** gets URL's from ALL of those sources too (with ability to filter
 - Alien Vault OTX (otx.alienvault.com)
 - URLScan (urlscan.io)
 - Virus Total (virustotal.com)
-- Intelligence X (intelx.io) - PAID SOURCE ONLY
+- Intelligence X (intelx.io) - ACADEMIA OR PAID TIERS ONLY
 
 👉 It's a point that many seem to miss, so I'll just add it again :) ... The biggest difference between **waymore** and other tools is that it can also **download the archived responses** for URLs on wayback machine so that you can then search these for even more links, developer comments, extra parameters, etc. etc.
 
@@ -154,7 +154,7 @@ The `config.yml` file (typically in `~/.config/waymore/`) have values that can b
 - `TELEGRAM_BOT_TOKEN` - If the `--notify-telegram` argument is passed, `waymore` will use this token to send a notification to Telegram.
 - `TELEGRAM_CHAT_ID` - If the `--notify-telegram` argument is passed, `waymore` will send the notification to this chat ID.
 - `DEFAULT_OUTPUT_DIR` - This is the default location of any output files written if the `-oU` and `-oR` arguments are not used. If the value of this key is blank, then it will default to the location of the `config.yml` file.
-- `INTELX_API_KEY` - You can sign up to [intelx.io here](https://intelx.io/product). It requires a paid API key to do the `/phonebook/search` through their API (as of 2024-09-01, the Phonebook service has been restricted to paid users due to constant abuse by spam accounts).
+- `INTELX_API_KEY` - You can sign up to [intelx.io here](https://intelx.io/product). It requires an academia or paid API key to do the `/phonebook/search` through their API (as of 2024-09-01, the Phonebook service has been restricted to academia or paid users due to constant abuse by spam accounts). You can get a free API key for academic use if you sign up with a valid academic email address.
 
   **NOTE: The MIME types cannot be filtered for Alien Vault OTX, Virus Total and Intelligence X because they don't have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined for a URL. In these cases, URLs will be included regardless of filter or match. Bear this in mind and consider excluding certain providers if this is important.**
 
