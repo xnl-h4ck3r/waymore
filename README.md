@@ -155,6 +155,7 @@ The `config.yml` file (typically in `~/.config/waymore/`) have values that can b
 - `TELEGRAM_CHAT_ID` - If the `--notify-telegram` argument is passed, `waymore` will send the notification to this chat ID.
 - `DEFAULT_OUTPUT_DIR` - This is the default location of any output files written if the `-oU` and `-oR` arguments are not used. If the value of this key is blank, then it will default to the location of the `config.yml` file.
 - `INTELX_API_KEY` - You can sign up to [intelx.io here](https://intelx.io/product). It requires an academia or paid API key to do the `/phonebook/search` through their API (as of 2024-09-01, the Phonebook service has been restricted to academia or paid users due to constant abuse by spam accounts). You can get a free API key for academic use if you sign up with a valid academic email address.
+- `SOURCE_IP` - Optional. Bind outbound HTTP/HTTPS requests to a specific source IP on multi-homed hosts. Can also be set via the `--source-ip/--bind-ip` CLI flag (CLI takes precedence).
 
   **NOTE: The MIME types cannot be filtered for Alien Vault OTX, Virus Total and Intelligence X because they don't have the ability to filter on MIME Type. Sometimes URLScan does not have a MIME Type defined for a URL. In these cases, URLs will be included regardless of filter or match. Bear this in mind and consider excluding certain providers if this is important.**
 

@@ -11,6 +11,7 @@ import json
 import math
 import multiprocessing.dummy as mp
 import os
+import ipaddress
 import pickle
 import random
 import re
@@ -26,6 +27,7 @@ import requests
 import tldextract
 import yaml
 from requests.adapters import HTTPAdapter, Retry
+from urllib3.poolmanager import PoolManager
 from requests.exceptions import ConnectionError
 from requests.utils import quote
 from termcolor import colored
@@ -115,6 +117,7 @@ linksFoundAlienVault = set()
 linksFoundURLScan = set()
 linksFoundVirusTotal = set()
 linksFoundIntelx = set()
+SOURCE_IP = None
 
 # Thread lock for protecting shared state during concurrent operations
 links_lock = threading.Lock()
@@ -211,6 +214,30 @@ USER_AGENT = [
     "Mozilla/5.0 (iPad; CPU OS 7_1_2 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D257 Safari/9537.53",
     "Mozilla/5.0 (iPhone; CPU iPhone OS 8_4_1 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Version/8.0 Mobile/12H321 Safari/600.1.4",
 ]
+
+
+class SourceAddressAdapter(HTTPAdapter):
+    """
+    HTTPAdapter that binds outbound connections to a specific source IP address.
+    """
+
+    def __init__(self, source_ip=None, *args, **kwargs):
+        self.source_ip = source_ip
+        super().__init__(*args, **kwargs)
+
+    def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
+        if self.source_ip:
+            # (ip, 0) lets OS choose the port
+            pool_kwargs["source_address"] = (self.source_ip, 0)
+        self.poolmanager = PoolManager(
+            num_pools=connections, maxsize=maxsize, block=block, **pool_kwargs
+        )
+
+    def proxy_manager_for(self, *args, **kwargs):
+        if self.source_ip:
+            kwargs.setdefault("proxy_kwargs", {})
+            kwargs["proxy_kwargs"]["source_address"] = (self.source_ip, 0)
+        return super().proxy_manager_for(*args, **kwargs)
 
 # The default maximum number of responses to download
 DEFAULT_LIMIT = 5000
@@ -349,9 +376,14 @@ def writerr(text="", pipe=False):
 
 
 def showVersion():
+    global HTTP_ADAPTER
     try:
         try:
-            resp = requests.get(
+            session = requests.Session()
+            if HTTP_ADAPTER is not None:
+                session.mount("https://", HTTP_ADAPTER)
+                session.mount("http://", HTTP_ADAPTER)
+            resp = session.get(
                 "https://raw.githubusercontent.com/xnl-h4ck3r/waymore/main/waymore/__init__.py",
                 timeout=3,
             )
@@ -487,7 +519,7 @@ def showOptions():
     """
     Show the chosen options and config settings
     """
-    global inputIsDomainANDPath, argsInput, isInputFile, INTELX_API_KEY
+    global inputIsDomainANDPath, argsInput, isInputFile, INTELX_API_KEY, SOURCE_IP
 
     try:
         write(colored("Selected config and settings:", "cyan"))
@@ -921,6 +953,17 @@ def showOptions():
                 )
             )
 
+        if SOURCE_IP:
+            write(
+                colored("--source-ip: " + str(SOURCE_IP), "magenta")
+                + colored(" Outbound requests will bind to this IP.", "white")
+            )
+        else:
+            write(
+                colored("--source-ip: default", "magenta")
+                + colored(" Outbound IP determined by OS routing table.", "white")
+            )
+
         write()
 
     except Exception as e:
@@ -931,7 +974,7 @@ def getConfig():
     """
     Try to get the values from the config file, otherwise use the defaults
     """
-    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, DEFAULT_OUTPUT_DIR, MATCH_MIME, INTELX_API_KEY
+    global FILTER_CODE, FILTER_MIME, FILTER_URL, FILTER_KEYWORDS, URLSCAN_API_KEY, VIRUSTOTAL_API_KEY, CONTINUE_RESPONSES_IF_PIPED, subs, path, waymorePath, inputIsDomainANDPath, HTTP_ADAPTER, HTTP_ADAPTER_CC, argsInput, terminalWidth, MATCH_CODE, WEBHOOK_DISCORD, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, DEFAULT_OUTPUT_DIR, MATCH_MIME, INTELX_API_KEY, SOURCE_IP
     try:
 
         # Set terminal width
@@ -958,32 +1001,6 @@ def getConfig():
         # Also, if a path is passed, the subs will not be used
         if args.no_subs or inputIsDomainANDPath:
             subs = ""
-
-        # Set up an HTTPAdaptor for retry strategy when making requests
-        try:
-            retry = Retry(
-                total=args.retries,
-                backoff_factor=1.1,
-                status_forcelist=[429, 500, 502, 503, 504],
-                raise_on_status=False,
-                respect_retry_after_header=False,
-            )
-            HTTP_ADAPTER = HTTPAdapter(max_retries=retry)
-        except Exception as e:
-            writerr(colored("ERROR getConfig 2: " + str(e), "red"))
-
-        # Set up an HTTPAdaptor for retry strategy for Common Crawl when making requests
-        try:
-            retry = Retry(
-                total=args.retries + 3,
-                backoff_factor=1.1,
-                status_forcelist=[503],
-                raise_on_status=False,
-                respect_retry_after_header=False,
-            )
-            HTTP_ADAPTER_CC = HTTPAdapter(max_retries=retry)
-        except Exception as e:
-            writerr(colored("ERROR getConfig 3: " + str(e), "red"))
 
         # Try to get the config file values
         useDefaults = False
@@ -1137,6 +1154,28 @@ def getConfig():
                     INTELX_API_KEY = ""
             except Exception:
                 INTELX_API_KEY = ""
+
+            try:
+                if args.source_ip:
+                    SOURCE_IP = args.source_ip
+                else:
+                    cfg_source_ip = config.get("SOURCE_IP")
+                    if str(cfg_source_ip) in ("None", "", "null"):
+                        SOURCE_IP = None
+                    else:
+                        try:
+                            ipaddress.ip_address(cfg_source_ip)
+                            SOURCE_IP = str(cfg_source_ip)
+                        except ValueError:
+                            writerr(
+                                colored(
+                                    'Invalid "SOURCE_IP" value in config.yml - ignoring and using default routing',
+                                    "yellow",
+                                )
+                            )
+                            SOURCE_IP = None
+            except Exception:
+                SOURCE_IP = args.source_ip
 
             try:
                 FILTER_KEYWORDS = config.get("FILTER_KEYWORDS")
@@ -1337,6 +1376,38 @@ def getConfig():
             TELEGRAM_BOT_TOKEN = ""
             TELEGRAM_CHAT_ID = ""
             DEFAULT_OUTPUT_DIR = os.path.expanduser("~/.config/waymore")
+            SOURCE_IP = args.source_ip
+
+        # Build HTTP adapters (after SOURCE_IP is resolved)
+        try:
+            retry = Retry(
+                total=args.retries,
+                backoff_factor=1.1,
+                status_forcelist=[429, 500, 502, 503, 504],
+                raise_on_status=False,
+                respect_retry_after_header=False,
+            )
+            if SOURCE_IP:
+                HTTP_ADAPTER = SourceAddressAdapter(source_ip=SOURCE_IP, max_retries=retry)
+            else:
+                HTTP_ADAPTER = HTTPAdapter(max_retries=retry)
+        except Exception as e:
+            writerr(colored("ERROR getConfig 2: " + str(e), "red"))
+
+        try:
+            retry_cc = Retry(
+                total=args.retries + 3,
+                backoff_factor=1.1,
+                status_forcelist=[503],
+                raise_on_status=False,
+                respect_retry_after_header=False,
+            )
+            if SOURCE_IP:
+                HTTP_ADAPTER_CC = SourceAddressAdapter(source_ip=SOURCE_IP, max_retries=retry_cc)
+            else:
+                HTTP_ADAPTER_CC = HTTPAdapter(max_retries=retry_cc)
+        except Exception as e:
+            writerr(colored("ERROR getConfig 3: " + str(e), "red"))
 
     except Exception as e:
         writerr(colored("ERROR getConfig 1: " + str(e), "red"))
@@ -2288,6 +2359,18 @@ def validateArgProviders(x):
     return x
 
 
+def validateArgIPAddress(x):
+    """
+    Validate the --source-ip argument
+    Accepts IPv4 or IPv6 addresses.
+    """
+    try:
+        ipaddress.ip_address(x)
+    except ValueError:
+        raise argparse.ArgumentTypeError("Please provide a valid IPv4 or IPv6 address")
+    return x
+
+
 def parseDateArg(dateArg):
     """
     Parse a date argument from the command line into a datetime object
@@ -3149,7 +3232,10 @@ def getURLScanUrls():
                         )
                     # Set key to blank for further requests
                     URLSCAN_API_KEY = ""
-                    resp = requests.get(url, headers={"User-Agent": userAgent})
+                    session_no_key = requests.Session()
+                    session_no_key.mount("https://", HTTP_ADAPTER)
+                    session_no_key.mount("http://", HTTP_ADAPTER)
+                    resp = session_no_key.get(url, headers={"User-Agent": userAgent})
                 except Exception as e:
                     writerr(
                         colored(
@@ -6402,6 +6488,14 @@ def main():
         type=int,
         help="The number of retries for requests that get connection error or rate limited (default: 1).",
         default=1,
+    )
+    parser.add_argument(
+        "--source-ip",
+        "--bind-ip",
+        dest="source_ip",
+        action="store",
+        help="Bind outbound HTTP/HTTPS requests to this source IP (useful on multi-homed hosts).",
+        type=validateArgIPAddress,
     )
     parser.add_argument(
         "-m",
