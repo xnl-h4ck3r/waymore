@@ -165,8 +165,9 @@ def chooseIntelxBase(api_key: str) -> Optional[requests.Response]:
     initIntelxTls()
     try:
         session = requests.Session()
-        session.mount("https://", HTTP_ADAPTER)
-        session.mount("http://", HTTP_ADAPTER)
+        if HTTP_ADAPTER is not None:
+            session.mount("https://", HTTP_ADAPTER)
+            session.mount("http://", HTTP_ADAPTER)
         last_resp = None
         for base in INTELX_BASES:
             userAgent = random.choice(USER_AGENT)
@@ -5969,7 +5970,11 @@ def notifyDiscord():
             "username": "waymore",
         }
         try:
-            result = requests.post(WEBHOOK_DISCORD, json=data)
+            session = requests.Session()
+            if HTTP_ADAPTER is not None:
+                session.mount("https://", HTTP_ADAPTER)
+                session.mount("http://", HTTP_ADAPTER)
+            result = session.post(WEBHOOK_DISCORD, json=data)
             if 300 <= result.status_code < 200:
                 writerr(
                     colored(
@@ -5999,7 +6004,11 @@ def notifyTelegram():
             "text": "waymore has finished for `-i " + args.input + " -mode " + args.mode + "` ! 🤘",
         }
         try:
-            result = requests.post(url, json=data)
+            session = requests.Session()
+            if HTTP_ADAPTER is not None:
+                session.mount("https://", HTTP_ADAPTER)
+                session.mount("http://", HTTP_ADAPTER)
+            result = session.post(url, json=data)
             if 300 <= result.status_code < 200:
                 writerr(
                     colored(

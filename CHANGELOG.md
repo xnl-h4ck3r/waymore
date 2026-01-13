@@ -1,5 +1,16 @@
 ## Changelog
 
+- v7.6
+
+  - New
+  
+    - **Source IP Binding**: Added `--source-ip` / `--bind-ip` CLI argument and `SOURCE_IP` config option to bind outbound HTTP/HTTPS requests to a specific source IP address. Useful for multi-homed hosts where you need to use a specific whitelisted IP. Thanks to [fbettag](https://github.com/fbettag) for PR [#79](https://github.com/xnl-h4ck3r/waymore/pull/79).
+  
+  - Changed
+
+    - Fixed `notifyDiscord()` and `notifyTelegram()` functions to use the HTTP adapter for source IP binding consistency.
+    - Added null checks for `HTTP_ADAPTER` in `chooseIntelxBase()` and webhook functions for robustness.
+
 - v7.5
 
   - New
