@@ -7,11 +7,11 @@
 import argparse
 import asyncio
 import enum
+import ipaddress
 import json
 import math
 import multiprocessing.dummy as mp
 import os
-import ipaddress
 import pickle
 import random
 import re
@@ -27,10 +27,10 @@ import requests
 import tldextract
 import yaml
 from requests.adapters import HTTPAdapter, Retry
-from urllib3.poolmanager import PoolManager
 from requests.exceptions import ConnectionError
 from requests.utils import quote
 from termcolor import colored
+from urllib3.poolmanager import PoolManager
 
 try:
     from . import __version__
@@ -117,7 +117,6 @@ linksFoundAlienVault = set()
 linksFoundURLScan = set()
 linksFoundVirusTotal = set()
 linksFoundIntelx = set()
-SOURCE_IP = None
 
 # Thread lock for protecting shared state during concurrent operations
 links_lock = threading.Lock()
@@ -240,6 +239,7 @@ class SourceAddressAdapter(HTTPAdapter):
             kwargs["proxy_kwargs"]["source_address"] = (self.source_ip, 0)
         return super().proxy_manager_for(*args, **kwargs)
 
+
 # The default maximum number of responses to download
 DEFAULT_LIMIT = 5000
 
@@ -275,6 +275,7 @@ TELEGRAM_BOT_TOKEN = ""
 TELEGRAM_CHAT_ID = ""
 DEFAULT_OUTPUT_DIR = ""
 INTELX_API_KEY = ""
+SOURCE_IP = None
 
 API_KEY_SECRET = "aHR0cHM6Ly95b3V0dS5iZS9kUXc0dzlXZ1hjUQ=="
 
@@ -6499,6 +6500,7 @@ def main():
         default=1,
     )
     parser.add_argument(
+        "-sip",
         "--source-ip",
         "--bind-ip",
         dest="source_ip",
