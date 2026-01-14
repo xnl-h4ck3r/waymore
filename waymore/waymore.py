@@ -218,7 +218,7 @@ USER_AGENT = [
 
 class SourceAddressAdapter(HTTPAdapter):
     """
-    HTTPAdapter that binds outbound connections to a specific source IP address.
+    HTTPAdapter that binds outbound connections to a specific source IP address
     """
 
     def __init__(self, source_ip=None, *args, **kwargs):
