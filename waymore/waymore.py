@@ -247,10 +247,10 @@ DEFAULT_LIMIT = 5000
 DEFAULT_TIMEOUT = 30
 
 # Exclusions used to exclude responses we will try to get from web.archive.org
-DEFAULT_FILTER_URL = ".css,.jpg,.jpeg,.png,.svg,.img,.gif,.mp4,.flv,.ogv,.webm,.webp,.mov,.mp3,.m4a,.m4p,.scss,.tif,.tiff,.ttf,.otf,.woff,.woff2,.bmp,.ico,.eot,.htc,.rtf,.swf,.image,/image,/img,/css,/wp-json,/wp-content,/wp-includes,/theme,/audio,/captcha,/font,node_modules,/jquery,/bootstrap,/_incapsula_resource"
+DEFAULT_FILTER_URL = ".css,.jpg,.jpeg,.png,.svg,.img,.gif,.mp4,.flv,.ogv,.webm,.webp,.mov,.mp3,.m4a,.m4p,.scss,.tif,.tiff,.ttf,.otf,.woff,.woff2,.bmp,.ico,.eot,.htc,.rtf,.swf,.image,/image,/img,/css,/wp-json,/wp-content,/wp-includes,/theme,/audio,/captcha,/font,node_modules,/jquery,/bootstrap,/_incapsula_resource,.wmv,.wma,.asx"
 
 # MIME Content-Type exclusions used to filter links and responses from web.archive.org through their API
-DEFAULT_FILTER_MIME = "text/css,image/jpeg,image/jpg,image/png,image/svg+xml,image/gif,image/tiff,image/webp,image/bmp,image/vnd,image/x-icon,image/vnd.microsoft.icon,font/ttf,font/woff,font/woff2,font/x-woff2,font/x-woff,font/otf,audio/mpeg,audio/wav,audio/webm,audio/aac,audio/ogg,audio/wav,audio/webm,video/mp4,video/mpeg,video/webm,video/ogg,video/mp2t,video/webm,video/x-msvideo,video/x-flv,application/font-woff,application/font-woff2,application/x-font-woff,application/x-font-woff2,application/vnd.ms-fontobject,application/font-sfnt,application/vnd.android.package-archive,binary/octet-stream,application/octet-stream,application/pdf,application/x-font-ttf,application/x-font-otf,video/webm,video/3gpp,application/font-ttf,audio/mp3,audio/x-wav,image/pjpeg,audio/basic,application/font-otf,application/x-ms-application,application/x-msdownload,video/x-ms-wmv,image/x-png,video/quicktime,image/x-ms-bmp,font/opentype,application/x-font-opentype,application/x-woff,audio/aiff"
+DEFAULT_FILTER_MIME = "text/css,image/jpeg,image/jpg,image/png,image/svg+xml,image/gif,image/tiff,image/webp,image/bmp,image/vnd,image/x-icon,image/vnd.microsoft.icon,font/ttf,font/woff,font/woff2,font/x-woff2,font/x-woff,font/otf,audio/mpeg,audio/wav,audio/webm,audio/aac,audio/ogg,audio/wav,audio/webm,video/mp4,video/mpeg,video/webm,video/ogg,video/mp2t,video/webm,video/x-msvideo,video/x-flv,application/font-woff,application/font-woff2,application/x-font-woff,application/x-font-woff2,application/vnd.ms-fontobject,application/font-sfnt,application/vnd.android.package-archive,binary/octet-stream,application/octet-stream,application/pdf,application/x-font-ttf,application/x-font-otf,video/webm,video/3gpp,application/font-ttf,audio/mp3,audio/x-wav,image/pjpeg,audio/basic,application/font-otf,application/x-ms-application,application/x-msdownload,video/x-ms-wmv,image/x-png,video/quicktime,image/x-ms-bmp,font/opentype,application/x-font-opentype,application/x-woff,audio/aiff,video/x-ms-asf,audio/x-ms-wma,audio/wma,application/x-mplayer2"
 
 # Response code exclusions we will use to filter links and responses from web.archive.org through their API
 DEFAULT_FILTER_CODE = "404,301,302"
@@ -296,6 +296,298 @@ INLINE_JS_EXCLUDE = [
     ".rar",
     ".json",
 ]
+
+# Binary file extensions that should be saved as raw bytes, not text
+BINARY_EXTENSIONS = frozenset(
+    [
+        ".zip",
+        ".gz",
+        ".gzip",
+        ".tar",
+        ".rar",
+        ".7z",
+        ".bz2",
+        ".xz",
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".ppt",
+        ".pptx",
+        ".exe",
+        ".msi",
+        ".dll",
+        ".bin",
+        ".so",
+        ".dmg",
+        ".deb",
+        ".rpm",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".bmp",
+        ".ico",
+        ".webp",
+        ".svg",
+        ".tiff",
+        ".tif",
+        ".mp3",
+        ".mp4",
+        ".wav",
+        ".avi",
+        ".mov",
+        ".mkv",
+        ".flv",
+        ".wmv",
+        ".webm",
+        ".ogg",
+        ".ttf",
+        ".otf",
+        ".woff",
+        ".woff2",
+        ".eot",
+        ".class",
+        ".jar",
+        ".war",
+        ".ear",
+        ".pyc",
+        ".pyo",
+        ".o",
+        ".a",
+        ".lib",
+        ".iso",
+        ".img",
+        ".sqlite",
+        ".db",
+        ".mdb",
+        ".swf",
+        ".fla",
+    ]
+)
+
+# Binary MIME types that should be saved as raw bytes, not text
+BINARY_MIME_TYPES = frozenset(
+    [
+        "application/zip",
+        "application/x-zip-compressed",
+        "application/x-gzip",
+        "application/gzip",
+        "application/x-tar",
+        "application/x-rar-compressed",
+        "application/x-7z-compressed",
+        "application/x-bzip2",
+        "application/x-xz",
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/x-msdownload",
+        "application/x-msi",
+        "application/x-dosexec",
+        "application/octet-stream",
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/bmp",
+        "image/x-icon",
+        "image/webp",
+        "image/tiff",
+        "audio/mpeg",
+        "audio/wav",
+        "audio/ogg",
+        "audio/webm",
+        "video/mp4",
+        "video/avi",
+        "video/quicktime",
+        "video/x-msvideo",
+        "video/x-matroska",
+        "video/webm",
+        "video/ogg",
+        "font/ttf",
+        "font/otf",
+        "font/woff",
+        "font/woff2",
+        "application/x-font-ttf",
+        "application/x-font-otf",
+        "application/font-woff",
+        "application/font-woff2",
+        "application/java-archive",
+        "application/x-java-class",
+        "application/x-shockwave-flash",
+        "application/x-sqlite3",
+        "application/x-iso9660-image",
+    ]
+)
+
+
+def isBinaryContent(contentBytes, contentType, url=""):
+    """
+    Determine if content should be treated as binary based on actual content, Content-Type, and URL.
+
+    Priority (highest to lowest):
+    1. Content inspection - check for text signatures (most reliable)
+    2. Content-Type header
+    3. URL extension (least reliable - archive might have captured an HTML error page)
+
+    Args:
+        contentBytes: The raw response bytes (at least first 100 bytes)
+        contentType: The Content-Type header value
+        url: The URL (optional, used as fallback)
+
+    Returns True if content is binary and should be saved as raw bytes.
+    """
+    # STEP 1: Check actual content for text signatures (most reliable)
+    # If content starts with text markers, it's definitely NOT binary regardless of extension
+    try:
+        if contentBytes and len(contentBytes) > 0:
+            # Get first 100 bytes and strip leading whitespace/newlines for checking
+            preview = contentBytes[:100].lstrip()
+            previewLower = preview.lower()
+
+            # Common text file signatures
+            textSignatures = [
+                b"<!doctype",  # HTML doctype
+                b"<html",  # HTML tag
+                b"<head",  # HTML head
+                b"<body",  # HTML body
+                b"<?xml",  # XML declaration
+                b"<svg",  # SVG image (actually XML text)
+                b"{",  # JSON object
+                b"[",  # JSON array
+                b"/*",  # CSS/JS comment
+                b"//",  # JS comment
+                b"#!",  # Shebang (shell scripts)
+                b"var ",  # JavaScript
+                b"let ",  # JavaScript
+                b"const ",  # JavaScript
+                b"function",  # JavaScript
+                b"import ",  # JavaScript/Python
+                b"export ",  # JavaScript
+                b"class ",  # Various languages
+                b"def ",  # Python
+            ]
+
+            for sig in textSignatures:
+                if previewLower.startswith(sig):
+                    return False  # Definitely text, not binary
+
+            # Check for binary file magic bytes (file signatures)
+            binarySignatures = [
+                b"%PDF",  # PDF
+                b"PK\x03\x04",  # ZIP, DOCX, XLSX, etc.
+                b"PK\x05\x06",  # Empty ZIP
+                b"\x1f\x8b",  # GZIP
+                b"\x89PNG",  # PNG
+                b"\xff\xd8\xff",  # JPEG
+                b"GIF87a",  # GIF
+                b"GIF89a",  # GIF
+                b"BM",  # BMP (check at start)
+                b"RIFF",  # WAV, AVI, WebP
+                b"\x00\x00\x00",  # Various binary formats (MP4, etc.)
+                b"ID3",  # MP3 with ID3 tag
+                b"\xff\xfb",  # MP3
+                b"\xff\xfa",  # MP3
+                b"OggS",  # OGG
+                b"\x4d\x5a",  # EXE/DLL (MZ header)
+                b"\x7fELF",  # Linux ELF binary
+                b"\xca\xfe\xba\xbe",  # Java class file
+                b"\x30\x26\xb2\x75",  # ASF/WMV/WMA (first 4 bytes of ASF GUID)
+                b"FLV\x01",  # FLV (Flash Video)
+                b"ftyp",  # MP4/M4A/MOV (after 4 byte size prefix)
+                b"Rar!\x1a\x07",  # RAR archive
+                b"7z\xbc\xaf\x27\x1c",  # 7-Zip archive
+                b"\x1a\x45\xdf\xa3",  # WebM/MKV (EBML)
+                b"II\x2a\x00",  # TIFF (Intel byte order)
+                b"MM\x00\x2a",  # TIFF (Motorola byte order)
+                b"\x00\x00\x01\x00",  # ICO (Windows Icon)
+                b"\x00\x00\x02\x00",  # CUR (Windows Cursor)
+                b"wOFF",  # WOFF font
+                b"wOF2",  # WOFF2 font
+                b"FWS",  # SWF (uncompressed Flash)
+                b"CWS",  # SWF (zlib compressed Flash)
+                b"ZWS",  # SWF (LZMA compressed Flash)
+                b"\x00\x01\x00\x00",  # TrueType font
+                b"OTTO",  # OpenType font with CFF
+            ]
+
+            for sig in binarySignatures:
+                if preview.startswith(sig):
+                    return True  # Definitely binary
+    except Exception:
+        pass
+
+    # STEP 2: Check Content-Type header
+    try:
+        if contentType:
+            mimeType = contentType.lower().split(";")[0].strip()
+
+            # Explicit text types
+            textMimeTypes = [
+                "text/html",
+                "text/plain",
+                "text/css",
+                "text/javascript",
+                "text/xml",
+                "text/csv",
+                "text/markdown",
+                "application/json",
+                "application/javascript",
+                "application/xml",
+                "application/xhtml+xml",
+                "application/rss+xml",
+                "application/atom+xml",
+            ]
+            if mimeType in textMimeTypes or mimeType.startswith("text/"):
+                return False  # Text type
+
+            # Known binary types
+            if mimeType in BINARY_MIME_TYPES:
+                return True
+
+            # Generic binary prefixes
+            if (
+                mimeType.startswith("image/")
+                or mimeType.startswith("audio/")
+                or mimeType.startswith("video/")
+            ):
+                return True
+            if mimeType.startswith("application/") and mimeType not in textMimeTypes:
+                # application/* is often binary, but not always - be conservative
+                if "octet-stream" in mimeType or "binary" in mimeType:
+                    return True
+    except Exception:
+        pass
+
+    # STEP 3: Check URL extension as last resort
+    try:
+        if url:
+            # Extract actual URL from prefixed formats (Wayback/URLScan)
+            actualUrl = url
+            httpPos = url.find("http://")
+            httpsPos = url.find("https://")
+            if httpsPos >= 0:
+                actualUrl = url[httpsPos:]
+            elif httpPos >= 0:
+                actualUrl = url[httpPos:]
+
+            parsed = urlparse(actualUrl.strip())
+            path = parsed.path.lower()
+            if "." in path:
+                ext = "." + path.rsplit(".", 1)[-1]
+                if "?" in ext:
+                    ext = ext.split("?")[0]
+                if ext in BINARY_EXTENSIONS:
+                    return True
+    except Exception:
+        pass
+
+    # Default: treat as text (safer - text processing won't corrupt text)
+    return False
 
 
 # Get memory usage for
@@ -955,15 +1247,11 @@ def showOptions():
                 )
             )
 
+        # Only show --source-ip if it's explicitly configured
         if SOURCE_IP:
             write(
                 colored("--source-ip: " + str(SOURCE_IP), "magenta")
                 + colored(" Outbound requests will bind to this IP.", "white")
-            )
-        else:
-            write(
-                colored("--source-ip: default", "magenta")
-                + colored(" Outbound IP determined by OS routing table.", "white")
             )
 
         write()
@@ -1497,6 +1785,63 @@ def fixArchiveOrgUrl(url):
     return url
 
 
+def isLikelyBinaryUrl(url):
+    """
+    Check if a URL likely points to a binary file based on its extension.
+    This is used BEFORE making a request to decide if we need the raw/id_ version.
+    """
+    try:
+        # Extract actual URL from prefixed formats (Wayback timestamp/URLScan UUID)
+        actualUrl = url
+        httpPos = url.find("http://")
+        httpsPos = url.find("https://")
+        if httpsPos >= 0:
+            actualUrl = url[httpsPos:]
+        elif httpPos >= 0:
+            actualUrl = url[httpPos:]
+
+        parsed = urlparse(actualUrl.strip())
+        path = parsed.path.lower()
+        if "." in path:
+            ext = "." + path.rsplit(".", 1)[-1]
+            if "?" in ext:
+                ext = ext.split("?")[0]
+            if ext in BINARY_EXTENSIONS:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def addRawModifier(archiveUrl):
+    """
+    Add 'id_' modifier to Wayback Machine URL to get raw/original content.
+    This is essential for binary files to avoid Wayback modifications.
+
+    Example:
+      Input:  https://web.archive.org/web/20090315210455/http://example.com/file.wmv
+      Output: https://web.archive.org/web/20090315210455id_/http://example.com/file.wmv
+    """
+    try:
+        # Find the timestamp in the URL (14 digits after /web/)
+        webPos = archiveUrl.find("/web/")
+        if webPos >= 0:
+            # Find where the timestamp ends (first / after /web/)
+            afterWeb = webPos + 5  # Position after "/web/"
+            slashAfterTimestamp = archiveUrl.find("/", afterWeb)
+            if slashAfterTimestamp > afterWeb:
+                # Insert id_ before the slash after timestamp
+                timestamp = archiveUrl[afterWeb:slashAfterTimestamp]
+                # Only add id_ if it's not already there
+                if not timestamp.endswith("id_"):
+                    return (
+                        archiveUrl[:slashAfterTimestamp] + "id_" + archiveUrl[slashAfterTimestamp:]
+                    )
+    except Exception:
+        pass
+    return archiveUrl
+
+
 # Add a link to the linksFound collection for archived responses (included timestamp preifx)
 def linksFoundResponseAdd(link):
     global linksFound, argsInput, argsInputHostname, links_lock
@@ -1581,6 +1926,12 @@ def processArchiveUrl(url):
         if stopProgram is None:
 
             archiveUrl = "https://web.archive.org/web/" + fixArchiveOrgUrl(url)
+
+            # For binary files, add id_ modifier to get raw/original content
+            # This prevents Wayback Machine from modifying the content
+            if isLikelyBinaryUrl(url):
+                archiveUrl = addRawModifier(archiveUrl)
+
             hashValue = ""
 
             # Get memory usage every 100 responses
@@ -1593,6 +1944,18 @@ def processArchiveUrl(url):
             # Make a request to the web archive
             try:
                 try:
+                    try:
+                        if os.environ.get("USER") == "xnl":
+                            writerr(
+                                colored(
+                                    "[ DBG ] Requesting file " + archiveUrl,
+                                    "yellow",
+                                    attrs=["dark"],
+                                )
+                            )
+                    except Exception:
+                        pass
+
                     # Choose a random user agent string to use for any requests
                     userAgent = random.choice(USER_AGENT)
 
@@ -1604,146 +1967,175 @@ def processArchiveUrl(url):
                         headers={"User-Agent": userAgent},
                         allow_redirects=True,
                     )
-                    archiveHtml = str(resp.text)
+
+                    # Get raw content bytes first
+                    contentBytes = resp.content
+
                     try:
-                        contentType = resp.headers.get("Content-Type").split(";")[0].lower()
+                        contentType = resp.headers.get("Content-Type", "").split(";")[0].lower()
                     except Exception:
                         contentType = ""
 
-                    # Only create a file if there is a response
-                    if len(archiveHtml) != 0:
+                    # Determine if this is binary content based on actual content, Content-Type, and URL
+                    isBinary = isBinaryContent(contentBytes, contentType, url)
 
+                    if isBinary:
+                        # For binary files, use raw bytes as-is
+                        archiveContent = contentBytes
+                        archiveHtml = None  # Not used for binary files
+                    else:
+                        # For text files, decode to string
+                        archiveHtml = contentBytes.decode("utf-8", errors="replace")
+                        archiveContent = None  # Not used for text files
+
+                    # Only create a file if there is a response
+                    responseLength = len(archiveContent) if isBinary else len(archiveHtml)
+                    if responseLength != 0:
+
+                        # For text files, check for custom 404 pages
                         # If the FILTER_CODE doesn't include 404, OR
                         # If the FILTER_CODE includes 404, and it doesn't seem to be a custom 404 page
-                        if "404" not in FILTER_CODE or (
-                            "404" in FILTER_CODE
-                            and not re.findall(REGEX_404, archiveHtml, re.DOTALL | re.IGNORECASE)
+                        if (
+                            isBinary
+                            or "404" not in FILTER_CODE
+                            or (
+                                "404" in FILTER_CODE
+                                and not re.findall(
+                                    REGEX_404, archiveHtml, re.DOTALL | re.IGNORECASE
+                                )
+                            )
                         ):
 
-                            # Add the URL as a comment at the start of the response
-                            if args.url_filename:
-                                archiveHtml = (
-                                    "/* Original URL: " + archiveUrl + " */\n" + archiveHtml
+                            # For text files only: Add URL comment and clean up wayback references
+                            if not isBinary:
+                                # Add the URL as a comment at the start of the response
+                                if args.url_filename:
+                                    archiveHtml = (
+                                        "/* Original URL: " + archiveUrl + " */\n" + archiveHtml
+                                    )
+
+                                # Remove all web archive references in the response
+                                archiveHtml = re.sub(
+                                    r'\<script type=\"text\/javascript" src=\"\/_static\/js\/bundle-playback\.js\?v=[A-Za-z0-9]*" charset="utf-8"\><\/script>\n<script type="text\/javascript" src="\/_static\/js\/wombat\.js.*\<\!-- End Wayback Rewrite JS Include --\>',
+                                    "",
+                                    archiveHtml,
+                                    1,
+                                    flags=re.DOTALL | re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"\<script src=\"\/\/archive\.org.*\<\!-- End Wayback Rewrite JS Include --\>",
+                                    "",
+                                    archiveHtml,
+                                    1,
+                                    flags=re.DOTALL | re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"\<script\>window\.RufflePlayer[^\<]*\<\/script\>",
+                                    "",
+                                    archiveHtml,
+                                    1,
+                                    flags=re.DOTALL | re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"\<\!-- BEGIN WAYBACK TOOLBAR INSERT --\>.*\<\!-- END WAYBACK TOOLBAR INSERT --\>",
+                                    "",
+                                    archiveHtml,
+                                    1,
+                                    flags=re.DOTALL | re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"(}\n)?(\/\*|<\!--\n)\s*FILE ARCHIVED ON.*108\(a\)\(3\)\)\.\n(\*\/|--\>)",
+                                    "",
+                                    archiveHtml,
+                                    1,
+                                    flags=re.DOTALL | re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"var\s_____WB\$wombat\$assign\$function.*WB\$wombat\$assign\$function_____\(\"opener\"\);",
+                                    "",
+                                    archiveHtml,
+                                    1,
+                                    flags=re.DOTALL | re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"(\<\!--|\/\*)\nplayback timings.*(--\>|\*\/)",
+                                    "",
+                                    archiveHtml,
+                                    1,
+                                    flags=re.DOTALL | re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"((https:)?\/\/web\.archive\.org)?\/web\/[0-9]{14}([A-Za-z]{2}\_)?\/",
+                                    "",
+                                    archiveHtml,
+                                    flags=re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"((https:)?\\\/\\\/web\.archive\.org)?\\\/web\\\/[0-9]{14}([A-Za-z]{2}\_)?\\\/",
+                                    "",
+                                    archiveHtml,
+                                    flags=re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"((https:)?%2F%2Fweb\.archive\.org)?%2Fweb%2F[0-9]{14}([A-Za-z]{2}\_)?%2F",
+                                    "",
+                                    archiveHtml,
+                                    flags=re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"((https:)?\\u002F\\u002Fweb\.archive\.org)?\\u002Fweb\\u002F[0-9]{14}([A-Za-z]{2}\_)?\\u002F",
+                                    "",
+                                    archiveHtml,
+                                    flags=re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"\<script type=\"text\/javascript\"\>\s*__wm\.init\(\"https:\/\/web\.archive\.org\/web\"\);[^\<]*\<\/script\>",
+                                    "",
+                                    archiveHtml,
+                                    flags=re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r'\<script type=\"text\/javascript\" src="https:\/\/web-static\.archive\.org[^\<]*\<\/script\>',
+                                    "",
+                                    archiveHtml,
+                                    flags=re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"\<link rel=\"stylesheet\" type=\"text\/css\" href=\"https:\/\/web-static\.archive\.org[^\<]*\/\>",
+                                    "",
+                                    archiveHtml,
+                                    flags=re.IGNORECASE,
+                                )
+                                archiveHtml = re.sub(
+                                    r"\<\!-- End Wayback Rewrite JS Include --\>",
+                                    "",
+                                    archiveHtml,
+                                    re.IGNORECASE,
                                 )
 
-                            # Remove all web archive references in the response
-                            archiveHtml = re.sub(
-                                r'\<script type=\"text\/javascript" src=\"\/_static\/js\/bundle-playback\.js\?v=[A-Za-z0-9]*" charset="utf-8"><\/script>\n<script type="text\/javascript" src="\/_static\/js\/wombat\.js.*\<\!-- End Wayback Rewrite JS Include --\>',
-                                "",
-                                archiveHtml,
-                                1,
-                                flags=re.DOTALL | re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"\<script src=\"\/\/archive\.org.*\<\!-- End Wayback Rewrite JS Include --\>",
-                                "",
-                                archiveHtml,
-                                1,
-                                flags=re.DOTALL | re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"\<script\>window\.RufflePlayer[^\<]*\<\/script\>",
-                                "",
-                                archiveHtml,
-                                1,
-                                flags=re.DOTALL | re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"\<\!-- BEGIN WAYBACK TOOLBAR INSERT --\>.*\<\!-- END WAYBACK TOOLBAR INSERT --\>",
-                                "",
-                                archiveHtml,
-                                1,
-                                flags=re.DOTALL | re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"(}\n)?(\/\*|<!--\n)\s*FILE ARCHIVED ON.*108\(a\)\(3\)\)\.\n(\*\/|-->)",
-                                "",
-                                archiveHtml,
-                                1,
-                                flags=re.DOTALL | re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"var\s_____WB\$wombat\$assign\$function.*WB\$wombat\$assign\$function_____\(\"opener\"\);",
-                                "",
-                                archiveHtml,
-                                1,
-                                flags=re.DOTALL | re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"(\<\!--|\/\*)\nplayback timings.*(--\>|\*\/)",
-                                "",
-                                archiveHtml,
-                                1,
-                                flags=re.DOTALL | re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"((https:)?\/\/web\.archive\.org)?\/web\/[0-9]{14}([A-Za-z]{2}\_)?\/",
-                                "",
-                                archiveHtml,
-                                flags=re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"((https:)?\\\/\\\/web\.archive\.org)?\\\/web\\\/[0-9]{14}([A-Za-z]{2}\_)?\\\/",
-                                "",
-                                archiveHtml,
-                                flags=re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"((https:)?%2F%2Fweb\.archive\.org)?%2Fweb%2F[0-9]{14}([A-Za-z]{2}\_)?%2F",
-                                "",
-                                archiveHtml,
-                                flags=re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"((https:)?\\u002F\\u002Fweb\.archive\.org)?\\u002Fweb\\u002F[0-9]{14}([A-Za-z]{2}\_)?\\u002F",
-                                "",
-                                archiveHtml,
-                                flags=re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"\<script type=\"text\/javascript\">\s*__wm\.init\(\"https:\/\/web\.archive\.org\/web\"\);[^\<]*\<\/script\>",
-                                "",
-                                archiveHtml,
-                                flags=re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r'\<script type=\"text\/javascript\" src="https:\/\/web-static\.archive\.org[^\<]*\<\/script\>',
-                                "",
-                                archiveHtml,
-                                flags=re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"\<link rel=\"stylesheet\" type=\"text\/css\" href=\"https:\/\/web-static\.archive\.org[^\<]*\/\>",
-                                "",
-                                archiveHtml,
-                                flags=re.IGNORECASE,
-                            )
-                            archiveHtml = re.sub(
-                                r"\<\!-- End Wayback Rewrite JS Include --\>",
-                                "",
-                                archiveHtml,
-                                re.IGNORECASE,
-                            )
-
-                            # If there is a specific Wayback error in the response, raise an exception
-                            if (
-                                archiveHtml.lower().find(
-                                    "wayback machine has not archived that url"
-                                )
-                                > 0
-                                or archiveHtml.lower().find(
-                                    "snapshot cannot be displayed due to an internal error"
-                                )
-                                > 0
-                            ):
-                                raise WayBackException
+                                # If there is a specific Wayback error in the response, raise an exception
+                                if (
+                                    archiveHtml.lower().find(
+                                        "wayback machine has not archived that url"
+                                    )
+                                    > 0
+                                    or archiveHtml.lower().find(
+                                        "snapshot cannot be displayed due to an internal error"
+                                    )
+                                    > 0
+                                ):
+                                    raise WayBackException
 
                             # Create file name based on url or hash value of the response, depending on selection. Ensure the file name isn't over 255 characters
                             if args.url_filename:
                                 fileName = url.replace("/", "-").replace(":", "")
                                 fileName = fileName[0:254]
                             else:
-                                hashValue = filehash(archiveHtml)
+                                # For binary files, hash the raw bytes; for text, hash the text
+                                if isBinary:
+                                    hashValue = filehash(archiveContent.hex())
+                                else:
+                                    hashValue = filehash(archiveHtml)
                                 fileName = hashValue
 
                                 # Determine extension of file from the content-type using the mimetypes library
@@ -1785,11 +2177,15 @@ def processArchiveUrl(url):
                                         extension = "css"
                                     elif "pdf" in extension:
                                         extension = "pdf"
+                                    elif "zip" in extension:
+                                        extension = "zip"
+                                    elif "gzip" in extension or "x-gzip" in extension:
+                                        extension = "gz"
                                     elif "plain" == extension:
                                         extension = "txt"
 
                                     # If extension is still blank, set to html if the content ends with HTML tag, otherwise set to unknown
-                                    if extension == "":
+                                    if extension == "" and not isBinary:
                                         if (
                                             archiveHtml.lower().strip().endswith("</html>")
                                             or archiveHtml.lower()
@@ -1800,6 +2196,8 @@ def processArchiveUrl(url):
                                             extension = "html"
                                         else:
                                             extension = "unknown"
+                                    elif extension == "" and isBinary:
+                                        extension = "bin"
 
                                 fileName = fileName + "." + extension
 
@@ -1816,10 +2214,14 @@ def processArchiveUrl(url):
                                     + f"{fileName}"
                                 )
 
-                            # Write the file
+                            # Write the file - binary mode for binary files, text mode for text files
                             try:
-                                responseFile = open(filePath, "w", encoding="utf8")
-                                responseFile.write(archiveHtml)
+                                if isBinary:
+                                    responseFile = open(filePath, "wb")
+                                    responseFile.write(archiveContent)
+                                else:
+                                    responseFile = open(filePath, "w", encoding="utf8")
+                                    responseFile.write(archiveHtml)
                                 responseFile.close()
                                 fileCount = fileCount + 1
                             except Exception as e:
@@ -1852,9 +2254,10 @@ def processArchiveUrl(url):
                                         )
                                     )
 
-                            # FOR DEBUGGING PURPOSES
+                            # FOR DEBUGGING PURPOSES (only for text files)
                             try:
-                                if os.environ.get("USER") == "xnl":
+                                if os.environ.get("USER") == "xnl" and not isBinary:
+
                                     debugText = ""
                                     if archiveHtml.lower().find("archive.org") > 0:
                                         debugText = "ARCHIVE.ORG"
@@ -1866,16 +2269,27 @@ def processArchiveUrl(url):
                                         writerr(
                                             colored(
                                                 getSPACER(
-                                                    '"'
+                                                    '[ DBG ] "'
                                                     + fileName
                                                     + '" CONTAINS '
                                                     + debugText
                                                     + " - CHECK ITS A VALID REFERENCE"
                                                 ),
                                                 "yellow",
+                                                attrs=["dark"],
                                             )
                                         )
-                            except Exception:
+                            except Exception as e:
+                                writerr(
+                                    colored(
+                                        '[ DBG ] Error - Failed to output debug info for "'
+                                        + archiveUrl
+                                        + '": '
+                                        + str(e),
+                                        "red",
+                                        attrs=["dark"],
+                                    )
+                                )
                                 pass
 
                     successCount = successCount + 1
@@ -2897,17 +3311,38 @@ def getURLScanDOM(originalUrl, domUrl):
                     resp = session.get(
                         domUrl, headers={"User-Agent": userAgent}, allow_redirects=True
                     )
-                    archiveHtml = str(resp.text)
+
+                    # Get raw content bytes first
+                    contentBytes = resp.content
+
+                    # Get content type from response headers
+                    try:
+                        contentType = resp.headers.get("Content-Type", "").split(";")[0].lower()
+                    except Exception:
+                        contentType = ""
+
+                    # Determine if this is binary content based on actual content, Content-Type, and URL
+                    isBinary = isBinaryContent(contentBytes, contentType, originalUrl)
+
+                    if isBinary:
+                        # For binary files, use raw bytes as-is
+                        archiveContent = contentBytes
+                        archiveHtml = None
+                    else:
+                        # For text files, decode to string
+                        archiveHtml = contentBytes.decode("utf-8", errors="replace")
+                        archiveContent = None
 
                     # If there is a specific URLScan error in the response, raise an exception
-                    if archiveHtml.lower().strip() == "not found!":
+                    if not isBinary and archiveHtml.lower().strip() == "not found!":
                         raise WayBackException
 
                     # Only create a file if there is a response
-                    if len(archiveHtml) != 0:
+                    responseLength = len(archiveContent) if isBinary else len(archiveHtml)
+                    if responseLength != 0:
 
-                        # Add the URL as a comment at the start of the response
-                        if args.url_filename:
+                        # Add the URL as a comment at the start of the response (text files only)
+                        if not isBinary and args.url_filename:
                             archiveHtml = "/* Original URL: " + originalUrl + " */\n" + archiveHtml
 
                         # Create file name based on url or hash value of the response, depending on selection. Ensure the file name isn't over 255 characters
@@ -2915,7 +3350,11 @@ def getURLScanDOM(originalUrl, domUrl):
                             fileName = originalUrl.replace("/", "-").replace(":", "")
                             fileName = fileName[0:254]
                         else:
-                            hashValue = filehash(archiveHtml)
+                            # For binary files, hash the raw bytes; for text, hash the text
+                            if isBinary:
+                                hashValue = filehash(archiveContent.hex())
+                            else:
+                                hashValue = filehash(archiveHtml)
                             fileName = hashValue
 
                             # Determine extension of file from the content-type using the mimetypes library
@@ -2933,7 +3372,7 @@ def getURLScanDOM(originalUrl, domUrl):
                                 pass
 
                             # If the extension is blank, numeric, longer than 4 characters or not alphanumeric - then set to html if the content ends with HTML tag, otherwise set to unknown
-                            if extension == "":
+                            if extension == "" and not isBinary:
                                 if (
                                     archiveHtml.lower().strip().endswith("</html>")
                                     or archiveHtml.lower().strip().endswith("</body>")
@@ -2944,6 +3383,8 @@ def getURLScanDOM(originalUrl, domUrl):
                                     extension = "html"
                                 else:
                                     extension = "unknown"
+                            elif extension == "" and isBinary:
+                                extension = "bin"
 
                             fileName = fileName + "." + extension
 
@@ -2960,10 +3401,14 @@ def getURLScanDOM(originalUrl, domUrl):
                                 + f"{fileName}"
                             )
 
-                        # Write the file
+                        # Write the file - binary mode for binary files, text mode for text files
                         try:
-                            responseFile = open(filePath, "w", encoding="utf8")
-                            responseFile.write(archiveHtml)
+                            if isBinary:
+                                responseFile = open(filePath, "wb")
+                                responseFile.write(archiveContent)
+                            else:
+                                responseFile = open(filePath, "w", encoding="utf8")
+                                responseFile.write(archiveHtml)
                             responseFile.close()
                             fileCount = fileCount + 1
                         except Exception as e:

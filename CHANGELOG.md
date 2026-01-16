@@ -1,5 +1,28 @@
 ## Changelog
 
+- v7.7
+
+  - New
+
+    - Add a few more audio and video extensions to `FILTER_URL` in `config.yml` and default values in `DEFAULT_FILTER_URL`
+    - Add few more audio and video MIME type to `FILTER_MIME` in `config.yml` and default values in `DEFAULT_FILTER_MIME`
+    - Added extar debug info to show the file being processed so if waymore seems to freeze on a specific file I can investigate.
+
+  - Changed
+
+    - **Binary File Download Fix**: Fixed critical bug where binary files (`.zip`, `.pdf`, `.gz`, images, etc.) downloaded (with `-mode R`) were corrupted. The issue was that all responses were being handled as text (`resp.text`) and written in text mode with UTF-8 encoding, which mangles binary data during the encoding/decoding cycle.
+    - Added `BINARY_EXTENSIONS` constant containing 50+ binary file extensions (`.zip`, `.gz`, `.pdf`, `.exe`, `.png`, `.mp4`, fonts, archives, etc.)
+    - Added `BINARY_MIME_TYPES` constant containing 40+ binary MIME types (`application/zip`, `application/pdf`, `image/*`, `audio/*`, `video/*`, etc.)
+    - Replaced `isBinaryFile()` with improved `isBinaryContent()` function that now checks actual content bytes for file signatures. This ensures HTML error pages are correctly treated as text even if the URL has a binary extension like `.pdf`. Priority order: (1) content inspection for file magic bytes, (2) Content-Type header, (3) URL extension as fallback.
+    - Binary files are now downloaded using `resp.content` (raw bytes) and written using binary mode (`"wb"`), preserving the original file data
+    - Text files continue to use decoded bytes with UTF-8 encoding and Wayback cleanup regex processing
+    - Binary files that cannot determine an extension will use `.bin` instead of `.unknown`
+    - **Raw Wayback Downloads (`id_` modifier)**: For binary files, the Wayback Machine URL now includes the `id_` modifier (e.g., `/web/20090315210455id_/http://...`) which retrieves the raw original file without any Wayback Machine modifications. This fixes corruption of media files like `.wmv`, `.mp4`, etc.
+    - Added `isLikelyBinaryUrl()` helper to pre-check if a URL has a binary extension before making the request
+    - Added `addRawModifier()` helper to insert the `id_` modifier into Wayback URLs
+    - Added comprehensive binary file magic bytes signatures
+    - The `--source-ip` option is now only displayed in verbose (`-v`) output when it's explicitly configured. Previously, it always showed a default message even when not set.
+
 - v7.6
 
   - New
