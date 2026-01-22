@@ -1,6 +1,6 @@
 <center><img src="https://github.com/xnl-h4ck3r/waymore/blob/main/waymore/images/title.png"></center>
 
-## About - v7.7
+## About - v8.0
 
 The idea behind **waymore** is to find even more links from the Wayback Machine (plus other sources) than other existing tools.
 
@@ -16,6 +16,7 @@ Now **waymore** gets URL's from ALL of those sources too (with ability to filter
 - Alien Vault OTX (otx.alienvault.com)
 - URLScan (urlscan.io)
 - Virus Total (virustotal.com)
+- GhostArchive (ghostarchive.org)
 - Intelligence X (intelx.io) - ACADEMIA OR PAID TIERS ONLY
 
 👉 It's a point that many seem to miss, so I'll just add it again :) ... The biggest difference between **waymore** and other tools is that it can also **download the archived responses** for URLs on wayback machine so that you can then search these for even more links, developer comments, extra parameters, etc. etc.
@@ -84,6 +85,7 @@ pipx install git+https://github.com/xnl-h4ck3r/waymore.git
 | -xus          |                            | Exclude checks for links from urlscan.io                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -xvt          |                            | Exclude checks for links from virustotal.com                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | -xix          |                            | Exclude checks for links from Intelligence X.com                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| -xga          |                            | Exclude checks for links from ghostarchive.org                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | -lcc          |                            | Limit the number of Common Crawl index collections searched, e.g. `-lcc 10` will just search the latest `10` collections (default: 1). As of November 2024 there are currently 106 collections. Setting to `0` will search **ALL** collections. If you don't want to search Common Crawl at all, use the `-xcc` option.                                                                                                                                                                                                                                                                                                                                        |
 | -t            | --timeout                  | This is for archived responses only! How many seconds to wait for the server to send data before giving up (default: 30)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -p            | --processes                | Basic multithreading is done when getting requests for a file of URLs. This argument determines the number of processes (threads) used (default: 2)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -294,6 +296,7 @@ If you come across any problems at all, or have ideas for improvements, please f
 - [URLScan API](https://urlscan.io/docs/api/)
 - [VirusTotal API (v2)](https://docs.virustotal.com/v2.0/reference/getting-started)
 - [Intelligence X SDK](https://github.com/IntelligenceX/SDK?tab=readme-ov-file#intelligence-x-public-sdk)
+- [GhostArchive](https://ghostarchive.org/)
 
 Good luck and good hunting!
 If you really love the tool (or any others), or they helped you find an awesome bounty, consider [BUYING ME A COFFEE!](https://ko-fi.com/xnlh4ck3r) ☕ (I could use the caffeine!)

@@ -70,6 +70,7 @@ stopSourceAlienVault = False
 stopSourceURLScan = False
 stopSourceVirusTotal = False
 stopSourceIntelx = False
+stopSourceGhostArchive = False
 successCount = 0
 failureCount = 0
 fileCount = 0
@@ -79,6 +80,7 @@ totalPages = 0
 indexFile = None
 continueRespFile = None
 continueRespFileURLScan = None
+continueRespFileGhostArchive = None
 inputIsDomainANDPath = False
 inputIsSubDomain = False
 subs = "*."
@@ -102,6 +104,7 @@ checkAlienVault = 0
 checkURLScan = 0
 checkVirusTotal = 0
 checkIntelx = 0
+checkGhostArchive = 0
 argsInputHostname = ""
 responseOutputDirectory = ""
 urlscanRequestLinks = set()
@@ -112,11 +115,14 @@ linkCountAlienVault = 0
 linkCountURLScan = 0
 linkCountVirusTotal = 0
 linkCountIntelx = 0
+linkCountGhostArchive = 0
 linksFoundCommonCrawl = set()
 linksFoundAlienVault = set()
 linksFoundURLScan = set()
 linksFoundVirusTotal = set()
 linksFoundIntelx = set()
+linksFoundGhostArchive = set()
+ghostArchiveRequestLinks = set()
 
 # Thread lock for protecting shared state during concurrent operations
 links_lock = threading.Lock()
@@ -124,6 +130,7 @@ links_lock = threading.Lock()
 # Shared state for link collection across all sources
 linksFound = set()
 linkMimes = set()
+extraWarcLinks = set()  # Track extra URLs found in WARC files for mode B
 
 # Source Provider URLs
 WAYBACK_URL = "https://web.archive.org/cdx/search/cdx?url={DOMAIN}{COLLAPSE}&fl=timestamp,original,mimetype,statuscode,digest"
@@ -134,6 +141,8 @@ URLSCAN_DOM_URL = "https://urlscan.io/dom/"
 VIRUSTOTAL_URL = "https://www.virustotal.com/vtapi/v2/domain/report?apikey={APIKEY}&domain={DOMAIN}"
 # Paid endpoint first, free endpoint as fallback
 INTELX_BASES = ["https://2.intelx.io", "https://free.intelx.io"]
+GHOSTARCHIVE_URL = "https://ghostarchive.org/search?term={DOMAIN}&page="
+GHOSTARCHIVE_DOM_URL = "https://ghostarchive.org"
 
 intelx_tls = threading.local()
 
@@ -247,10 +256,10 @@ DEFAULT_LIMIT = 5000
 DEFAULT_TIMEOUT = 30
 
 # Exclusions used to exclude responses we will try to get from web.archive.org
-DEFAULT_FILTER_URL = ".css,.jpg,.jpeg,.png,.svg,.img,.gif,.mp4,.flv,.ogv,.webm,.webp,.mov,.mp3,.m4a,.m4p,.scss,.tif,.tiff,.ttf,.otf,.woff,.woff2,.bmp,.ico,.eot,.htc,.rtf,.swf,.image,/image,/img,/css,/wp-json,/wp-content,/wp-includes,/theme,/audio,/captcha,/font,node_modules,/jquery,/bootstrap,/_incapsula_resource,.wmv,.wma,.asx"
+DEFAULT_FILTER_URL = ".css,.jpg,.jpeg,.png,.svg,.img,.gif,.mp4,.flv,.ogv,.webm,.webp,.mov,.mp3,.m4a,.m4p,.scss,.tif,.tiff,.ttf,.otf,.woff,.woff2,.bmp,.ico,.eot,.htc,.rtf,.swf,.image,/image,/img,/css,/wp-json,/wp-content,/wp-includes,/theme,/audio,/captcha,/font,node_modules,/jquery,/bootstrap,/_incapsula_resource,.wmv,.wma,.asx,.avif"
 
 # MIME Content-Type exclusions used to filter links and responses from web.archive.org through their API
-DEFAULT_FILTER_MIME = "text/css,image/jpeg,image/jpg,image/png,image/svg+xml,image/gif,image/tiff,image/webp,image/bmp,image/vnd,image/x-icon,image/vnd.microsoft.icon,font/ttf,font/woff,font/woff2,font/x-woff2,font/x-woff,font/otf,audio/mpeg,audio/wav,audio/webm,audio/aac,audio/ogg,audio/wav,audio/webm,video/mp4,video/mpeg,video/webm,video/ogg,video/mp2t,video/webm,video/x-msvideo,video/x-flv,application/font-woff,application/font-woff2,application/x-font-woff,application/x-font-woff2,application/vnd.ms-fontobject,application/font-sfnt,application/vnd.android.package-archive,binary/octet-stream,application/octet-stream,application/pdf,application/x-font-ttf,application/x-font-otf,video/webm,video/3gpp,application/font-ttf,audio/mp3,audio/x-wav,image/pjpeg,audio/basic,application/font-otf,application/x-ms-application,application/x-msdownload,video/x-ms-wmv,image/x-png,video/quicktime,image/x-ms-bmp,font/opentype,application/x-font-opentype,application/x-woff,audio/aiff,video/x-ms-asf,audio/x-ms-wma,audio/wma,application/x-mplayer2"
+DEFAULT_FILTER_MIME = "text/css,image/jpeg,image/jpg,image/png,image/svg+xml,image/gif,image/tiff,image/webp,image/bmp,image/vnd,image/x-icon,image/vnd.microsoft.icon,font/ttf,font/woff,font/woff2,font/x-woff2,font/x-woff,font/otf,audio/mpeg,audio/wav,audio/webm,audio/aac,audio/ogg,audio/wav,audio/webm,video/mp4,video/mpeg,video/webm,video/ogg,video/mp2t,video/webm,video/x-msvideo,video/x-flv,application/font-woff,application/font-woff2,application/x-font-woff,application/x-font-woff2,application/vnd.ms-fontobject,application/font-sfnt,application/vnd.android.package-archive,binary/octet-stream,application/octet-stream,application/x-font-ttf,application/x-font-otf,video/webm,video/3gpp,application/font-ttf,audio/mp3,audio/x-wav,image/pjpeg,audio/basic,application/font-otf,application/x-ms-application,application/x-msdownload,video/x-ms-wmv,image/x-png,video/quicktime,image/x-ms-bmp,font/opentype,application/x-font-opentype,application/x-woff,audio/aiff,video/x-ms-asf,audio/x-ms-wma,audio/wma,application/x-mplayer2,image/avif"
 
 # Response code exclusions we will use to filter links and responses from web.archive.org through their API
 DEFAULT_FILTER_CODE = "404,301,302"
@@ -743,7 +752,7 @@ def handler(signal_received, frame):
     This function is called if Ctrl-C is called by the user
     An attempt will be made to try and clean up properly
     """
-    global stopSource, stopProgram, stopProgramCount, stopSourceWayback, stopSourceCommonCrawl, stopSourceAlienVault, stopSourceURLScan, stopSourceVirusTotal, stopSourceIntelx, current_response, current_session
+    global stopSource, stopProgram, stopProgramCount, stopSourceWayback, stopSourceCommonCrawl, stopSourceAlienVault, stopSourceURLScan, stopSourceVirusTotal, stopSourceIntelx, stopSourceGhostArchive, current_response, current_session
 
     if stopProgram is not None:
         stopProgramCount = stopProgramCount + 1
@@ -778,6 +787,7 @@ def handler(signal_received, frame):
         stopSourceURLScan = True
         stopSourceVirusTotal = True
         stopSourceIntelx = True
+        stopSourceGhostArchive = True
         # Try to close any active response or session to interrupt blocking network I/O
         try:
             if current_response is not None:
@@ -1753,11 +1763,15 @@ def printProgressBar(
 
 def filehash(text):
     """
-    Generate a hash value for the passed string. This is used for the file name of a downloaded archived response
+    Generate a hash value for the passed string or bytes. This is used for the file name of a downloaded archived response
     """
     hash = 0
     for ch in text:
-        hash = (hash * 281 ^ ord(ch) * 997) & 0xFFFFFFFFFFF
+        # Handle both str (gives chars needing ord()) and bytes (gives ints directly)
+        if isinstance(ch, int):
+            hash = (hash * 281 ^ ch * 997) & 0xFFFFFFFFFFF
+        else:
+            hash = (hash * 281 ^ ord(ch) * 997) & 0xFFFFFFFFFFF
     return str(hash)
 
 
@@ -1945,7 +1959,7 @@ def processArchiveUrl(url):
             try:
                 try:
                     try:
-                        if os.environ.get("USER") == "xnl":
+                        if verbose() and os.environ.get("USER") == "xnl":
                             writerr(
                                 colored(
                                     "[ DBG ] Requesting file " + archiveUrl,
@@ -2265,7 +2279,7 @@ def processArchiveUrl(url):
                                         debugText = "INTERNET ARCHIVE"
                                     elif archiveHtml.lower().find("wombat") > 0:
                                         debugText = "WOMBAT (JS)"
-                                    if debugText != "":
+                                    if verbose() and debugText != "":
                                         writerr(
                                             colored(
                                                 getSPACER(
@@ -2280,16 +2294,17 @@ def processArchiveUrl(url):
                                             )
                                         )
                             except Exception as e:
-                                writerr(
-                                    colored(
-                                        '[ DBG ] Error - Failed to output debug info for "'
-                                        + archiveUrl
-                                        + '": '
-                                        + str(e),
-                                        "red",
-                                        attrs=["dark"],
+                                if verbose():
+                                    writerr(
+                                        colored(
+                                            '[ DBG ] Error - Failed to output debug info for "'
+                                            + archiveUrl
+                                            + '": '
+                                            + str(e),
+                                            "red",
+                                            attrs=["dark"],
+                                        )
                                     )
-                                )
                                 pass
 
                     successCount = successCount + 1
@@ -2760,17 +2775,20 @@ def validateArgProviders(x):
     - urlscan
     - virustotal
     - intelx
+    - ghostarchive
     """
     invalid = False
     x = x.lower()
     providers = x.split(",")
     for provider in providers:
-        if not re.fullmatch(r"(wayback|commoncrawl|otx|urlscan|virustotal|intelx)", provider):
+        if not re.fullmatch(
+            r"(wayback|commoncrawl|otx|urlscan|virustotal|intelx|ghostarchive)", provider
+        ):
             invalid = True
             break
     if invalid:
         raise argparse.ArgumentTypeError(
-            "Pass providers separated by a comma, e.g. wayback,commoncrawl,otx,urlscan,virustotal,intelx"
+            "Pass providers separated by a comma, e.g. wayback,commoncrawl,otx,urlscan,virustotal,intelx,ghostarchive"
         )
     return x
 
@@ -3528,6 +3546,522 @@ def getURLScanDOM(originalUrl, domUrl):
         writerr(colored("ERROR getURLScanDOM 1:  " + str(e), "red"))
 
 
+def getGhostArchiveWARC(originalUrl, domUrl):
+    """
+    Get the DOM for the passed GhostArchive link - parses WARC files containing multiple request/response pairs
+    """
+    global stopProgram, successCount, failureCount, fileCount, DEFAULT_OUTPUT_DIR, totalResponses, indexFile, argsInput, argsInputHostname, REGEX_404, linksFound, extraWarcLinks, links_lock
+    try:
+        if stopProgram is None:
+
+            # The WARC files are found by replacing /archive with /chimurai4 and using the .warc file extension
+            warcUrl = domUrl.replace("/archive", "/chimurai4") + ".warc"
+
+            # Get memory usage every 100 responses
+            if (successCount + failureCount) % 100 == 0:
+                try:
+                    getMemory()
+                except Exception:
+                    pass
+
+            # Fetch content
+            try:
+                # Show progress bar
+                fillTest = (successCount + failureCount) % 2
+                fillChar = "o"
+                if fillTest == 0:
+                    fillChar = "O"
+                suffix = "Complete "
+
+                printProgressBar(
+                    successCount + failureCount,
+                    totalResponses,
+                    prefix="Processing " + str(totalResponses) + " WARC files:",
+                    suffix=suffix,
+                    length=getProgressBarLength(),
+                    fill=fillChar,
+                )
+
+                try:
+                    try:
+                        if verbose() and os.environ.get("USER") == "xnl":
+                            writerr(
+                                colored(
+                                    "[ DBG ] Requesting file " + warcUrl,
+                                    "yellow",
+                                    attrs=["dark"],
+                                )
+                            )
+                    except Exception:
+                        pass
+
+                    # Choose a random user agent string to use for any requests
+                    userAgent = random.choice(USER_AGENT)
+                    session = requests.Session()
+                    session.mount("https://", HTTP_ADAPTER)
+                    session.mount("http://", HTTP_ADAPTER)
+
+                    # Retry loop for 503 or maintenance responses
+                    maxRetries = 3
+                    warcBytes = b""
+                    for attempt in range(maxRetries):
+                        resp = session.get(
+                            warcUrl,
+                            headers={"User-Agent": userAgent},
+                            allow_redirects=True,
+                            timeout=args.timeout,
+                        )
+                        warcBytes = resp.content
+
+                        # Check if we need to retry (decode just for this check)
+                        try:
+                            warcTextCheck = warcBytes.decode("utf-8", errors="replace").lower()
+                        except Exception:
+                            warcTextCheck = ""
+                        if resp.status_code == 503 or "website under maintenance" in warcTextCheck:
+                            if attempt < maxRetries - 1:
+                                import time
+
+                                time.sleep(0.5)
+                                continue
+                        break
+
+                    # Parse the WARC file to extract multiple responses
+                    # WARC header lines are text, but response bodies may be binary
+                    # Split by line separator but keep bytes for body extraction
+                    lineBytes = warcBytes.split(b"\n")
+                    lines = [lb.decode("utf-8", errors="replace") for lb in lineBytes]
+
+                    # State machine to track parsing
+                    currentTargetUri = ""
+                    inResponse = False
+                    contentType = ""
+                    responsesFound = (
+                        []
+                    )  # List of (targetUri, contentType, responseBytes, httpStatusCode)
+
+                    i = 0
+                    skipCurrentResponse = False  # Initialize before loop
+                    pendingResponseType = (
+                        False  # Track if we saw WARC-Type: response and are waiting for Target-URI
+                    )
+                    responseStartIdx = -1  # Initialize before loop
+                    httpStatusCode = ""  # Initialize before loop
+                    while i < len(lines) and stopProgram is None and not stopSourceGhostArchive:
+                        line = lines[i]
+
+                        # When we see a new WARC record start, reset pending state
+                        if line.startswith("WARC/1.0"):
+                            # If we were in a response and collecting, save it before moving to new record
+                            if inResponse and responseStartIdx >= 0:
+                                responseBodyBytes = b"\n".join(lineBytes[responseStartIdx:i])
+                                responsesFound.append(
+                                    (
+                                        currentTargetUri,
+                                        contentType,
+                                        responseBodyBytes,
+                                        httpStatusCode if "httpStatusCode" in dir() else "",
+                                    )
+                                )
+                                inResponse = False
+                                responseStartIdx = -1
+                                contentType = ""
+                                httpStatusCode = ""
+                            pendingResponseType = False
+                            skipCurrentResponse = False
+
+                        # Look for WARC-Type: response - mark that we're in a response record header
+                        elif line.startswith("WARC-Type: response"):
+                            pendingResponseType = True
+                            inResponse = False  # Don't start capturing body yet
+                            responseStartIdx = -1
+                            contentType = ""
+
+                        # Look for WARC-Target-URI to get the request URL
+                        elif line.startswith("WARC-Target-URI:"):
+                            currentTargetUri = line.split(":", 1)[1].strip()
+                            skipCurrentResponse = False
+
+                            # Check: URL host must contain the input hostname
+                            if argsInputHostname:
+                                try:
+                                    parsed = urlparse(currentTargetUri)
+                                    host = parsed.netloc.lower()
+                                    if argsInputHostname.lower() not in host:
+                                        skipCurrentResponse = True
+                                except Exception:
+                                    skipCurrentResponse = True
+
+                            # Check: Filter by URL (FILTER_URL)
+                            if not skipCurrentResponse and FILTER_URL and currentTargetUri:
+                                filterUrls = [u.strip().lower() for u in FILTER_URL.split(",")]
+                                for filterUrl in filterUrls:
+                                    if filterUrl in currentTargetUri.lower():
+                                        skipCurrentResponse = True
+                                        break
+
+                            # If we were waiting for Target-URI after seeing WARC-Type: response, and it's valid, start response mode
+                            if pendingResponseType and not skipCurrentResponse:
+                                inResponse = True
+                                pendingResponseType = False
+
+                        # If we're in a response section (after seeing both WARC-Type: response and valid WARC-Target-URI)
+                        elif inResponse:
+                            # Check for HTTP start and capture status code
+                            if line.startswith("HTTP"):
+                                # Extract status code (e.g., "HTTP/1.1 200 OK" -> "200")
+                                try:
+                                    httpStatusCode = line.split()[1]
+                                except Exception:
+                                    httpStatusCode = ""
+
+                                # Early check: Filter by HTTP status code (FILTER_CODE)
+                                if FILTER_CODE and httpStatusCode:
+                                    filterCodes = [c.strip() for c in FILTER_CODE.split(",")]
+                                    if httpStatusCode in filterCodes:
+                                        inResponse = False
+                                        responseStartIdx = -1
+                                        i += 1
+                                        continue
+
+                                responseStartIdx = i  # Mark start of response
+                            elif responseStartIdx >= 0:
+                                # Capture Content-Type if present (case-insensitive check)
+                                if line.lower().startswith("content-type:"):
+                                    try:
+                                        contentType = (
+                                            line.split(":", 1)[1].strip().split(";")[0].lower()
+                                        )
+                                    except Exception:
+                                        pass
+
+                                    # Early check: Filter by MIME type (FILTER_MIME)
+                                    if FILTER_MIME and contentType:
+                                        filterMimes = [
+                                            m.strip().lower() for m in FILTER_MIME.split(",")
+                                        ]
+                                        if contentType in filterMimes:
+                                            inResponse = False
+                                            responseStartIdx = -1
+                                            i += 1
+                                            continue
+
+                        i += 1
+
+                    if stopProgram is not None:
+                        return
+
+                    # Don't forget the last response if file doesn't end with WARC/1.0
+                    if inResponse and responseStartIdx >= 0:
+                        responseBodyBytes = b"\n".join(lineBytes[responseStartIdx:])
+                        responsesFound.append(
+                            (
+                                currentTargetUri,
+                                contentType,
+                                responseBodyBytes,
+                                httpStatusCode if "httpStatusCode" in dir() else "",
+                            )
+                        )
+
+                    # Process each response found
+                    for targetUri, contentType, responseBytes, httpStatusCode in responsesFound:
+                        if stopProgram is not None:
+                            break
+
+                        if not responseBytes:
+                            continue
+
+                        # Split HTTP header from body in bytes (look for \r\n\r\n or \n\n separator)
+                        if b"\r\n\r\n" in responseBytes:
+                            bodyBytes = responseBytes.split(b"\r\n\r\n", 1)[1]
+                        elif b"\n\n" in responseBytes:
+                            bodyBytes = responseBytes.split(b"\n\n", 1)[1]
+                        else:
+                            bodyBytes = responseBytes
+
+                        # Skip empty bodies or "not found" responses
+                        if not bodyBytes or bodyBytes.lower().strip() == b"not found":
+                            continue
+
+                        # If -f / --filter-responses-only is passed, track all URLs immediately (before filtering)
+                        if args.mode == "B" and args.filter_responses_only and targetUri:
+                            with links_lock:
+                                if targetUri not in linksFound and targetUri not in extraWarcLinks:
+                                    extraWarcLinks.add(targetUri)
+
+                        # Use isBinaryContent to detect if this is binary content
+                        isBinary = isBinaryContent(bodyBytes, contentType, targetUri)
+
+                        if isBinary:
+                            # Binary file - save raw bytes
+                            archiveContent = bodyBytes
+                            archiveHtml = None
+                        else:
+                            # Text file - decode to string
+                            archiveHtml = bodyBytes.decode("utf-8", errors="replace")
+                            archiveContent = None
+
+                            # Collapse multiple blank lines into one
+                            archiveHtml = re.sub(r"\n{3,}", "\n\n", archiveHtml)
+
+                            # Skip if body is empty after processing
+                            if not archiveHtml.strip():
+                                continue
+
+                        if stopProgram is not None:
+                            break
+
+                        # Determine if this is HTML or JS based on content-type or URL
+                        isHtml = (
+                            contentType in ["text/html", "application/xhtml+xml"]
+                            or targetUri.lower().endswith(".html")
+                            or targetUri.lower().endswith(".htm")
+                        )
+                        isJs = contentType in [
+                            "text/javascript",
+                            "application/javascript",
+                            "application/x-javascript",
+                        ] or targetUri.lower().endswith(".js")
+
+                        # Add the URL as a comment at the start of the response (only for text files)
+                        if not isBinary and args.url_filename:
+                            if isHtml:
+                                archiveHtml = (
+                                    "<!-- Original URL: " + targetUri + " -->\n" + archiveHtml
+                                )
+                            elif isJs:
+                                archiveHtml = (
+                                    "/* Original URL: " + targetUri + " */\n" + archiveHtml
+                                )
+
+                        # Create file name based on url or hash value
+                        if args.url_filename:
+                            fileName = targetUri.replace("/", "-").replace(":", "")
+                            fileName = fileName[0:254]
+                            hashValue = ""
+                        else:
+                            # Hash the content to get the filename
+                            if isBinary:
+                                hashValue = filehash(archiveContent)
+                            else:
+                                hashValue = filehash(archiveHtml)
+                            fileName = hashValue
+
+                            # Determine extension of file from the content-type or URL
+                            extension = ""
+                            try:
+                                # Get path extension from URL
+                                if "://" in targetUri:
+                                    targetUrl = "https://" + targetUri.split("://")[1]
+                                    parsed = urlparse(targetUrl.strip())
+                                    path = parsed.path
+                                    extension = path[path.rindex(".") + 1 :]
+                                    if "/" in extension:
+                                        extension = ""
+                                    # If extension is over 6 characters, it's likely not a real extension (e.g. API endpoint ID)
+                                    if len(extension) > 6:
+                                        extension = ""
+                            except Exception:
+                                pass
+
+                            # If extension is blank, determine from MIME type or content
+                            if extension == "":
+                                if isBinary:
+                                    # Binary file extensions from MIME type
+                                    if contentType:
+                                        if "image/png" in contentType:
+                                            extension = "png"
+                                        elif (
+                                            "image/jpeg" in contentType
+                                            or "image/jpg" in contentType
+                                        ):
+                                            extension = "jpg"
+                                        elif "image/gif" in contentType:
+                                            extension = "gif"
+                                        elif "image/webp" in contentType:
+                                            extension = "webp"
+                                        elif "application/pdf" in contentType:
+                                            extension = "pdf"
+                                        elif "application/zip" in contentType:
+                                            extension = "zip"
+                                        else:
+                                            extension = "bin"
+                                    else:
+                                        extension = "bin"
+                                else:
+                                    # Text file extensions
+                                    if contentType and "javascript" in contentType.lower():
+                                        extension = "js"
+                                    elif contentType and "html" in contentType.lower():
+                                        extension = "html"
+                                    elif contentType and "json" in contentType.lower():
+                                        extension = "json"
+                                    elif contentType and "text" in contentType.lower():
+                                        extension = "txt"
+                                    elif archiveHtml and (
+                                        archiveHtml.lower().strip().endswith("</html>")
+                                        or archiveHtml.lower().strip().endswith("</body>")
+                                        or archiveHtml.lower().strip().startswith("<!doctype html")
+                                        or archiveHtml.lower().strip().startswith("<html")
+                                        or archiveHtml.lower().strip().startswith("<head")
+                                    ):
+                                        extension = "html"
+                                    else:
+                                        extension = "unknown"
+
+                            fileName = fileName + "." + extension
+
+                        # Determine file path
+                        if args.output_responses != "":
+                            filePath = args.output_responses + "/" + f"{fileName}"
+                        else:
+                            filePath = (
+                                DEFAULT_OUTPUT_DIR
+                                + "/results/"
+                                + str(argsInput).replace("/", "-")
+                                + "/"
+                                + f"{fileName}"
+                            )
+
+                        if stopProgram is not None:
+                            break
+
+                        # Write the file
+                        try:
+                            if isBinary:
+                                # Binary file - write as bytes
+                                responseFile = open(filePath, "wb")
+                                responseFile.write(archiveContent)
+                            else:
+                                # Text file - write as UTF-8
+                                responseFile = open(filePath, "w", encoding="utf8")
+                                responseFile.write(archiveHtml)
+                            responseFile.close()
+                            with links_lock:
+                                fileCount = fileCount + 1
+
+                            # Track extra URLs found in WARC files for mode B (only when -f is not passed, since we track earlier if it is)
+                            if args.mode == "B" and not args.filter_responses_only and targetUri:
+                                with links_lock:
+                                    if (
+                                        targetUri not in linksFound
+                                        and targetUri not in extraWarcLinks
+                                    ):
+                                        extraWarcLinks.add(targetUri)
+                        except Exception as e:
+                            writerr(
+                                colored(
+                                    "GhostArchive - [ ERR ] Failed to write file "
+                                    + filePath
+                                    + ": "
+                                    + str(e),
+                                    "red",
+                                )
+                            )
+
+                        # Write the hash value and URL to the index file
+                        if not args.url_filename and hashValue:
+                            try:
+                                timestamp = str(datetime.now())
+                                indexFile.write(
+                                    hashValue
+                                    + ","
+                                    + domUrl
+                                    + "#"
+                                    + targetUri
+                                    + " ,"
+                                    + timestamp
+                                    + "\n"
+                                )
+                                indexFile.flush()
+                            except Exception as e:
+                                writerr(
+                                    colored(
+                                        'GhostArchive - [ ERR ] Failed to write to waymore_index.txt for "'
+                                        + warcUrl
+                                        + '": '
+                                        + str(e),
+                                        "red",
+                                    )
+                                )
+
+                    successCount = successCount + 1
+
+                except WayBackException:
+                    failureCount = failureCount + 1
+
+                except Exception as e:
+                    failureCount = failureCount + 1
+                    if verbose():
+                        # Simplify common error messages
+                        if "connection broken" in str(e).lower():
+                            errorMsg = "Connection Broken"
+                        else:
+                            errorMsg = str(e)
+                        try:
+                            statusCode = (
+                                resp.status_code if "resp" in dir() and resp is not None else "ERR"
+                            )
+                            writerr(
+                                colored(
+                                    "GhostArchive - [ "
+                                    + str(statusCode)
+                                    + ' ] Failed to get response for "'
+                                    + warcUrl
+                                    + '": '
+                                    + errorMsg,
+                                    "red",
+                                )
+                            )
+                        except Exception:
+                            writerr(
+                                colored(
+                                    'GhostArchive - [ ERR ] Failed to get response for "'
+                                    + warcUrl
+                                    + '": '
+                                    + errorMsg,
+                                    "red",
+                                )
+                            )
+
+                # Show memory usage if -v option chosen, and check memory every 25 responses (or if its the last)
+                if (successCount + failureCount) % 25 == 1 or (
+                    successCount + failureCount
+                ) == totalResponses:
+                    try:
+                        getMemory()
+                        if verbose():
+                            suffix = (
+                                "Complete (Mem Usage "
+                                + humanReadableSize(currentMemUsage)
+                                + ", Total Mem "
+                                + str(currentMemPercent)
+                                + "%)   "
+                            )
+                    except Exception:
+                        if verbose():
+                            suffix = 'Complete (To show mem use, run "pip install psutil")'
+                printProgressBar(
+                    successCount + failureCount,
+                    totalResponses,
+                    prefix="Processing " + str(totalResponses) + " WARC files:",
+                    suffix=suffix,
+                    length=getProgressBarLength(),
+                    fill=fillChar,
+                )
+
+            except Exception as e:
+                if verbose():
+                    writerr(
+                        colored(
+                            'GhostArchive - [ ERR ] Error for "' + domUrl + '": ' + str(e), "red"
+                        )
+                    )
+
+    except Exception as e:
+        writerr(colored("ERROR getGhostArchiveWARC 1:  " + str(e), "red"))
+
+
 def format_date_for_urlscan(date_str):
     # Handle different lengths of input
     if len(date_str) == 4:  # YYYY
@@ -4198,7 +4732,6 @@ def processWayBackPage(url):
                     pass
                 return
         else:
-            print("DEBUG: HERE END!")  # DEBUG
             pass
     except Exception as e:
         if verbose():
@@ -5456,12 +5989,309 @@ def getIntelxUrls():
         writerr(colored("ERROR getIntelxUrls 1: " + str(e), "red"))
 
 
+def processGhostArchiveUrl(url, ghostArchiveID=""):
+    """
+    Process a specific URL from ghostarchive.org to determine whether to save the link
+    """
+    global argsInput, argsInputHostname, links_lock, linkCountGhostArchive, linksFoundGhostArchive
+
+    addLink = True
+
+    try:
+        # Strip Wayback Machine prefix if present (e.g., https://web.archive.org/web/20230101120000_/https://example.com)
+        waybackMatch = re.match(r"^https?://web\.archive\.org/[^/]+/[a-zA-Z0-9]+_/", url)
+        if waybackMatch:
+            url = url[waybackMatch.end() :]
+
+        # If the input has a / in it, then a URL was passed, so the link will only be added if the URL matches
+        if "/" in url:
+            if argsInput not in url:
+                addLink = False
+
+        # If filters are required then test them
+        if addLink and not args.filter_responses_only:
+
+            # If the user requested -n / --no-subs then we don't want to add it if it has a sub domain (www. will not be classed as a sub domain)
+            if args.no_subs:
+                match = re.search(
+                    r"^[A-za-z]*\:\/\/(www\.)?" + re.escape(argsInputHostname),
+                    url,
+                    flags=re.IGNORECASE,
+                )
+                if match is None:
+                    addLink = False
+
+            # If the user didn't requested -f / --filter-responses-only then check http code
+            if addLink and not args.filter_responses_only:
+
+                # Check the URL exclusions
+                if addLink:
+                    match = re.search(
+                        r"(" + re.escape(FILTER_URL).replace(",", "|") + ")",
+                        url,
+                        flags=re.IGNORECASE,
+                    )
+                    if match is not None:
+                        addLink = False
+
+                # Set keywords filter if -ko argument passed
+                if addLink and args.keywords_only:
+                    if args.keywords_only == "#CONFIG":
+                        match = re.search(
+                            r"(" + re.escape(FILTER_KEYWORDS).replace(",", "|") + ")",
+                            url,
+                            flags=re.IGNORECASE,
+                        )
+                    else:
+                        match = re.search(r"(" + args.keywords_only + ")", url, flags=re.IGNORECASE)
+                    if match is None:
+                        addLink = False
+
+        # Add link if it passed filters
+        if addLink:
+            # Just get the hostname of the url
+            tldExtract = tldextract.extract(url)
+            subDomain = tldExtract.subdomain
+            if subDomain != "":
+                subDomain = subDomain + "."
+            domainOnly = subDomain + tldExtract.domain + "." + tldExtract.suffix
+
+            # GhostArchive might return URLs that aren't for the domain passed so we need to check for those and not process them
+            # Check the URL
+            match = re.search(
+                r"(^|\.)" + re.escape(argsInputHostname) + "$",
+                domainOnly,
+                flags=re.IGNORECASE,
+            )
+            if match is not None:
+                if args.mode in ("U", "B"):
+                    linksFoundAdd(url, linksFoundGhostArchive)
+                # If Response mode is requested then add the DOM ID to try later, for the number of responses wanted
+                if ghostArchiveID != "" and args.mode in ("R", "B"):
+                    if args.limit == 0 or len(ghostArchiveRequestLinks) < args.limit:
+                        with links_lock:
+                            ghostArchiveRequestLinks.add(
+                                (url, GHOSTARCHIVE_DOM_URL + ghostArchiveID)
+                            )
+
+    except Exception as e:
+        writerr(colored("ERROR processGhostArchiveUrl 1: " + str(e), "red"))
+
+
+def getGhostArchiveUrls():
+    """
+    Get URLs from GhostArchive (ghostarchive.org)
+    This source doesn't have an API, so we crawl the HTML pages directly.
+    """
+    global linksFound, path, subs, stopProgram, stopSourceGhostArchive, argsInput, checkGhostArchive, argsInputHostname, linkCountGhostArchive, linksFoundGhostArchive
+
+    try:
+        stopSourceGhostArchive = False
+        linksFoundGhostArchive = set()
+
+        # Build the base URL
+        # If there is only one . in the hostname, we can guarantee that a subdoman wasn't passed, so we can prefix with . to the links quicker as it won't include other domains that end with the target domain,
+        # Else, we need to get all and then confirm the actual host of the links later
+        if argsInputHostname.count(".") == 1:
+            baseUrl = GHOSTARCHIVE_URL.replace("{DOMAIN}", "." + quote(argsInput))
+        else:
+            baseUrl = GHOSTARCHIVE_URL.replace("{DOMAIN}", quote(argsInput))
+
+        if verbose():
+            write(
+                colored("GhostArchive - [ INFO ] The URL requested to get links: ", "magenta")
+                + colored(baseUrl + "0\n", "white")
+            )
+
+        if not args.check_only and args.mode == "U":
+            write(
+                colored(
+                    "GhostArchive - [ INFO ] Getting links from ghostarchive.org (this can take a while for some domains)...",
+                    "cyan",
+                )
+            )
+
+        # Set up session with cookie
+        session = requests.Session()
+        if HTTP_ADAPTER is not None:
+            session.mount("https://", HTTP_ADAPTER)
+            session.mount("http://", HTTP_ADAPTER)
+
+        userAgent = random.choice(USER_AGENT)
+        headers = {"User-Agent": userAgent}
+        cookies = {"theme": "original"}
+
+        pageNum = 0
+
+        while stopProgram is None and not stopSourceGhostArchive:
+            getMemory()
+
+            url = baseUrl + str(pageNum)
+
+            try:
+                resp = session.get(url, headers=headers, cookies=cookies, timeout=DEFAULT_TIMEOUT)
+            except Exception as e:
+                writerr(
+                    colored(
+                        "GhostArchive - [ ERR ] Unable to get page " + str(pageNum) + ": " + str(e),
+                        "red",
+                    )
+                )
+                break
+
+            if resp.status_code == 429:
+                writerr(
+                    colored(
+                        "GhostArchive - [ 429 ] Rate limit reached at page " + str(pageNum) + ".",
+                        "red",
+                    )
+                )
+                break
+
+            # Check for maintenance/end of results indicator
+            if (
+                resp.status_code == 503
+                or "The site is under maintenance and will be back soon" in resp.text
+                or "No archives for that site" in resp.text
+            ):
+                if verbose():
+                    if pageNum == 0:
+                        if args.check_only:
+                            checkGhostArchive = 1
+                            write(
+                                colored(
+                                    "GhostArchive - [ INFO ] Get URLs from GhostArchive: ", "cyan"
+                                )
+                                + colored("1 request", "white")
+                            )
+                        else:
+                            write(
+                                colored(
+                                    "GhostArchive - [ INFO ] No results found",
+                                    "cyan",
+                                )
+                            )
+                    else:
+                        write(
+                            colored(
+                                "GhostArchive - [ INFO ] Retrieved all results from "
+                                + str(pageNum)
+                                + " pages",
+                                "cyan",
+                            )
+                        )
+                break
+            if resp.status_code != 200:
+                writerr(
+                    colored(
+                        "GhostArchive - [ ERR ] [ "
+                        + str(resp.status_code)
+                        + " ] at page "
+                        + str(pageNum),
+                        "red",
+                    )
+                )
+                break
+
+            # Check only mode - just count pages
+            if args.check_only:
+                # For check only, we check if there are results and try to get total count
+                if pageNum == 0:
+                    # Check if there are any results on the first page
+                    if '<a href="/archive/' in resp.text:
+                        # Try to find "out of X" to determine total results/pages
+                        outOfMatch = re.search(r"out of (\d+)", resp.text)
+                        if outOfMatch:
+                            totalResults = int(outOfMatch.group(1))
+                            checkGhostArchive = totalResults
+                            write(
+                                colored(
+                                    "GhostArchive - [ INFO ] Get URLs from GhostArchive: ", "cyan"
+                                )
+                                + colored(f"{totalResults} requests (pagination required)", "white")
+                            )
+                        else:
+                            checkGhostArchive = 1
+                            write(
+                                colored(
+                                    "GhostArchive - [ INFO ] Get URLs from GhostArchive: ", "cyan"
+                                )
+                                + colored("unknown requests (pagination required)", "white")
+                            )
+                    else:
+                        checkGhostArchive = 1
+                        write(
+                            colored("GhostArchive - [ INFO ] Get URLs from GhostArchive: ", "cyan")
+                            + colored("1 request (no results)", "white")
+                        )
+                break
+
+            # Use regex to extract URLs from anchor tag text content
+            # Pattern matches: <a href="/archive/ID">URL_HERE</a> - captures both href path and URL
+            pattern = r'<a href="(/archive/[^"]*)">([^<]+)</a>'
+            matches = re.findall(pattern, resp.text)
+
+            # If no matches found, we've reached the end of results
+            if not matches:
+                if verbose():
+                    write(
+                        colored(
+                            "GhostArchive - [ INFO ] Retrieved all results from "
+                            + str(pageNum + 1)
+                            + " pages",
+                            "cyan",
+                        )
+                    )
+                break
+
+            for match in matches:
+                ghostArchiveId = match[0]  # e.g., "/archive/gkOOR"
+                potentialUrl = match[1].strip()
+                processGhostArchiveUrl(potentialUrl, ghostArchiveId)
+
+            # Check if there's a "Next Page" link - if not, we've reached the last page
+            # GhostArchive resets to Page 1 when exceeding actual pages, so checking for Next Page is essential
+            if "Next Page" not in resp.text and ">»</a>" not in resp.text:
+                if verbose():
+                    write(
+                        colored(
+                            "GhostArchive - [ INFO ] Retrieved all results from "
+                            + str(pageNum + 1)
+                            + " pages",
+                            "cyan",
+                        )
+                    )
+                break
+
+            pageNum += 1
+
+        if not args.check_only:
+            # Count links based on mode - in R mode, count response links; in U/B mode, count URL links
+            if args.mode == "R":
+                linkCountGhostArchive = len(ghostArchiveRequestLinks)
+            else:
+                linkCountGhostArchive = len(linksFoundGhostArchive)
+            write(
+                colored("GhostArchive - [ INFO ] Links found on ghostarchive.org: ", "cyan")
+                + colored(str(linkCountGhostArchive), "white")
+            )
+            linksFound.update(linksFoundGhostArchive)
+            linksFoundGhostArchive.clear()
+
+    except Exception as e:
+        writerr(colored("ERROR getGhostArchiveUrls 1: " + str(e), "red"))
+
+
 def processResponses():
     """
     Get archived responses from al sources
     """
     global stopProgram, totalFileCount
     try:
+
+        # Get responses from GhostArchive unless excluded
+        if stopProgram is None and not args.xga:
+            processResponsesGhostArchive()
 
         # Get responses from URLScan unless excluded
         if stopProgram is None and not args.xus:
@@ -5482,6 +6312,235 @@ def processResponses():
 
     except Exception as e:
         writerr(colored(getSPACER("ERROR processResponses 1: " + str(e)), "red"))
+
+
+def processResponsesGhostArchive():
+    """
+    Get archived responses from GhostArchive (ghostarchive.org)
+    """
+    global subs, path, indexFile, totalResponses, stopProgram, argsInput, successCount, fileCount, DEFAULT_OUTPUT_DIR, responseOutputDirectory, ghostArchiveRequestLinks, failureCount, totalFileCount, checkGhostArchive
+    try:
+        fileCount = 0
+        failureCount = 0
+        if not args.check_only:
+            # Create 'results' and domain directory if needed
+            createDirs()
+
+            # Get the path of the files, depending on whether -oR / --output_responses was passed
+            try:
+                responsesPath = responseOutputDirectory + "responses.GhostArchive.tmp"
+                indexPath = responseOutputDirectory + "waymore_index.txt"
+            except Exception as e:
+                if verbose():
+                    writerr(colored("ERROR processResponsesGhostArchive 4: " + str(e), "red"))
+
+        # Get URLs from GhostArchive if the DOM ID's haven't been retrieved yet
+        if stopProgram is None and not args.check_only:
+            if args.mode in ("R", "B"):
+                write(
+                    colored(
+                        "GhostArchive - [ INFO ] Getting list of response links (this can take a while for some domains)...",
+                        "cyan",
+                    )
+                )
+            if args.mode == "R":
+                getGhostArchiveUrls()
+
+        # Check if a responses.GhostArchive.tmp files exists
+        if not args.check_only and os.path.exists(responsesPath):
+
+            # Load the links into the set
+            with open(responsesPath, "rb") as fl:
+                linkRequests = pickle.load(fl)
+
+        # Set start point
+        successCount = 0
+
+        # Get the URLScan DOM links
+        linkRequests = []
+        for originalUrl, domUrl in ghostArchiveRequestLinks:
+            linkRequests.append((originalUrl, domUrl))
+
+        # Write the links to a temp file
+        if not args.check_only:
+            with open(responsesPath, "wb") as f:
+                pickle.dump(linkRequests, f)
+
+        # Get the total number of responses we will try to get and set the current file count to the success count
+        totalResponses = len(linkRequests)
+        checkGhostArchive = checkGhostArchive + totalResponses
+
+        # If there are no reponses to download, diaplay an error and exit
+        if args.mode != "R" and totalResponses == 0:
+            writerr(
+                colored(
+                    getSPACER(
+                        "Failed to get responses from GhostArchive (ghostarchive.org) - check input and try again."
+                    ),
+                    "red",
+                )
+            )
+            return
+
+        fileCount = successCount
+
+        if args.check_only:
+            writerr(
+                colored("Downloading archived responses: ", "cyan")
+                + colored("UNKNOWN requests", "cyan")
+            )
+            writerr(
+                colored(
+                    "\n-> Downloading the responses can vary depending on the target and the rate limiting on GhostArchive",
+                    "green",
+                )
+            )
+            write("")
+        else:
+            # If the limit has been set over the default, give a warning that this could take a long time!
+            if totalResponses - successCount > DEFAULT_LIMIT:
+                if successCount > 0:
+                    writerr(
+                        colored(
+                            getSPACER(
+                                "WARNING: Downloading remaining "
+                                + str(totalResponses - successCount)
+                                + " responses may take a loooooooong time! Consider using arguments -ko, -l, -ci, -from and -to wisely!"
+                            ),
+                            "yellow",
+                        )
+                    )
+                else:
+                    writerr(
+                        colored(
+                            getSPACER(
+                                "WARNING: Downloading "
+                                + str(totalResponses)
+                                + " responses may take a loooooooong time! Consider using arguments -ko, -l, -ci, -from and -to wisely!"
+                            ),
+                            "yellow",
+                        )
+                    )
+
+            # Open the index file if hash value is going to be used (not URL)
+            if not args.url_filename:
+                indexFile = open(indexPath, "a")
+
+            # Process the URLs from GhostArchive
+            if stopProgram is None:
+                p = mp.Pool(
+                    args.processes * 2
+                )  # Double the number of processes to speed up the download
+                p.starmap(getGhostArchiveWARC, linkRequests[successCount:])
+                p.close()
+                p.join()
+
+            # Delete the tmp files now it has run successfully
+            if stopProgram is None:
+                try:
+                    os.remove(responsesPath)
+                except Exception:
+                    pass
+
+            # Close the index file if hash value is going to be used (not URL)
+            if not args.url_filename:
+                indexFile.close()
+
+        if not args.check_only:
+            try:
+                if failureCount > 0:
+                    if verbose():
+                        write(
+                            colored("GhostArchive - [ INFO ] Responses saved to ", "cyan")
+                            + colored(responseOutputDirectory, "white")
+                            + colored(" for " + subs + argsInput + ": ", "cyan")
+                            + colored(
+                                str(fileCount) + " 🤘",
+                                "white",
+                            )
+                            + colored(" (" + str(failureCount) + " not found)\n", "red")
+                        )
+                    else:
+                        write(
+                            colored("GhostArchive - [ INFO ] Responses saved to ", "cyan")
+                            + colored(responseOutputDirectory, "white")
+                            + colored(" for " + subs + argsInput + ": ", "cyan")
+                            + colored(str(fileCount) + " 🤘", "white")
+                            + colored(" (" + str(failureCount) + " not found)\n", "red")
+                        )
+                else:
+                    if verbose():
+                        write(
+                            colored("GhostArchive - [ INFO ] Responses saved to ", "cyan")
+                            + colored(responseOutputDirectory, "white")
+                            + colored(" for " + subs + argsInput + ": ", "cyan")
+                            + colored(str(fileCount) + " 🤘\n", "white")
+                        )
+                    else:
+                        write(
+                            colored("GhostArchive - [ INFO ] Responses saved to ", "cyan")
+                            + colored(responseOutputDirectory, "white")
+                            + colored(" for " + subs + argsInput + ": ", "cyan")
+                            + colored(str(fileCount) + " 🤘\n", "white")
+                        )
+            except Exception as e:
+                if verbose():
+                    writerr(colored("ERROR processResponsesGhostArchive 5: " + str(e), "red"))
+
+            # Append extra links from WARC files to URL output file (for mode B)
+            try:
+                if args.mode == "B" and len(extraWarcLinks) > 0:
+                    # Determine URL output file path (same logic as processURLOutput)
+                    if args.output_urls == "":
+                        if args.output_responses != "":
+                            urlFilePath = args.output_responses + "/waymore.txt"
+                        else:
+                            urlFilePath = (
+                                str(DEFAULT_OUTPUT_DIR)
+                                + "/results/"
+                                + str(argsInput).replace("/", "-")
+                                + "/waymore.txt"
+                            )
+                    else:
+                        urlFilePath = args.output_urls
+
+                    # Load existing URLs from file to avoid duplicates
+                    existingUrls = set()
+                    try:
+                        with open(urlFilePath) as f:
+                            for line in f:
+                                existingUrls.add(line.strip())
+                    except Exception:
+                        pass
+
+                    # Append only new unique URLs
+                    newLinks = [
+                        url
+                        for url in extraWarcLinks
+                        if url not in existingUrls and url not in linksFound
+                    ]
+                    if len(newLinks) > 0:
+                        with open(urlFilePath, "a") as f:
+                            for url in newLinks:
+                                f.write(url + "\n")
+
+                        # Display message about extra links
+                        write(
+                            colored("GhostArchive - [ INFO ] ", "cyan")
+                            + colored(str(len(newLinks)), "white")
+                            + colored(" extra links found in WARC files added to file ", "cyan")
+                            + colored(urlFilePath, "white")
+                            + "\n"
+                        )
+            except Exception as e:
+                if verbose():
+                    writerr(colored("ERROR processResponsesGhostArchive 6: " + str(e), "red"))
+
+        totalFileCount = totalFileCount + fileCount
+    except Exception as e:
+        writerr(colored(getSPACER("ERROR processResponsesGhostArchive 1: " + str(e)), "red"))
+    finally:
+        linkRequests = None
 
 
 def processResponsesURLScan():
@@ -6699,6 +7758,12 @@ async def fetch_intelx_async():
     await loop.run_in_executor(None, getIntelxUrls)
 
 
+async def fetch_ghostarchive_async():
+    """Async wrapper for getGhostArchiveUrls - runs in thread pool"""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, getGhostArchiveUrls)
+
+
 async def fetch_all_sources_async():
     """
     Orchestrator function to fetch from all enabled sources concurrently.
@@ -6721,6 +7786,8 @@ async def fetch_all_sources_async():
         tasks.append(("VirusTotal", fetch_virustotal_async()))
     if not args.xix and INTELX_API_KEY != "" and stopProgram is None:
         tasks.append(("Intelligence X", fetch_intelx_async()))
+    if not args.xga and stopProgram is None:
+        tasks.append(("GhostArchive", fetch_ghostarchive_async()))
 
     if not tasks:
         return
@@ -6746,7 +7813,7 @@ async def fetch_all_sources_async():
 
 # Run waymore
 def main():
-    global args, DEFAULT_TIMEOUT, inputValues, argsInput, linksFound, linkMimes, successCount, failureCount, fileCount, totalResponses, totalPages, indexFile, path, stopSource, stopProgram, VIRUSTOTAL_API_KEY, inputIsSubDomain, argsInputHostname, WEBHOOK_DISCORD, responseOutputDirectory, fileCount, INTELX_API_KEY, stopSourceAlienVault, stopSourceCommonCrawl, stopSourceWayback, stopSourceURLScan, stopSourceVirusTotal, stopSourceIntelx
+    global args, DEFAULT_TIMEOUT, inputValues, argsInput, linksFound, linkMimes, successCount, failureCount, fileCount, totalResponses, totalPages, indexFile, path, stopSource, stopProgram, VIRUSTOTAL_API_KEY, inputIsSubDomain, argsInputHostname, WEBHOOK_DISCORD, responseOutputDirectory, fileCount, INTELX_API_KEY, stopSourceAlienVault, stopSourceCommonCrawl, stopSourceWayback, stopSourceURLScan, stopSourceVirusTotal, stopSourceIntelx, stopSourceGhostArchive, extraWarcLinks
 
     # Tell Python to run the handler() function when SIGINT is received
     signal(SIGINT, handler)
@@ -6903,12 +7970,18 @@ def main():
         default=False,
     )
     parser.add_argument(
+        "-xga",
+        action="store_true",
+        help="Exclude checks for links from ghostarchive.org",
+        default=False,
+    )
+    parser.add_argument(
         "--providers",
         action="store",
-        help="A comma separated list of source providers that you want to get URLs from. The values can be wayback,commoncrawl,otx,urlscan,virustotal and intelx. Passing this will override any exclude arguments (e.g. -xwm,-xcc, etc.) passed to exclude sources, and reset those based on what was passed with this argument.",
+        help="A comma separated list of source providers that you want to get URLs from. The values can be wayback,commoncrawl,otx,urlscan,virustotal,intelx and ghostarchive. Passing this will override any exclude arguments (e.g. -xwm,-xcc, etc.) passed to exclude sources, and reset those based on what was passed with this argument.",
         default=[],
         type=validateArgProviders,
-        metavar="{wayback,commoncrawl,otx,urlscan,virustotal,intelx}",
+        metavar="{wayback,commoncrawl,otx,urlscan,virustotal,intelx,ghostarchive}",
     )
     parser.add_argument(
         "-lcc",
@@ -7075,6 +8148,10 @@ def main():
             args.xix = True
         else:
             args.xix = False
+        if "ghostarchive" not in args.providers:
+            args.xga = True
+        else:
+            args.xga = False
 
     # If no input was given, raise an error
     if sys.stdin.isatty():
@@ -7145,6 +8222,7 @@ def main():
             # Reset global variables
             linksFound = set()
             linkMimes = set()
+            extraWarcLinks = set()
             successCount = 0
             failureCount = 0
             fileCount = 0
@@ -7159,6 +8237,7 @@ def main():
             stopSourceURLScan = False
             stopSourceVirusTotal = False
             stopSourceIntelx = False
+            stopSourceGhostArchive = False
 
             # Get the config settings from the config.yml file
             getConfig()

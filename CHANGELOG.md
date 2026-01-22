@@ -1,5 +1,18 @@
 ## Changelog
 
+- v8.0
+
+  - New
+
+    - **GhostArchive Source**: Added [GhostArchive](https://ghostarchive.org/) as a new URL source for `-mode U` AND `-mode R`. This source doesn't have an API, so waymore crawls the HTML pages directly to extract archived URLs. The source paginates automatically until no more results are found. For `-mode R` it will download the WARC files and extract the HTTP Responses and extra URLs from them.
+    - Added `-xga` argument to exclude checks for links from ghostarchive.org.
+    - Updated `--providers` argument to accept `ghostarchive` as a valid provider value.
+    - Added `.avif` to `FILTER_URL` and `image/avif` to `FILTER_MIME` in `config.yml` and default values in `DEFAULT_FILTER_URL` and `DEFAULT_FILTER_MIME`.
+
+  - Changed
+
+    - Remove `application/pdf` from `FILTER_MIME` in `config.yml` and default values in `DEFAULT_FILTER_MIME`. These files can contain valuable information and should not be filtered out.
+
 - v7.7
 
   - New
