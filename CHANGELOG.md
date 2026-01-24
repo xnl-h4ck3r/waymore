@@ -1,5 +1,11 @@
 ## Changelog
 
+- v8.1
+
+  - New
+
+    - **Auto-create config.yml**: If the `config.yml` file is not found in the default location when `waymore` runs, it will now be automatically created with default values. This fixes issues where the config file was not created during installation for some users.
+
 - v8.0
 
   - New

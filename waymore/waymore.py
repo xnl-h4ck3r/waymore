@@ -1334,6 +1334,46 @@ def getConfig():
                     configPath = Path(waymorePath / "config.yml")
             else:
                 configPath = Path(args.config)
+
+            # If the config file doesn't exist, create the default one
+            if not os.path.isfile(configPath):
+                try:
+                    # Make sure the directory exists
+                    os.makedirs(os.path.dirname(configPath), exist_ok=True)
+                    # Create the default config content using the DEFAULT_* constants
+                    defaultConfig = f"""FILTER_CODE: {DEFAULT_FILTER_CODE}
+FILTER_MIME: {DEFAULT_FILTER_MIME}
+FILTER_URL: {DEFAULT_FILTER_URL}
+FILTER_KEYWORDS: {DEFAULT_FILTER_KEYWORDS}
+URLSCAN_API_KEY:
+VIRUSTOTAL_API_KEY:
+CONTINUE_RESPONSES_IF_PIPED: True
+WEBHOOK_DISCORD: YOUR_WEBHOOK
+TELEGRAM_BOT_TOKEN: YOUR_TOKEN
+TELEGRAM_CHAT_ID: YOUR_CHAT_ID
+DEFAULT_OUTPUT_DIR:
+INTELX_API_KEY:
+SOURCE_IP:
+"""
+                    with open(configPath, "w", encoding="utf-8") as f:
+                        f.write(defaultConfig)
+                    writerr(
+                        colored(
+                            'Config file not found - created default config at "'
+                            + str(configPath)
+                            + '"',
+                            "yellow",
+                        )
+                    )
+                except Exception as e:
+                    writerr(
+                        colored(
+                            "Config file not found, but failed to create default config file: "
+                            + str(e),
+                            "red",
+                        )
+                    )
+
             config = yaml.safe_load(open(configPath))
             try:
                 FILTER_URL = config.get("FILTER_URL")
