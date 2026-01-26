@@ -1,5 +1,12 @@
 ## Changelog
 
+- v8.3
+
+  - Changed
+
+    - **Dual-Method Config Creation**: Restored the setup-time configuration creation logic in `setup.py` while maintaining the robust runtime fallback in `waymore.py`. This ensures better visibility and immediate setup for traditional installations while keeping `pipx` and wheel installations fully supported.
+    - Minor cleanup and line-spacing improvements.
+
 - v8.2
 
   - Changed
