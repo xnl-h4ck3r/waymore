@@ -1,5 +1,14 @@
 ## Changelog
 
+- v8.2
+
+  - Changed
+
+    - **Reliable Config Creation**: Improved the configuration file creation logic to ensure it works across all installation methods (e.g., `pipx`). The config file is now created robustly at runtime if it doesn't already exist.
+    - Improved platform-specific path detection for Windows, Linux, and macOS.
+    - Fixed a bug where providing a relative path via `-c` would fail to create the default config if the directory was not already present.
+    - Removed redundant and fragile install-time config copying logic from `setup.py`.
+
 - v8.1
 
   - New

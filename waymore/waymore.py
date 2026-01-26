@@ -1306,32 +1306,15 @@ def getConfig():
         useDefaults = False
         try:
             # Get the path of the config file. If -c / --config argument is not passed, then it defaults to config.yml in the same directory as the run file
-            waymorePath = (
-                Path(os.path.join(os.getenv("APPDATA", ""), "waymore"))
-                if os.name == "nt"
-                else (
-                    Path(os.path.join(os.path.expanduser("~"), ".config", "waymore"))
-                    if os.name == "posix"
-                    else (
-                        Path(
-                            os.path.join(
-                                os.path.expanduser("~"),
-                                "Library",
-                                "Application Support",
-                                "waymore",
-                            )
-                        )
-                        if os.name == "darwin"
-                        else None
-                    )
-                )
-            )
-            waymorePath.absolute
+            if os.name == "nt":
+                waymorePath = Path(os.path.join(os.getenv("APPDATA", ""), "waymore"))
+            elif sys.platform == "darwin":
+                waymorePath = Path(os.path.expanduser("~/Library/Application Support/waymore"))
+            else:
+                waymorePath = Path(os.path.expanduser("~/.config/waymore"))
+
             if args.config is None:
-                if waymorePath == "":
-                    configPath = "config.yml"
-                else:
-                    configPath = Path(waymorePath / "config.yml")
+                configPath = waymorePath / "config.yml"
             else:
                 configPath = Path(args.config)
 
@@ -1339,7 +1322,8 @@ def getConfig():
             if not os.path.isfile(configPath):
                 try:
                     # Make sure the directory exists
-                    os.makedirs(os.path.dirname(configPath), exist_ok=True)
+                    if configPath.parent != Path("."):
+                        os.makedirs(configPath.parent, exist_ok=True)
                     # Create the default config content using the DEFAULT_* constants
                     defaultConfig = f"""FILTER_CODE: {DEFAULT_FILTER_CODE}
 FILTER_MIME: {DEFAULT_FILTER_MIME}
