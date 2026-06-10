@@ -1,8 +1,5 @@
 PyYAML
 requests
-setuptools
 termcolor
 psutil
-urlparse3
 tldextract
-aiohttp

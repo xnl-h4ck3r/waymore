@@ -57,7 +57,6 @@ setup(
         "pyyaml",
         "termcolor",
         "psutil",
-        "urlparse3",
         "tldextract",
     ],
     entry_points={

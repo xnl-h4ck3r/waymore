@@ -1,5 +1,12 @@
 ## Changelog
 
+- v8.8
+
+  - Changed
+
+    - RELIABILITY FIX: Previously, many outbound HTTP requests were made without a timeout, e.g. getting the number of pages/links to search from sources, the URLScan / VirusTotal / Intelligence X API calls, the Common Crawl index collection lookup (including the streaming download of index data), and the Discord / Telegram completion notifications. If a source server was slow or unresponsive, a worker thread could block indefinitely and `waymore` would appear to hang with no way to recover other than killing it. All outbound requests now apply a default timeout of `DEFAULT_TIMEOUT` (30) seconds when one is not explicitly set. This is done via a new `TimeoutSession` wrapper around `requests.Session` that is used for every request. Calls that already specify their own timeout (including archived response downloads controlled by the `-t` / `--timeout` argument) are unaffected and continue to use that value.
+    - DEPENDENCY CLEANUP: Removed unused and incorrectly-scoped dependencies. `aiohttp` and `urlparse3` were listed in `requirements.txt` but are never imported anywhere in the code — URL parsing uses the standard library `urllib.parse`, and concurrency uses `asyncio` with thread pool executors rather than `aiohttp`. `setuptools` was listed as a runtime dependency but is only required at build time (it remains in the `[build-system]` requirements of `pyproject.toml`). The `install_requires` list in `setup.py` has also been reconciled with `requirements.txt` (removing `urlparse3`) so the two no longer disagree. This reduces the install footprint and dependency/CVE surface, with no change to functionality.
+
 - v8.7
 
   - New

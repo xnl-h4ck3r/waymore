@@ -172,7 +172,7 @@ def chooseIntelxBase(api_key: str) -> Optional[requests.Response]:
     """
     initIntelxTls()
     try:
-        session = requests.Session()
+        session = TimeoutSession()
         if HTTP_ADAPTER is not None:
             session.mount("https://", HTTP_ADAPTER)
             session.mount("http://", HTTP_ADAPTER)
@@ -254,6 +254,23 @@ DEFAULT_LIMIT = 5000
 
 # The default timeout for archived responses to be retrieved in seconds
 DEFAULT_TIMEOUT = 30
+
+
+class TimeoutSession(requests.Session):
+    """
+    A requests.Session that applies a default timeout of DEFAULT_TIMEOUT seconds
+    to every request when the caller has not explicitly specified one. This stops
+    requests from blocking indefinitely on slow or unresponsive archive endpoints
+    (many call sites historically omitted a timeout, which could hang the program).
+    Any explicit per-call timeout (e.g. the -t / --timeout value used for archived
+    response downloads) is always respected.
+    """
+
+    def request(self, *args, **kwargs):
+        if kwargs.get("timeout") is None:
+            kwargs["timeout"] = DEFAULT_TIMEOUT
+        return super().request(*args, **kwargs)
+
 
 # Exclusions used to exclude responses we will try to get from web.archive.org
 DEFAULT_FILTER_URL = ".css,.jpg,.jpeg,.png,.svg,.img,.gif,.mp4,.flv,.ogv,.webm,.webp,.mov,.mp3,.m4a,.m4p,.scss,.tif,.tiff,.ttf,.otf,.woff,.woff2,.bmp,.ico,.eot,.htc,.rtf,.swf,.image,/image,/img,/css,/wp-json,/wp-content,/wp-includes,/theme,/audio,/captcha,/font,node_modules,/jquery,/bootstrap,/_incapsula_resource,.wmv,.wma,.asx,.avif"
@@ -682,7 +699,7 @@ def showVersion():
     global HTTP_ADAPTER
     try:
         try:
-            session = requests.Session()
+            session = TimeoutSession()
             if HTTP_ADAPTER is not None:
                 session.mount("https://", HTTP_ADAPTER)
                 session.mount("http://", HTTP_ADAPTER)
@@ -1999,7 +2016,7 @@ def processArchiveUrl(url):
                     # Choose a random user agent string to use for any requests
                     userAgent = random.choice(USER_AGENT)
 
-                    session = requests.Session()
+                    session = TimeoutSession()
                     session.mount("https://", HTTP_ADAPTER)
                     session.mount("http://", HTTP_ADAPTER)
                     resp = session.get(
@@ -2897,7 +2914,7 @@ def processAlienVaultPage(url):
                 # Choose a random user agent string to use for any requests
                 userAgent = random.choice(USER_AGENT)
                 page = url.split("page=")[1]
-                session = requests.Session()
+                session = TimeoutSession()
                 session.mount("https://", HTTP_ADAPTER)
                 session.mount("http://", HTTP_ADAPTER)
                 resp = session.get(url, headers={"User-Agent": userAgent})
@@ -3123,7 +3140,7 @@ def getAlienVaultUrls():
                 )
             # Choose a random user agent string to use for any requests
             userAgent = random.choice(USER_AGENT)
-            session = requests.Session()
+            session = TimeoutSession()
             session.mount("https://", HTTP_ADAPTER)
             session.mount("http://", HTTP_ADAPTER)
             resp = session.get(url + "&showNumPages=True", headers={"User-Agent": userAgent})
@@ -3397,7 +3414,7 @@ def getURLScanDOM(originalUrl, domUrl):
                 try:
                     # Choose a random user agent string to use for any requests
                     userAgent = "waymore v" + __version__ + " by xnl-h4ck3r"
-                    session = requests.Session()
+                    session = TimeoutSession()
                     session.mount("https://", HTTP_ADAPTER)
                     session.mount("http://", HTTP_ADAPTER)
                     resp = session.get(
@@ -3671,7 +3688,7 @@ def getGhostArchiveWARC(originalUrl, domUrl):
 
                     # Choose a random user agent string to use for any requests
                     userAgent = random.choice(USER_AGENT)
-                    session = requests.Session()
+                    session = TimeoutSession()
                     session.mount("https://", HTTP_ADAPTER)
                     session.mount("http://", HTTP_ADAPTER)
 
@@ -4214,7 +4231,7 @@ def getURLScanUrls():
             # that there are a handful of those that ALWAYS return 429. Passing a specific one all the time seems to
             # be successful all the time
             userAgent = "waymore v" + __version__ + " by xnl-h4ck3r"
-            session = requests.Session()
+            session = TimeoutSession()
             session.mount("https://", HTTP_ADAPTER)
             session.mount("http://", HTTP_ADAPTER)
             # Pass the API-Key header too. This can change the max endpoints per page, depending on URLScan subscription
@@ -4287,7 +4304,7 @@ def getURLScanUrls():
                         )
                     # Set key to blank for further requests
                     URLSCAN_API_KEY = ""
-                    session_no_key = requests.Session()
+                    session_no_key = TimeoutSession()
                     session_no_key.mount("https://", HTTP_ADAPTER)
                     session_no_key.mount("http://", HTTP_ADAPTER)
                     resp = session_no_key.get(url, headers={"User-Agent": userAgent})
@@ -4445,7 +4462,7 @@ def getURLScanUrls():
                             # Get the next page from urlscan.io
                             try:
                                 # Choose a random user agent string to use for any requests
-                                session = requests.Session()
+                                session = TimeoutSession()
                                 session.mount("https://", HTTP_ADAPTER)
                                 session.mount("http://", HTTP_ADAPTER)
                                 # Pass the API-Key header too. This can change the max endpoints per page, depending on URLScan subscription
@@ -4587,7 +4604,7 @@ def processWayBackPage(url):
                 resp = None
                 userAgent = random.choice(USER_AGENT)
                 page = url.split("page=")[1]
-                session = requests.Session()
+                session = TimeoutSession()
                 session.mount("https://", HTTP_ADAPTER)
                 session.mount("http://", HTTP_ADAPTER)
                 # expose session so SIGINT handler can close it to interrupt blocking network I/O
@@ -4895,7 +4912,7 @@ def getWaybackUrls():
                 )
             # Choose a random user agent string to use for any requests
             userAgent = random.choice(USER_AGENT)
-            session = requests.Session()
+            session = TimeoutSession()
             session.mount("https://", HTTP_ADAPTER)
             session.mount("http://", HTTP_ADAPTER)
             resp = session.get(url + "&showNumPages=True", headers={"User-Agent": userAgent})
@@ -5138,7 +5155,7 @@ def processCommonCrawlCollection(cdxApiUrl):
             try:
                 # Choose a random user agent string to use for any requests
                 userAgent = random.choice(USER_AGENT)
-                session = requests.Session()
+                session = TimeoutSession()
                 session.mount("https://", HTTP_ADAPTER_CC)
                 session.mount("http://", HTTP_ADAPTER_CC)
                 try:
@@ -5328,7 +5345,7 @@ def getCommonCrawlIndexes():
             try:
                 # Choose a random user agent string to use for any requests
                 userAgent = random.choice(USER_AGENT)
-                session = requests.Session()
+                session = TimeoutSession()
                 session.mount("https://", HTTP_ADAPTER_CC)
                 session.mount("http://", HTTP_ADAPTER_CC)
                 indexes = session.get(CCRAWL_INDEX_URL, headers={"User-Agent": userAgent})
@@ -5678,7 +5695,7 @@ def getVirusTotalUrls():
         # Make request
         try:
             userAgent = random.choice(USER_AGENT)
-            session = requests.Session()
+            session = TimeoutSession()
             session.mount("https://", HTTP_ADAPTER)
             session.mount("http://", HTTP_ADAPTER)
             resp = session.get(url, headers={"User-Agent": userAgent})
@@ -5879,7 +5896,7 @@ def processIntelxType(target, credits):
         resp = None
         # Choose a random user agent string to use for any requests and reuse session
         userAgent = random.choice(USER_AGENT)
-        session = requests.Session()
+        session = TimeoutSession()
         session.mount("https://", HTTP_ADAPTER)
         session.mount("http://", HTTP_ADAPTER)
 
@@ -6256,7 +6273,7 @@ def getGhostArchiveUrls():
             )
 
         # Set up session with cookie
-        session = requests.Session()
+        session = TimeoutSession()
         if HTTP_ADAPTER is not None:
             session.mount("https://", HTTP_ADAPTER)
             session.mount("http://", HTTP_ADAPTER)
@@ -7118,7 +7135,7 @@ def processResponsesWayback():
                 # Choose a random user agent string to use for any requests
                 success = True
                 userAgent = random.choice(USER_AGENT)
-                session = requests.Session()
+                session = TimeoutSession()
                 session.mount("https://", HTTP_ADAPTER)
                 session.mount("http://", HTTP_ADAPTER)
                 try:
@@ -7623,7 +7640,7 @@ def notifyDiscord():
             "username": "waymore",
         }
         try:
-            session = requests.Session()
+            session = TimeoutSession()
             if HTTP_ADAPTER is not None:
                 session.mount("https://", HTTP_ADAPTER)
                 session.mount("http://", HTTP_ADAPTER)
@@ -7657,7 +7674,7 @@ def notifyTelegram():
             "text": "waymore has finished for `-i " + args.input + " -mode " + args.mode + "` ! 🤘",
         }
         try:
-            session = requests.Session()
+            session = TimeoutSession()
             if HTTP_ADAPTER is not None:
                 session.mount("https://", HTTP_ADAPTER)
                 session.mount("http://", HTTP_ADAPTER)
