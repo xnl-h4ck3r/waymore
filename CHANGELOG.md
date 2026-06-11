@@ -1,5 +1,11 @@
 ## Changelog
 
+- v8.9
+
+  - Changed
+
+    - BUG FIX: When downloading archived responses, the file extension is derived from the URL path. For some URLs (e.g. captured analytics/beacon requests with long query-string-like values after a `.` in the path) this produced an extremely long "extension" that was appended to the filename, causing `[Errno 36] File name too long` errors when writing files. The extension is now validated for length: if the determined extension is longer than 20 characters it is treated as invalid and set to `unknown`, preventing the "File name too long" failures. This check has been applied to both the Wayback/archive and URLScan response-saving code paths.
+
 - v8.8
 
   - Changed

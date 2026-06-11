@@ -2256,6 +2256,10 @@ def processArchiveUrl(url):
                                     elif extension == "" and isBinary:
                                         extension = "bin"
 
+                                # If the extension is longer than 20 characters then it's not a valid file type, so set to unknown (this also prevents "File name too long" errors)
+                                if len(extension) > 20:
+                                    extension = "unknown"
+
                                 fileName = fileName + "." + extension
 
                             # If -oR / --output-responses was passed then add the file to that directory,
@@ -3494,6 +3498,10 @@ def getURLScanDOM(originalUrl, domUrl):
                                     extension = "unknown"
                             elif extension == "" and isBinary:
                                 extension = "bin"
+
+                            # If the extension is longer than 20 characters then it's not a valid file type, so set to unknown (this also prevents "File name too long" errors)
+                            if len(extension) > 20:
+                                extension = "unknown"
 
                             fileName = fileName + "." + extension
 
